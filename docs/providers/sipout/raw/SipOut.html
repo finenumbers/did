@@ -1,0 +1,1586 @@
+<!DOCTYPE html>
+<!-- saved from url=(0034)https://lk.sipout.net/userapi_doc/ -->
+<html><div id="in-page-channel-node-id" data-channel-name="in_page_channel_q3JS0T"></div><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<title>Документация API - Личный кабинет Sipout</title>
+	<link rel="stylesheet" type="text/css" href="./SipOut_files/first_load.css">
+<link rel="stylesheet" type="text/css" href="./SipOut_files/bulma-tooltip.min.css">
+<link rel="stylesheet" type="text/css" href="./SipOut_files/bulma-calendar.min.css">
+<link rel="stylesheet" type="text/css" href="./SipOut_files/bulma.min.css">
+<link rel="stylesheet" type="text/css" href="./SipOut_files/all.min.css">
+<link rel="stylesheet" type="text/css" href="./SipOut_files/main.css">
+
+	<script type="text/javascript" src="./SipOut_files/jquery-1.12.4.min.js"></script>
+<script type="text/javascript" src="./SipOut_files/masked_input_v1.3.js"></script>
+<script type="text/javascript" src="./SipOut_files/bulma-calendar.min.js"></script>
+<script type="text/javascript" src="./SipOut_files/main.js"></script>
+<script type="text/javascript" src="./SipOut_files/sipout_lc.js"></script>
+
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="https://lk.sipout.net/_public/img/favicon.svg" sizes="any" type="image/svg+xml">
+
+	<script>
+var controller_url_path = "\/userapi_doc";
+
+</script>
+
+<meta content="extension" property="gosuslugi.plugin.extension.content"></head>
+<body>
+	<div id="menu_toggler" class="button has-text-grey-dark is-medium" onclick="$(&#39;#navi-bar&#39;).slideToggle(200); return false;"><div class="icon"><i class="fas fa-lg fa-bars"></i></div></div>
+	<div id="header_layout" class="section s_is-vertival_paddingless">
+		<div class="container"><div id="header">
+	<div class="level">
+		<div class="level-left">
+			<div class="level-item">
+				<img id="logo" src="./SipOut_files/sipout_logo_standard.png">
+			</div>
+			<div class="level-item">
+				<div class="is-size-5 is-hidden-tablet-only">Личный кабинет</div>
+			</div>
+		</div>
+		<div class="level-right" id="user_info_header">
+			<div class="level-item">
+				<div id="header_acc" data-acc="3007075">
+
+
+				<span class="has-text-weight-semibold">#3007075</span>
+		</div>
+
+			</div>
+
+			<div class="level-item">
+				<div class="control">
+	<a href="https://lk.sipout.net/favourites/" class="button has-icon">
+		<span class="icon is-medium has-text-grey-dark"><i class="fas fa-heart"></i></span>
+		<span class="has-text-weight-semibold fave_cnt">0</span>
+	</a>
+</div>
+
+			</div>
+			<div class="level-item">
+				<div class="control">
+	<a href="https://lk.sipout.net/cart/" class="button has-icon">
+		<span class="icon is-medium has-text-grey-dark"><i class="fas fa-shopping-cart"></i></span>
+		<span class="has-text-weight-semibold cart_cnt">0</span>
+	</a>
+</div>
+
+			</div>
+
+			<div class="level-item">
+					<div class="dropdown is-hoverable is-right">
+		<div class="dropdown-trigger">
+			<button class="button" aria-haspopup="true" aria-controls="dropdown-menu4">
+				<span><strong>9&nbsp;309.93&nbsp;₽</strong></span>
+				<span class="icon is-small">
+					<i class="fas fa-angle-down" aria-hidden="true"></i>
+				</span>
+			</button>
+		</div>
+		<div class="dropdown-menu" id="dropdown-menu4" role="menu">
+			<div class="dropdown-content">
+				<div class="dropdown-item">
+					<table class="table"><tbody><tr>
+	<td class="has-text-right nowrap_tablet">Першин Денис Владимирович</td>
+	<td class="px-0">
+		<span class="icon" style="color: #aaaaaa">
+			<i class="fas fa-user"></i>
+		</span>
+	</td>
+	<td class="has-text-right has-text-weight-semibold"><nobr>0.00&nbsp;₽</nobr></td>
+	
+</tr><tr>
+	<td class="has-text-right nowrap_tablet">ООО "ФРОНТИР НЕТВОРК"</td>
+	<td class="px-0">
+		<span class="icon" style="color: #44BB6E">
+			<i class="fas fa-building"></i>
+		</span>
+	</td>
+	<td class="has-text-right has-text-weight-semibold"><nobr>9&nbsp;301.73&nbsp;₽</nobr></td>
+	
+</tr><tr class="has-text-info">
+	<td class="has-text-right nowrap_tablet">Бонусный счёт</td>
+	<td class="px-0">
+		<span class="icon" style="color: ">
+			<i class="fas fa-coins"></i>
+		</span>
+	</td>
+	<td class="has-text-right has-text-weight-semibold"><nobr>8.20&nbsp;₽</nobr></td>
+	
+</tr></tbody></table>					<div class="content has-text-centered">
+						<a href="https://lk.sipout.net/payments/">
+							<button class="button has-text-weight-semibold">Пополнить</button>
+						</a>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+				</div>
+
+			<div class="level-item">
+				<div class="control">
+					<button class="button is-danger" onclick="logout();">Выйти</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+</div>
+	</div>
+	<div id="site" class="section s_is-vertival_paddingless">
+		<div class="container">
+			<div id="site_body" class="columns">
+				<div class="column is-narrow noselect">
+	<div id="navi-bar">
+
+		<div class="level user_info_navibar">
+			<div class="level-item has-text-weight-semibold">
+					<div id="header_acc" data-acc="3007075">
+
+
+				<span class="has-text-weight-semibold">#3007075</span>
+		</div>
+
+				</div>
+
+			<div class="level-item">
+					<div class="dropdown is-hoverable is-right">
+		<div class="dropdown-trigger">
+			<button class="button" aria-haspopup="true" aria-controls="dropdown-menu4">
+				<span><strong>9&nbsp;309.93&nbsp;₽</strong></span>
+				<span class="icon is-small">
+					<i class="fas fa-angle-down" aria-hidden="true"></i>
+				</span>
+			</button>
+		</div>
+		<div class="dropdown-menu" id="dropdown-menu4" role="menu">
+			<div class="dropdown-content">
+				<div class="dropdown-item">
+					<table class="table"><tbody><tr>
+	<td class="has-text-right nowrap_tablet">Першин Денис Владимирович</td>
+	<td class="px-0">
+		<span class="icon" style="color: #aaaaaa">
+			<i class="fas fa-user"></i>
+		</span>
+	</td>
+	<td class="has-text-right has-text-weight-semibold"><nobr>0.00&nbsp;₽</nobr></td>
+	
+</tr><tr>
+	<td class="has-text-right nowrap_tablet">ООО "ФРОНТИР НЕТВОРК"</td>
+	<td class="px-0">
+		<span class="icon" style="color: #44BB6E">
+			<i class="fas fa-building"></i>
+		</span>
+	</td>
+	<td class="has-text-right has-text-weight-semibold"><nobr>9&nbsp;301.73&nbsp;₽</nobr></td>
+	
+</tr><tr class="has-text-info">
+	<td class="has-text-right nowrap_tablet">Бонусный счёт</td>
+	<td class="px-0">
+		<span class="icon" style="color: ">
+			<i class="fas fa-coins"></i>
+		</span>
+	</td>
+	<td class="has-text-right has-text-weight-semibold"><nobr>8.20&nbsp;₽</nobr></td>
+	
+</tr></tbody></table>					<div class="content has-text-centered">
+						<a href="https://lk.sipout.net/payments/">
+							<button class="button has-text-weight-semibold">Пополнить</button>
+						</a>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+				</div>
+			<div class="level-item">
+				<div class="field is-grouped">
+					<div class="control">
+	<a href="https://lk.sipout.net/favourites/" class="button has-icon">
+		<span class="icon is-medium has-text-grey-dark"><i class="fas fa-heart"></i></span>
+		<span class="has-text-weight-semibold fave_cnt">0</span>
+	</a>
+</div>
+
+					<div class="control">
+	<a href="https://lk.sipout.net/cart/" class="button has-icon">
+		<span class="icon is-medium has-text-grey-dark"><i class="fas fa-shopping-cart"></i></span>
+		<span class="has-text-weight-semibold cart_cnt">0</span>
+	</a>
+</div>
+
+				</div>
+			</div>
+		</div>
+
+		<a href="https://lk.sipout.net/vpbx/user_info/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="fas fa-headset"></i></span><span class="is-hidden-tablet-only">Профиль АТС</span></p></a><a href="https://lk.sipout.net/vpbx/ivr/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="fas fa-sign-in-alt"></i></span><span class="is-hidden-tablet-only">Вход. маршруты / IVR</span></p></a><a href="https://lk.sipout.net/vpbx/white_list/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="far fa-list-alt"></i></span><span class="is-hidden-tablet-only">Белый список</span></p></a><a href="https://lk.sipout.net/vpbx/black_list/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="fas fa-list-alt"></i></span><span class="is-hidden-tablet-only">Чёрный список</span></p></a><a href="https://lk.sipout.net/current_calls/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="far fa-clock"></i></span><span class="is-hidden-tablet-only">Текущие звонки</span></p></a><a href="https://lk.sipout.net/callblast/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="fas fa-voicemail"></i></span><span class="is-hidden-tablet-only">Автообзвон</span></p></a><a href="https://lk.sipout.net/crm/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="fas fa-atom"></i></span><span class="is-hidden-tablet-only">Интеграции</span></p></a><a href="https://lk.sipout.net/internal_numbers/" class="is-primary"><p class="navi-item navi-underlined"><span class="icon is-medium"><i class="fas fa-fax"></i></span><span class="is-hidden-tablet-only">Внутренние номера</span></p></a><a href="https://lk.sipout.net/user/profile/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="far fa-user"></i></span><span class="is-hidden-tablet-only">Аккаунт</span></p></a><a href="https://lk.sipout.net/payments/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="fas fa-ruble-sign"></i></span><span class="is-hidden-tablet-only">Платежи</span></p></a><a href="https://lk.sipout.net/documents/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="fas fa-paste"></i></span><span class="is-hidden-tablet-only">Документы</span></p></a><a href="https://lk.sipout.net/messengers/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="fas fa-comment"></i></span><span class="is-hidden-tablet-only">Рассылки</span></p></a><a href="https://lk.sipout.net/calls/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="fas fa-money-check-alt"></i></span><span class="is-hidden-tablet-only">Стоимость звонков</span></p></a><a href="https://lk.sipout.net/call_stat/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="far fa-chart-bar"></i></span><span class="is-hidden-tablet-only">Статистика звонков</span></p></a><a href="https://lk.sipout.net/connected_numbers/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="fas fa-link"></i></span><span class="is-hidden-tablet-only">Мои номера</span></p></a><a href="https://lk.sipout.net/buy_number/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="fas fa-cart-plus"></i></span><span class="is-hidden-tablet-only">Подключить номер</span></p></a><a href="https://lk.sipout.net/c2c/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="fas fa-phone"></i></span><span class="is-hidden-tablet-only">Click2Call</span></p></a><a href="https://lk.sipout.net/referal/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="fas fa-user-friends"></i></span><span class="is-hidden-tablet-only">Партнерская программа</span></p></a><p class="navi-item navi-underlined navi-highlighted"><span class="icon is-medium"><i class="fas fa-code"></i></span><span class="is-hidden-tablet-only">Документация API</span></p><a href="https://lk.sipout.net/payable_services/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="fas fa-wallet"></i></span><span class="is-hidden-tablet-only">Доп. услуги</span><span class="icon has-text-danger" data-tooltip="Обратите внимание"><i class="fas fa-exclamation"></i></span></p></a><a href="https://lk.sipout.net/services/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="fas fa-server"></i></span><span class="is-hidden-tablet-only">Сервисы</span></p></a><a href="https://lk.sipout.net/support/" class="is-primary"><p class="navi-item"><span class="icon is-medium"><i class="fas fa-question"></i></span><span class="is-hidden-tablet-only">Поддержка</span></p></a>
+		<div class="level is-hidden-tablet-only">
+			<div class="level-item is-fullwidth is-size-5 social_links">
+                <a style="color: #4680C2 !important;" href="https://vk.me/sipoutnet" target="_blank" class="icon is-large has-text-grey"><i class="fab fa-lg fa-vk"></i></a>
+                <a style="color: #43d854 !important;" href="https://max.navy/lksipoutnet_maxbot" target="_blank" class="icon is-large has-text-grey"><span style="width:26px;height:26px;transform:scale(0.6046);transform-origin:top left;"><svg xmlns="http://www.w3.org/2000/svg" width="43" height="43" fill="none"><g filter="url(#a)"><g clip-path="url(#b)" data-figma-skip-parse="true"><foreignobject width="2764.31" height="2764.31" x="-1382.15" y="-1382.15" transform="matrix(-.0126698 .018634 -.017121 -.0117992 20.42 23.37)"><div style="background:conic-gradient(from 90deg,#06affb 0deg,#00b8ff 5.4deg,#001cf1 109.8deg,#8900ac 252deg,#06affb 360deg);height:100%;width:100%;opacity:1"></div></foreignobject></g><path d="M22.39 41.89c-3.93 0-5.75-.58-8.9-2.9-2.02 2.61-8.34 4.63-8.62 1.17 0-2.6-.58-4.8-1.22-7.2C2.87 30 2 26.72 2 21.94 2 10.56 11.28 2 22.28 2c11 0 19.63 8.98 19.63 20.06 0 11.07-8.9 19.83-19.52 19.83Zm.2-30.02c-5.22-.27-9.3 3.37-10.2 9.08-.74 4.72.58 10.48 1.7 10.77.54.13 1.9-.98 2.74-1.82 1.39.9 2.97 1.6 4.73 1.7a9.96 9.96 0 0 0 10.4-9.34 10 10 0 0 0-9.37-10.39Z" clip-rule="evenodd"></path></g><g filter="url(#c)"><ellipse cx="21.95" cy="22.09" fill="url(#d)" rx="19.05" ry="19.18"></ellipse></g><g filter="url(#e)"><ellipse cx="21.78" cy="21.4" fill="url(#f)" rx="17.91" ry="18.03"></ellipse></g><g filter="url(#g)"><ellipse cx="14" cy="14.1" fill="url(#h)" rx="14" ry="14.1" transform="matrix(-.998415 -.0562829 .0555313 -.998457 35.55 36.84)"></ellipse></g><g filter="url(#i)"><ellipse cx="1.14" cy="6.87" fill="#000" fill-opacity=".38" rx="1.14" ry="6.87" transform="matrix(.988028 -.154275 .152257 .988341 3.25 21.78)"></ellipse></g><g filter="url(#j)"><path stroke="#fff" stroke-opacity=".3" stroke-width=".36" d="M21.47 7.36a2.43 2.43 0 0 1 2.8 0c.6.43 1.4.56 2.11.33.98-.3 2.06.05 2.66.87.45.6 1.17.97 1.92.97 1.01.01 1.93.68 2.26 1.65.24.7.8 1.28 1.52 1.51a2.43 2.43 0 0 1 1.64 2.27c0 .74.37 1.46.97 1.9.82.62 1.17 1.7.87 2.67-.23.71-.1 1.5.33 2.12.6.83.6 1.96 0 2.8-.43.6-.56 1.4-.33 2.11.3.97-.05 2.06-.87 2.66-.6.45-.96 1.17-.97 1.91a2.43 2.43 0 0 1-1.64 2.27c-.71.24-1.28.8-1.52 1.51a2.43 2.43 0 0 1-2.26 1.65c-.75 0-1.47.37-1.92.97a2.43 2.43 0 0 1-2.66.87 2.43 2.43 0 0 0-2.12.33c-.83.6-1.96.6-2.8 0a2.43 2.43 0 0 0-2.11-.33c-.97.3-2.05-.05-2.66-.87a2.43 2.43 0 0 0-1.91-.97 2.43 2.43 0 0 1-2.27-1.65c-.23-.7-.8-1.27-1.51-1.51a2.43 2.43 0 0 1-1.65-2.27c0-.74-.37-1.46-.97-1.9a2.43 2.43 0 0 1-.86-2.67c.22-.71.1-1.5-.34-2.12a2.43 2.43 0 0 1 0-2.8c.43-.6.56-1.4.34-2.11-.3-.97.04-2.05.86-2.66.6-.45.97-1.17.97-1.91A2.43 2.43 0 0 1 11 12.69c.7-.23 1.28-.8 1.51-1.51a2.43 2.43 0 0 1 2.27-1.65c.74 0 1.46-.37 1.9-.97a2.43 2.43 0 0 1 2.67-.87c.71.23 1.5.1 2.12-.33Z"></path></g><defs><filter id="a" width="39.91" height="40" x="2" y="2" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feflood flood-opacity="0" result="BackgroundImageFix"></feflood><feblend in="SourceGraphic" in2="BackgroundImageFix" result="shape"></feblend><fecolormatrix in="SourceAlpha" result="hardAlpha" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"></fecolormatrix><feoffset></feoffset><fegaussianblur stdDeviation="2.25"></fegaussianblur><fecomposite in2="hardAlpha" k2="-1" k3="1" operator="arithmetic"></fecomposite><fecolormatrix values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.6 0"></fecolormatrix><feblend in2="shape" result="effect1_innerShadow_338_8816"></feblend></filter><filter id="c" width="40.49" height="40.74" x="1.71" y="1.72" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feflood flood-opacity="0" result="BackgroundImageFix"></feflood><feblend in="SourceGraphic" in2="BackgroundImageFix" result="shape"></feblend><fegaussianblur result="effect1_foregroundBlur_338_8816" stdDeviation=".6"></fegaussianblur></filter><filter id="e" width="40.61" height="40.85" x="1.48" y=".98" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feflood flood-opacity="0" result="BackgroundImageFix"></feflood><feblend in="SourceGraphic" in2="BackgroundImageFix" result="shape"></feblend><fegaussianblur result="effect1_foregroundBlur_338_8816" stdDeviation="1.2"></fegaussianblur></filter><filter id="g" width="31.59" height="31.78" x="6.56" y="6.08" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feflood flood-opacity="0" result="BackgroundImageFix"></feflood><feblend in="SourceGraphic" in2="BackgroundImageFix" result="shape"></feblend><fegaussianblur result="effect1_foregroundBlur_338_8816" stdDeviation=".9"></fegaussianblur></filter><filter id="i" width="10.26" height="20.76" x=".3" y="18.02" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feflood flood-opacity="0" result="BackgroundImageFix"></feflood><feblend in="SourceGraphic" in2="BackgroundImageFix" result="shape"></feblend><fegaussianblur result="effect1_foregroundBlur_338_8816" stdDeviation="1.79"></fegaussianblur></filter><filter id="j" width="37.4" height="37.4" x="4.17" y="4.35" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feflood flood-opacity="0" result="BackgroundImageFix"></feflood><feblend in="SourceGraphic" in2="BackgroundImageFix" result="shape"></feblend><fegaussianblur result="effect1_foregroundBlur_338_8816" stdDeviation="1.2"></fegaussianblur></filter><lineargradient id="d" x1="29.96" x2="37.74" y1="33.06" y2="48.3" gradientUnits="userSpaceOnUse"><stop stop-color="#fff" stop-opacity="0"></stop><stop offset="1" stop-color="#fff" stop-opacity=".37"></stop></lineargradient><lineargradient id="f" x1="11.72" x2="14.13" y1="6" y2="9.55" gradientUnits="userSpaceOnUse"><stop stop-color="#fff"></stop><stop offset="1" stop-color="#fff" stop-opacity="0"></stop></lineargradient><lineargradient id="h" x1="5.34" x2="8.27" y1="1.47" y2="5.69" gradientUnits="userSpaceOnUse"><stop stop-color="#fff" stop-opacity=".69"></stop><stop offset="1" stop-color="#fff" stop-opacity="0"></stop></lineargradient><clippath id="b"><path fill-rule="evenodd" d="M22.39 41.89c-3.93 0-5.75-.58-8.9-2.9-2.02 2.61-8.34 4.63-8.62 1.17 0-2.6-.58-4.8-1.22-7.2C2.87 30 2 26.72 2 21.94 2 10.56 11.28 2 22.28 2c11 0 19.63 8.98 19.63 20.06 0 11.07-8.9 19.83-19.52 19.83Zm.2-30.02c-5.22-.27-9.3 3.37-10.2 9.08-.74 4.72.58 10.48 1.7 10.77.54.13 1.9-.98 2.74-1.82 1.39.9 2.97 1.6 4.73 1.7a9.96 9.96 0 0 0 10.4-9.34 10 10 0 0 0-9.37-10.39Z" clip-rule="evenodd"></path></clippath></defs></svg></span></a>
+            	<a style="color: #0088cc !important;" href="https://telegram.dog/Sipout_bot" target="_blank" class="icon is-large has-text-grey"><i class="fab fa-lg fa-telegram-plane"></i></a>
+            </div>
+		</div>
+
+		<div class="is-hidden-mobile is-hidden-desktop social_links">
+			<a style="color: #4680C2 !important;" href="https://vk.me/sipoutnet" target="_blank" class="has-text-grey">
+				<p class="navi-item">
+					<span class="icon is-medium">
+						<i class="fab fa-lg fa-vk"></i>
+					</span>
+				</p>
+			</a>
+
+
+			<a style="color: #43d854 !important;" href="https://max.navy/lksipoutnet_maxbot" target="_blank">
+				<p class="navi-item">
+					<span class="icon is-medium">
+						<img src="./SipOut_files/max.png" width="21">
+					</span>
+				</p>
+			</a>
+
+			<a style="color: #0088cc !important;" href="https://telegram.dog/Sipout_bot" target="_blank" class="has-text-grey">
+				<p class="navi-item">
+					<span class="icon is-medium">
+						<i class="fab fa-lg fa-telegram-plane"></i>
+					</span>
+				</p>
+			</a>
+
+		</div>
+
+		<div class="level user_info_navibar">
+			<div class="level-left">
+				<div class="level-item">
+					<div class="button is-danger" onclick="logout();">Выйти</div>
+				</div>
+			</div>
+		</div>
+
+	</div>
+</div>
+
+
+				<div class="column">
+					<div id="content">
+						
+						<nav class="level">
+							<div class="level-left">
+								<div class="level-item">
+									<h1 class="title has-text-centered-mobile">Документация API</h1>
+								</div>
+							</div>
+						</nav>
+						<div class="content">Для всех пользователей SIPOUT доступны методы api для быстрого автоматического доступа к данным и редактирования настроек, без необходимости входа в личный кабинет. Список возможностей расширяется, а документация всегда будет доступна на этой странице.</div>
+<script>
+	function userapi_doc_new_key()
+		{
+		if (!confirm('Вы уверены, что хотите обновить api-ключ?'))
+			{
+			return;
+			}
+		$.post('/' + base_folder + '/ajax/?act=change_userapi_key', {}, function (ret)
+			{
+			if (ret.result == 'ok')
+				{
+				document.location.reload();
+				return;
+				}
+			else
+				{
+				let err = 'При обновлении ключа возникла ошибка';
+				if (ret.error_text != '')
+					{
+					err = ret.error_text;
+					}
+				alert(err);
+				}
+			});
+		}
+</script>
+
+<div class="box has-text-centered">
+	<div class="heading is-marginless">Ваш api-ключ</div>
+	<p class="is-size-4">
+		<span id="userapi_doc_key">aece1ec03d26954212f8a222e10717d5</span>
+		<br>
+		<button class="button has-icon" onclick="copy_to_clipboard($(&#39;#userapi_doc_key&#39;)[0]); $(this).blur();">
+			<span class="icon">
+				<i class="far fa-copy"></i>
+			</span>
+			<span>Скопировать</span>
+		</button>
+	</p>
+	<p class="content">
+		</p><div class="field has-text-centered">
+			<div class="notification">Если Ваш api-ключ был скомпрометирован, или Вы по какой-то другой причине хотите сменить его, в любое время может быть сгенерирован новый. Для это нажмите на кнопку ниже.<div class="help has-text-danger">Внимание! При генерировании нового ключа, старый перестаёт действовать. Убедитесь, что он больше нигде не используется.</div></div>
+			<div class="control has-text-centered">
+				<button class="button is-primary" onclick="userapi_doc_new_key();">Обновить ключ</button>
+			</div>
+		</div>
+	<p></p>
+</div>
+
+<h5 class="title is-5">Основные положения</h5>
+<div class="content box">
+	<p>В общем виде запрос происходит по следующему url:</p>
+	<div class="message is-dark">
+		<div class="message-body">
+			<span class="is-size-5">https://lk.sipout.net/userapi/?key=<b class="has-text-success">&lt;key&gt;</b>&amp;method=<b class="has-text-success">&lt;method&gt;</b>&amp;action=<b class="has-text-success">&lt;action&gt;</b><b class="has-text-grey-light">[&amp;params]</b></span>
+		</div>
+	</div>
+
+	<label class="label">Обязательные параметры</label>
+	<ul>
+		<li><b>key</b> - Ключ аутентификации</li>
+		<li><b>method</b> - Запрашиваемый метод</li>
+		<li><b>action</b> - Запрашиваемое действие</li>
+	</ul>
+<hr>
+	<label class="label">Дополнительные параметры</label>
+	<ul>
+		<li><b>&lt;params&gt;</b> - параметры запроса, дополнительные фильтры и другие данные, необходимые для конкретного запроса</li>
+	</ul>
+	<div class="help1">Обязательные параметры среди дополнительных отмечены знаком <span class="has-text-danger">*</span></div>
+<hr>
+	<label class="label">Формат запроса</label>
+	<p>Сервис работает в режиме <b>REST API</b>.<br>Параметры <b>POST-запросов</b> должны передаваться формате <b>Multipart/form-data</b></p>
+<hr>
+	<label class="label">Формат ответа</label>
+	<p>Ответ приходит в виде JSON-кодированного массива, состоящего из:</p>
+	<ul>
+		<li><b>result</b> - значения “ok” и “bad”. Статус выполнения запроса. Обязательное поле</li>
+		<li><b>err</b> - название ошибки для программистов. <br>Возвращается в случае ошибки, пример: <span class="is-italic">peer_not_found (Внутренний номер, указанный в запросе не найден)</span></li>
+		<li><b>err_text</b> - необязательный, дополняет “err”. Текст ошибки в человекочитаемом формате</li>
+		<li><b>data</b> - выходные данные запроса (если есть), у каждого в своем формате</li>
+	</ul>
+</div>
+
+
+<div class="userapi_doc_method_container">
+
+	<h3 class="title is-3 is-marginless1">Городские номера</h3>
+	<div class="message is-info">
+		<div class="message-body has-text-grey-dark">
+			<div class="block">
+				<p class="is-size-4">method=<strong>did</strong></p>
+				<p>Метод для работы с городскими номерами</p>
+			</div>
+		</div>
+	</div>
+
+					<div class="card block userapi_doc_action_container">
+				<div class="card-content">
+					<label class="label is-size-4">Список подключенных номеров</label>
+					<div class="block">
+						<p>action=<strong>connected_list</strong></p>
+						<p>Возвращает список подключенных городских номеров аккаунта</p>
+					</div>
+					<div class="heading is-marginless">URL-адрес запроса</div>
+					<div class="message is-dark">
+						<div class="message-body">
+							<button class="button is-small has-icon has-tooltip" data-tooltip="Скопировать в буфер" onclick="copy_to_clipboard($(this).parent().find(&#39;.userapi_doc_action_url&#39;)[0]);">
+								<span class="icon">
+									<i class="far fa-copy"></i>
+								</span>
+							</button>
+							<span class="userapi_doc_action_url">https://lk.sipout.net/userapi/?key=aece1ec03d26954212f8a222e10717d5&amp;method=did&amp;action=connected_list</span>
+						</div>
+					</div>
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">GET-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																	<tbody><tr><td class="is-italic">Нет доступных параметров</td></tr>
+																	</tbody></table>
+							</div>
+						</div>
+						<div class="column">
+							<label class="label">POST-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																	<tbody><tr><td class="is-italic">Нет доступных параметров</td></tr>
+																	</tbody></table>
+							</div>
+						</div>
+					</div>
+
+					<hr>
+
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">Параметры ответа</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">cnt</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Общее количество подключенных номеров.">Количество<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">list</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Массив подключенных номеров.">Список<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+						<div class="column"></div>
+					</div>
+												<label class="label">Пример ответа</label>
+							<pre style="white-space: pre-wrap;">{
+	"result": "ok",
+	"data": {
+		"cnt": "2",
+		"list": [
+			{
+				"did": "70123456789",
+				"user_comment": "Номер 1",
+				"order_id": "1",
+				"doc_status": "bad",
+				"order_doc_required": "1",
+				"doc_required": "1",
+				"status": "default",
+				"city_id": "13",
+				"has_sms": "0",
+				"sign": false
+			},
+			{
+				"did": "7123456790",
+				"user_comment": "Номер 2",
+				"order_id": "2",
+				"doc_status": "ok",
+				"order_doc_required": "1",
+				"doc_required": "1",
+				"status": "ok",
+				"city_id": "1073",
+				"has_sms": "1",
+				"sign": true
+			}
+		]
+	}
+}</pre>
+											</div>
+			</div>
+						<div class="card block userapi_doc_action_container">
+				<div class="card-content">
+					<label class="label is-size-4">Подключение номеров</label>
+					<div class="block">
+						<p>action=<strong>connect</strong></p>
+						<p>Подключает номера, переданные в теле запроса</p>
+					</div>
+					<div class="heading is-marginless">URL-адрес запроса</div>
+					<div class="message is-dark">
+						<div class="message-body">
+							<button class="button is-small has-icon has-tooltip" data-tooltip="Скопировать в буфер" onclick="copy_to_clipboard($(this).parent().find(&#39;.userapi_doc_action_url&#39;)[0]);">
+								<span class="icon">
+									<i class="far fa-copy"></i>
+								</span>
+							</button>
+							<span class="userapi_doc_action_url">https://lk.sipout.net/userapi/?key=aece1ec03d26954212f8a222e10717d5&amp;method=did&amp;action=connect</span>
+						</div>
+					</div>
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">GET-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																	<tbody><tr><td class="is-italic">Нет доступных параметров</td></tr>
+																	</tbody></table>
+							</div>
+						</div>
+						<div class="column">
+							<label class="label">POST-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">numbers<span class="has-text-danger">*</span></span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Строка. Список номеров в формате Е164 через запятую">Номера для подключения<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">contract_id<span class="has-text-danger">*</span></span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Паспорт конечного пользователя, ранее загруженный на странице документов">Идентификатор паспорта<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">org_inn</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="ИНН организации, на счёт которой подключается номер (пустой в случае с физ.лицом)">ИНН организации<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+					</div>
+
+					<hr>
+
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">Параметры ответа</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">spent_sum</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Сумма, фактически списанная при подключении номеров">Сумма<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">statuses</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="ok - успешно, иначе текст ошибки">Статусы подключения<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+						<div class="column"></div>
+					</div>
+												<label class="label">Пример ответа</label>
+							<pre style="white-space: pre-wrap;">{
+	"result": "ok",
+	"data": {
+		"spent_sum": "198.00",
+		"statuses": {
+			"73412208809": "ok",
+			"73412208810": "ok"
+		}
+	}
+}</pre>
+											</div>
+			</div>
+						<div class="card block userapi_doc_action_container">
+				<div class="card-content">
+					<label class="label is-size-4">Отключение номеров</label>
+					<div class="block">
+						<p>action=<strong>switch_off</strong></p>
+						<p>Отключает выбранные номера</p>
+					</div>
+					<div class="heading is-marginless">URL-адрес запроса</div>
+					<div class="message is-dark">
+						<div class="message-body">
+							<button class="button is-small has-icon has-tooltip" data-tooltip="Скопировать в буфер" onclick="copy_to_clipboard($(this).parent().find(&#39;.userapi_doc_action_url&#39;)[0]);">
+								<span class="icon">
+									<i class="far fa-copy"></i>
+								</span>
+							</button>
+							<span class="userapi_doc_action_url">https://lk.sipout.net/userapi/?key=aece1ec03d26954212f8a222e10717d5&amp;method=did&amp;action=switch_off</span>
+						</div>
+					</div>
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">GET-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																	<tbody><tr><td class="is-italic">Нет доступных параметров</td></tr>
+																	</tbody></table>
+							</div>
+						</div>
+						<div class="column">
+							<label class="label">POST-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">numbers<span class="has-text-danger">*</span></span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Строка. Список номеров в формате Е164 через запятую">Номера для отключения<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+					</div>
+
+					<hr>
+
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">Параметры ответа</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">statuses</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="ok - успешно, иначе текст ошибки">Статусы отключения<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+						<div class="column"></div>
+					</div>
+												<label class="label">Пример ответа</label>
+							<pre style="white-space: pre-wrap;">{
+	"result": "ok",
+	"data": {
+		"statuses": {
+			"73412208809": "ok",
+			"73412208810": "ok"
+		}
+	}
+}</pre>
+											</div>
+			</div>
+						<div class="card block userapi_doc_action_container">
+				<div class="card-content">
+					<label class="label is-size-4">Свободные номера</label>
+					<div class="block">
+						<p>action=<strong>free_list</strong></p>
+						<p>Получение списка номеров, доступных для подключения</p>
+					</div>
+					<div class="heading is-marginless">URL-адрес запроса</div>
+					<div class="message is-dark">
+						<div class="message-body">
+							<button class="button is-small has-icon has-tooltip" data-tooltip="Скопировать в буфер" onclick="copy_to_clipboard($(this).parent().find(&#39;.userapi_doc_action_url&#39;)[0]);">
+								<span class="icon">
+									<i class="far fa-copy"></i>
+								</span>
+							</button>
+							<span class="userapi_doc_action_url">https://lk.sipout.net/userapi/?key=aece1ec03d26954212f8a222e10717d5&amp;method=did&amp;action=free_list</span>
+						</div>
+					</div>
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">GET-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">city_id</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Список городов можно получить в методе did-&gt;get_cities">id города<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">mask</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Цифры и символ *">Маска номера<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+						<div class="column">
+							<label class="label">POST-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																	<tbody><tr><td class="is-italic">Нет доступных параметров</td></tr>
+																	</tbody></table>
+							</div>
+						</div>
+					</div>
+
+					<hr>
+
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">Параметры ответа</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">cnt</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Кол-во номеров в выдаче">Количество<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">list</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Список номеров, удовлетворяющих условиям запроса">Номера<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+						<div class="column"></div>
+					</div>
+												<label class="label">Пример ответа</label>
+							<pre style="white-space: pre-wrap;">{
+	"result": "ok",
+	"data": {
+		"cnt": "4",
+		"list": [
+			{
+				"did": "74953084480",
+				"price": "222",
+				"city_id": "41"
+			},
+			{
+				"did": "74953084481",
+				"price": "222",
+				"city_id": "41"
+			},
+			{
+				"did": "74953084483",
+				"price": "222",
+				"city_id": "41"
+			},
+			{
+				"did": "74953084484",
+				"price": "222",
+				"city_id": "41"
+			}
+		]
+	}
+}</pre>
+											</div>
+			</div>
+						<div class="card block userapi_doc_action_container">
+				<div class="card-content">
+					<label class="label is-size-4">Список городов</label>
+					<div class="block">
+						<p>action=<strong>get_cities</strong></p>
+						<p>Получение списка городов и регионов с идентификаторами sipout</p>
+					</div>
+					<div class="heading is-marginless">URL-адрес запроса</div>
+					<div class="message is-dark">
+						<div class="message-body">
+							<button class="button is-small has-icon has-tooltip" data-tooltip="Скопировать в буфер" onclick="copy_to_clipboard($(this).parent().find(&#39;.userapi_doc_action_url&#39;)[0]);">
+								<span class="icon">
+									<i class="far fa-copy"></i>
+								</span>
+							</button>
+							<span class="userapi_doc_action_url">https://lk.sipout.net/userapi/?key=aece1ec03d26954212f8a222e10717d5&amp;method=did&amp;action=get_cities</span>
+						</div>
+					</div>
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">GET-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																	<tbody><tr><td class="is-italic">Нет доступных параметров</td></tr>
+																	</tbody></table>
+							</div>
+						</div>
+						<div class="column">
+							<label class="label">POST-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																	<tbody><tr><td class="is-italic">Нет доступных параметров</td></tr>
+																	</tbody></table>
+							</div>
+						</div>
+					</div>
+
+					<hr>
+
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">Параметры ответа</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">cities</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Массив городов с данными">Города<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">regions</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Массив регионов с данными">Регионы<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+						<div class="column"></div>
+					</div>
+												<label class="label">Пример ответа</label>
+							<pre style="white-space: pre-wrap;">{
+	"result": "ok",
+	"data": {
+		"cities": [
+			{
+				"id": "7",
+				"name": "Ангарск",
+				"eng_name": "Angarsk",
+				"region_id": "38"
+			},
+			{
+				"id": "8",
+				"name": "Архангельск",
+				"eng_name": "arkhangelsk",
+				"region_id": "29"
+			}
+		],
+		"regions": [
+			{
+				"id": "59",
+				"name": "Пермский край",
+				"capital_city": "57",
+				"eng_name": "Permskiy_kray",
+				"gmt": "5"
+			},
+			{
+				"id": "1",
+				"name": "Республика Адыгея",
+				"capital_city": "0",
+				"eng_name": "Respublika_Adygeya",
+				"gmt": "3"
+			}
+		]
+	}
+}</pre>
+											</div>
+			</div>
+			
+		<h3 class="title is-3 is-marginless1">Внутренние номера</h3>
+	<div class="message is-info">
+		<div class="message-body has-text-grey-dark">
+			<div class="block">
+				<p class="is-size-4">method=<strong>peer</strong></p>
+				<p>Метод для работы с внутренними номерами аккаунта. Создание, удаление, редактирование, получение списка и т.д.</p>
+			</div>
+		</div>
+	</div>
+
+					<div class="card block userapi_doc_action_container">
+				<div class="card-content">
+					<label class="label is-size-4">Список внутренних номеров</label>
+					<div class="block">
+						<p>action=<strong>list</strong></p>
+						<p>Возвращает текущий список внутренних номеров с данными и настройками</p>
+					</div>
+					<div class="heading is-marginless">URL-адрес запроса</div>
+					<div class="message is-dark">
+						<div class="message-body">
+							<button class="button is-small has-icon has-tooltip" data-tooltip="Скопировать в буфер" onclick="copy_to_clipboard($(this).parent().find(&#39;.userapi_doc_action_url&#39;)[0]);">
+								<span class="icon">
+									<i class="far fa-copy"></i>
+								</span>
+							</button>
+							<span class="userapi_doc_action_url">https://lk.sipout.net/userapi/?key=aece1ec03d26954212f8a222e10717d5&amp;method=peer&amp;action=list</span>
+						</div>
+					</div>
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">GET-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																	<tbody><tr><td class="is-italic">Нет доступных параметров</td></tr>
+																	</tbody></table>
+							</div>
+						</div>
+						<div class="column">
+							<label class="label">POST-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																	<tbody><tr><td class="is-italic">Нет доступных параметров</td></tr>
+																	</tbody></table>
+							</div>
+						</div>
+					</div>
+
+					<hr>
+
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">Параметры ответа</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">cnt</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Количество созданных внутренних номеров">Количество<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">list</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Список внутренних номеров с параметрами и настройками">Список внутренних номеров<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+						<div class="column"></div>
+					</div>
+												<label class="label">Пример ответа</label>
+							<pre style="white-space: pre-wrap;">{
+	"result": "ok",
+	"data": {
+		"cnt": "2",
+		"list": [
+			{
+				"number": "1020",
+				"descr": "Татьяна (регионы)",
+				"sip_login": "685543302295",
+				"sip_password": "zJ48asd02qnn3S",
+				"aon": "73424150000",
+				"email": "i@sipout.net",
+				"pickup_groups": "",
+				"type": "default"
+			},
+			{
+				"number": "1050",
+				"descr": "Тех.поддержка",
+				"sip_login": "685596282444",
+				"sip_password": "Xr3K6t7hfmNq",
+				"aon": "74953084444",
+				"email": "support@sipout.net",
+				"pickup_groups": "0",
+				"type": "browser",
+				"ext_auth_str": "685596282444_1b9598b7f0d67b375d86d55597a94b64"
+			},
+			{
+				"number": "1070",
+				"descr": "Сим карта",
+				"aon": "73424150000",
+				"IMSI": "89701376010000194000",
+				"type": "sim",
+				"enabled": true
+			}
+		]
+	}
+}</pre>
+											</div>
+			</div>
+						<div class="card block userapi_doc_action_container">
+				<div class="card-content">
+					<label class="label is-size-4">Новый внутренний номер</label>
+					<div class="block">
+						<p>action=<strong>new</strong></p>
+						<p>Создаёт новый внутренний номер с указанными данными</p>
+					</div>
+					<div class="heading is-marginless">URL-адрес запроса</div>
+					<div class="message is-dark">
+						<div class="message-body">
+							<button class="button is-small has-icon has-tooltip" data-tooltip="Скопировать в буфер" onclick="copy_to_clipboard($(this).parent().find(&#39;.userapi_doc_action_url&#39;)[0]);">
+								<span class="icon">
+									<i class="far fa-copy"></i>
+								</span>
+							</button>
+							<span class="userapi_doc_action_url">https://lk.sipout.net/userapi/?key=aece1ec03d26954212f8a222e10717d5&amp;method=peer&amp;action=new</span>
+						</div>
+					</div>
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">GET-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																	<tbody><tr><td class="is-italic">Нет доступных параметров</td></tr>
+																	</tbody></table>
+							</div>
+						</div>
+						<div class="column">
+							<label class="label">POST-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">number<span class="has-text-danger">*</span></span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Внутренний номер сотрудника, на него можно позвонить. Так же используется в настройках АТС.">Внутренний номер<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">aon<span class="has-text-danger">*</span></span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Номер, который будет отображаться при звонке с внутреннего номера. Можно подставлять только из тех, что куплены на аккаунте. Список подключенных номеров можно узнать в методе did-&gt;connected_list.">Номер для АОНа<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">descr</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Например, имя сотрудника, либо телефон, с помощью которого происходит подключение к этому внутреннему номеру. Так же, отображается в Звонилке SIPOUT.">Название номера<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">type</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Для использования внутреннего номера в расширении браузера необходимо переключить его тип в соответствующее состояние. Зарегистрироваться с обычного телефона в этом случае не удастся.">Тип номера ( default / browser )<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">email</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Адрес электронной почты для отправки информации по внутреннему номеру.">Email для уведомлений<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">notify_by_email</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="1 - отправить письмо на указанный Email-адрес после создания внутреннего номера. По умолчанию 1">Уведомить о создании<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+					</div>
+
+					<hr>
+
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">Параметры ответа</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">sip_login</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Уникальный sip-логин, используется для аутентификации на конечном устройстве.">sip-логин<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">sip_password</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Пароль, который используется для регистрации внутреннего номера в АТС.">Пароль<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">ext_auth_str</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Появляется  в том случае, если тип внутреннего номера = browser">Строка регистрации для расширения браузера<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+						<div class="column"></div>
+					</div>
+												<label class="label">Пример ответа</label>
+							<pre style="white-space: pre-wrap;">{
+	"result": "ok",
+	"data": {
+		"sip_login": "685584446423",
+		"sip_password": "SwBDVgTMUFY2",
+		"ext_auth_str": "685593620822_fd8d1579d6f0236a613061992c81cf7e"
+	}
+}</pre>
+											</div>
+			</div>
+						<div class="card block userapi_doc_action_container">
+				<div class="card-content">
+					<label class="label is-size-4">Редактирование внутреннего номера</label>
+					<div class="block">
+						<p>action=<strong>edit</strong></p>
+						<p>Изменение настроек внутреннего номера</p>
+					</div>
+					<div class="heading is-marginless">URL-адрес запроса</div>
+					<div class="message is-dark">
+						<div class="message-body">
+							<button class="button is-small has-icon has-tooltip" data-tooltip="Скопировать в буфер" onclick="copy_to_clipboard($(this).parent().find(&#39;.userapi_doc_action_url&#39;)[0]);">
+								<span class="icon">
+									<i class="far fa-copy"></i>
+								</span>
+							</button>
+							<span class="userapi_doc_action_url">https://lk.sipout.net/userapi/?key=aece1ec03d26954212f8a222e10717d5&amp;method=peer&amp;action=edit&amp;sip_login=685584446423</span>
+						</div>
+					</div>
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">GET-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">sip_login<span class="has-text-danger">*</span></span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Уникальный sip-логин, который был выдан при создании внутреннего номера и используется для аутентификации на конечном устройстве.">sip-логин<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+						<div class="column">
+							<label class="label">POST-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">number</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Внутренний номер сотрудника, на него можно позвонить. Так же используется в настройках АТС.">Внутренний номер<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">descr</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Например, имя сотрудника, либо телефон, с помощью которого происходит подключение к этому внутреннему номеру. Так же, отображается в Звонилке SIPOUT.">Название номера<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">aon</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Номер, который будет отображаться при звонке с внутреннего номера. Можно подставлять только из тех, что куплены на аккаунте. Список подключенных номеров можно узнать в методе did-&gt;connected_list.">Номер для АОНа<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">sip_password</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Пароль, который используется для регистрации внутреннего номера в АТС.">Пароль<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">email</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Адрес электронной почты для отправки информации по внутреннему номеру.">Email для уведомлений<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">pickup_groups</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Группа, находясь внутри которой, внутренние номера могут перехватывать звонки друг друга.">Группа перехвата<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+					</div>
+
+					<hr>
+
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">Параметры ответа</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">ext_auth_str</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Появляется  в том случае, если тип внутреннего номера = browser">Строка регистрации для расширения браузера<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">sip_login</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Уникальный sip-логин, который был выдан при создании внутреннего номера и используется для аутентификации на конечном устройстве.">sip-логин<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">sip_password</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Пароль, который используется для регистрации внутреннего номера в АТС.">Пароль<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+						<div class="column"></div>
+					</div>
+												<label class="label">Пример ответа</label>
+							<pre style="white-space: pre-wrap;">{
+	"result": "ok",
+	"data": {
+		"ext_auth_str": "685593620822_fd8d1579d6f0236a613061992c81cf7e",
+		"sip_login": "685584446423",
+		"sip_password": "SwBDVgTMUFY2"
+	}
+}</pre>
+											</div>
+			</div>
+						<div class="card block userapi_doc_action_container">
+				<div class="card-content">
+					<label class="label is-size-4">Удаление внутреннего номера</label>
+					<div class="block">
+						<p>action=<strong>remove</strong></p>
+						<p>Удаление внутреннего номера без возможности восстановления</p>
+					</div>
+					<div class="heading is-marginless">URL-адрес запроса</div>
+					<div class="message is-dark">
+						<div class="message-body">
+							<button class="button is-small has-icon has-tooltip" data-tooltip="Скопировать в буфер" onclick="copy_to_clipboard($(this).parent().find(&#39;.userapi_doc_action_url&#39;)[0]);">
+								<span class="icon">
+									<i class="far fa-copy"></i>
+								</span>
+							</button>
+							<span class="userapi_doc_action_url">https://lk.sipout.net/userapi/?key=aece1ec03d26954212f8a222e10717d5&amp;method=peer&amp;action=remove&amp;sip_login=685584446423</span>
+						</div>
+					</div>
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">GET-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">sip_login<span class="has-text-danger">*</span></span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Уникальный sip-логин, который был выдан при создании внутреннего номера и используется для аутентификации на конечном устройстве.">sip-логин<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+						<div class="column">
+							<label class="label">POST-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																	<tbody><tr><td class="is-italic">Нет доступных параметров</td></tr>
+																	</tbody></table>
+							</div>
+						</div>
+					</div>
+
+					<hr>
+
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">Параметры ответа</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																	<tbody><tr><td class="is-italic">Нет дополнительных параметров ответа</td></tr>
+																	</tbody></table>
+							</div>
+						</div>
+						<div class="column"></div>
+					</div>
+									</div>
+			</div>
+			
+		<h3 class="title is-3 is-marginless1">Интеграции</h3>
+	<div class="message is-info">
+		<div class="message-body has-text-grey-dark">
+			<div class="block">
+				<p class="is-size-4">method=<strong>crm</strong></p>
+				<p>Метод для работы с интеграциями</p>
+			</div>
+		</div>
+	</div>
+
+					<div class="card block userapi_doc_action_container">
+				<div class="card-content">
+					<label class="label is-size-4">Поиск callid по параметрам звонка</label>
+					<div class="block">
+						<p>action=<strong>find_callid</strong></p>
+						<p>Возвращаяет callid звонка. Например, он нужен для формирования ссылки прослушивания записи разговора</p>
+					</div>
+					<div class="heading is-marginless">URL-адрес запроса</div>
+					<div class="message is-dark">
+						<div class="message-body">
+							<button class="button is-small has-icon has-tooltip" data-tooltip="Скопировать в буфер" onclick="copy_to_clipboard($(this).parent().find(&#39;.userapi_doc_action_url&#39;)[0]);">
+								<span class="icon">
+									<i class="far fa-copy"></i>
+								</span>
+							</button>
+							<span class="userapi_doc_action_url">https://lk.sipout.net/userapi/?key=aece1ec03d26954212f8a222e10717d5&amp;method=crm&amp;action=find_callid</span>
+						</div>
+					</div>
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">GET-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																	<tbody><tr><td class="is-italic">Нет доступных параметров</td></tr>
+																	</tbody></table>
+							</div>
+						</div>
+						<div class="column">
+							<label class="label">POST-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">start_time<span class="has-text-danger">*</span></span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Нужно указать начало или конец звонка в формате Timestamp">Начало звонка (timestamp)<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">phone<span class="has-text-danger">*</span></span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Номер телефон. При исходящем нужно указывать номер с которого звонят, а при входящем - на который">Номер телефона<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">direction<span class="has-text-danger">*</span></span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="incoming для входящего, outgoing - исходящий">Направление звонка<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">end_time</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Нужно указать начало или конец звонка в формате Timestamp">Окончание звонка (timestamp)<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+					</div>
+
+					<hr>
+
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">Параметры ответа</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">callid</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Идентификатор звонка">Идентификатор звонка<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+						<div class="column"></div>
+					</div>
+												<label class="label">Пример ответа</label>
+							<pre style="white-space: pre-wrap;">{
+	"result": "ok",
+	"data": {
+		"callid": "fa2b4a374274d78941441a26762981s3"
+	}
+}</pre>
+											</div>
+			</div>
+			
+		<h3 class="title is-3 is-marginless1">Баланс</h3>
+	<div class="message is-info">
+		<div class="message-body has-text-grey-dark">
+			<div class="block">
+				<p class="is-size-4">method=<strong>balance</strong></p>
+				<p>Метод для работы с балансом</p>
+			</div>
+		</div>
+	</div>
+
+					<div class="card block userapi_doc_action_container">
+				<div class="card-content">
+					<label class="label is-size-4">Текущий баланс</label>
+					<div class="block">
+						<p>action=<strong>get</strong></p>
+						<p>Получение текущего списка балансов по физ.лицу и по всем добавленным юр.лицам</p>
+					</div>
+					<div class="heading is-marginless">URL-адрес запроса</div>
+					<div class="message is-dark">
+						<div class="message-body">
+							<button class="button is-small has-icon has-tooltip" data-tooltip="Скопировать в буфер" onclick="copy_to_clipboard($(this).parent().find(&#39;.userapi_doc_action_url&#39;)[0]);">
+								<span class="icon">
+									<i class="far fa-copy"></i>
+								</span>
+							</button>
+							<span class="userapi_doc_action_url">https://lk.sipout.net/userapi/?key=aece1ec03d26954212f8a222e10717d5&amp;method=balance&amp;action=get</span>
+						</div>
+					</div>
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">GET-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																	<tbody><tr><td class="is-italic">Нет доступных параметров</td></tr>
+																	</tbody></table>
+							</div>
+						</div>
+						<div class="column">
+							<label class="label">POST-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																	<tbody><tr><td class="is-italic">Нет доступных параметров</td></tr>
+																	</tbody></table>
+							</div>
+						</div>
+					</div>
+
+					<hr>
+
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">Параметры ответа</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">list</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Полный список балансов с лимитами и наименованиями">Список балансов<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">summary</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Массив с суммарными балансом и лимитом по всем балансам">Суммарно<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+						<div class="column"></div>
+					</div>
+												<label class="label">Пример ответа</label>
+							<pre style="white-space: pre-wrap;">{
+	"result": "ok",
+	"data": {
+		"list": [
+			{
+				"inn": null,
+				"balance": "2.00",
+				"limit": "0.00",
+				"name": "Тестов Тест Тестович"
+			},
+			{
+				"inn": "5920032027",
+				"balance": "8981.21",
+				"limit": "0.00",
+				"name": "Бонусный счёт"
+			}
+		],
+		"summary": {
+			"balance": 8983.21,
+			"limit": 0
+		}
+	}
+}</pre>
+											</div>
+			</div>
+			
+		<h3 class="title is-3 is-marginless1">Статистика звонков</h3>
+	<div class="message is-info">
+		<div class="message-body has-text-grey-dark">
+			<div class="block">
+				<p class="is-size-4">method=<strong>call_stat</strong></p>
+				<p>Получение статистики по звонкам через АТС SIPOUT</p>
+			</div>
+		</div>
+	</div>
+
+					<div class="card block userapi_doc_action_container">
+				<div class="card-content">
+					<label class="label is-size-4">Список звонков</label>
+					<div class="block">
+						<p>action=<strong>get_list</strong></p>
+						<p>Получение списка звонков за определённые даты с фильтрами (аналогично разделу в личном кабинете)</p>
+					</div>
+					<div class="heading is-marginless">URL-адрес запроса</div>
+					<div class="message is-dark">
+						<div class="message-body">
+							<button class="button is-small has-icon has-tooltip" data-tooltip="Скопировать в буфер" onclick="copy_to_clipboard($(this).parent().find(&#39;.userapi_doc_action_url&#39;)[0]);">
+								<span class="icon">
+									<i class="far fa-copy"></i>
+								</span>
+							</button>
+							<span class="userapi_doc_action_url">https://lk.sipout.net/userapi/?key=aece1ec03d26954212f8a222e10717d5&amp;method=call_stat&amp;action=get_list&amp;ds=01.03.2022&amp;de=07.03.2022</span>
+						</div>
+					</div>
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">GET-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">ds<span class="has-text-danger">*</span></span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Дата, с которой будут получены звонки [dd.mm.yyyy]">Дата начала периода<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">de<span class="has-text-danger">*</span></span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Дата, по которую будут получены звонки [dd.mm.yyyy]">Дата окончания периода<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">caller</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Номер, с которого звонили (внутренний номер в случае исходящего)">Кто звонил<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">called</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Номер, на который звонили">Кому звонили<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">duration</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Если указана, звонки меньшей длительности не попадут в выборку [сек.]">Минимальная длительность разговора<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">max_duration</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Если указана, звонки большей длительности не попадут в выборку [сек.]">Максимальная длительность разговора<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">peer_descr</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Фильтр по описанию внутреннего номера из соответствующего раздела">Название внутреннего номера<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">call_type</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="all | in | out | callblast | local | c2c">Тип звонка<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+						<div class="column">
+							<label class="label">POST-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																	<tbody><tr><td class="is-italic">Нет доступных параметров</td></tr>
+																	</tbody></table>
+							</div>
+						</div>
+					</div>
+
+					<hr>
+
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">Параметры ответа</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">list</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Массив объектов с параметрами звонка">Список звонков<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+						<div class="column"></div>
+					</div>
+												<label class="label">Пример ответа</label>
+							<pre style="white-space: pre-wrap;">{
+	"result": "ok",
+	"data": {
+		"list": [
+			{
+				"date": "09.03.2022 00:05:40",
+				"cnam": "Тех. поддержка (Москва)",
+				"caller": "79991234567",
+				"called": "74953084444",
+				"duration": 84,
+				"direction": "in",
+				"type": "входящий",
+				"answer": true,
+				"note_cnt": 0,
+				"callid": "509c224254dsca1313d4e2450eb42f8c",
+				"ts": 1646784340.18411
+			}
+		]
+	}
+}</pre>
+											</div>
+			</div>
+			
+		<h3 class="title is-3 is-marginless1">Автообзвоны</h3>
+	<div class="message is-info">
+		<div class="message-body has-text-grey-dark">
+			<div class="block">
+				<p class="is-size-4">method=<strong>ai</strong></p>
+				<p>Методы для работы с автообзонами</p>
+			</div>
+		</div>
+	</div>
+
+					<div class="card block userapi_doc_action_container">
+				<div class="card-content">
+					<label class="label is-size-4">Добавить номер в автообзвон</label>
+					<div class="block">
+						<p>action=<strong>add</strong></p>
+						<p>Добавление номера или номеров в автообзвон</p>
+					</div>
+					<div class="heading is-marginless">URL-адрес запроса</div>
+					<div class="message is-dark">
+						<div class="message-body">
+							<button class="button is-small has-icon has-tooltip" data-tooltip="Скопировать в буфер" onclick="copy_to_clipboard($(this).parent().find(&#39;.userapi_doc_action_url&#39;)[0]);">
+								<span class="icon">
+									<i class="far fa-copy"></i>
+								</span>
+							</button>
+							<span class="userapi_doc_action_url">https://lk.sipout.net/userapi/?key=aece1ec03d26954212f8a222e10717d5&amp;method=ai&amp;action=add&amp;ai=call_2023_01_01_qwer&amp;phone=799999999999</span>
+						</div>
+					</div>
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">GET-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">ai<span class="has-text-danger">*</span></span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Системное имя, вида call_2023_01_01_qwer">Имя обзвона<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																				<tr>
+											<td><span class="has-text-weight-semibold is-italic">phone<span class="has-text-danger">*</span></span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Номер телефона, можно передать как GET, так и POST параметром">Номер телефона, который будет добавлен в ai<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+						<div class="column">
+							<label class="label">POST-параметры</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">phones[]</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Вместо одного номера, можно добавлять массивом несколько номеров. Передается либо один номер, либо список">Массив списка номеров для добавления в ai<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+					</div>
+
+					<hr>
+
+
+					<div class="columns">
+						<div class="column">
+							<label class="label">Параметры ответа</label>
+							<div class="block">
+								<table class="table is-striped is-narrow is-fullwidth">
+																		<tbody><tr>
+											<td><span class="has-text-weight-semibold is-italic">new_phone_count</span></td>
+											<td><span class="has-tooltip has-tooltip-multiline" data-tooltip="Сколько номеров добавилось в аи">Кол-во добавленых номеров<sup><small><b>?</b></small></sup></span></td>
+										</tr>
+																		</tbody></table>
+							</div>
+						</div>
+						<div class="column"></div>
+					</div>
+												<label class="label">Пример ответа</label>
+							<pre style="white-space: pre-wrap;">{
+	"result": "ok",
+	"data": {
+		"new_phone_count": "1"
+	}
+}</pre>
+											</div>
+			</div>
+			
+	</div>
+
+
+
+						<div class="empty_space"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+<script src="./SipOut_files/saved_resource" defer=""></script>
+
+
+</body></html>
