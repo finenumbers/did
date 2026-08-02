@@ -76,6 +76,8 @@ Use the existing Docker network `proxy` (NPM). No host ports published.
 
 NPM forward: `did-frontend:3000` (UI). Optional API: `did-backend:8000`.
 
+**Redeploy always uses `:latest`** (`DID_IMAGE_TAG=latest` + `pull_policy: always`). After CI publishes new images, update/recreate the Portainer stack (Re-pull image).
+
 ## Local run (without Compose frontend)
 
 ```bash

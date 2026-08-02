@@ -73,6 +73,14 @@ Then add that origin to `BACKEND_CORS_ORIGINS` if a browser talks to it cross-or
 
 Open `https://did.example.com/login` with `ADMIN_USERNAME` / `ADMIN_PASSWORD` from the stack env.
 
-## 6. Upgrade
+## 6. Redeploy / upgrade (always latest)
 
-Change `DID_IMAGE_TAG` (e.g. `0.1.1` → `0.1.2`) and **Update the stack**, or set `latest` and recreate containers after GHCR publish.
+Default is **`DID_IMAGE_TAG=latest`** with `pull_policy: always` on app services.
+
+After a new image is published to GHCR (`:latest` is updated on every push to `main` and every release tag):
+
+1. Portainer → Stack `did` → **Editor** → **Update the stack**
+2. Enable **Re-pull image** / recreate if Portainer shows the option
+3. Or: **Stop** → **Start** the stack so images are pulled again
+
+Do **not** pin version tags for routine redeploys — keep `DID_IMAGE_TAG=latest`.

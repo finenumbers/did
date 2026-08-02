@@ -50,7 +50,8 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            # Always publish :latest so Portainer redeploys get newest code
+            type=raw,value=latest
             type=sha,prefix=sha-
 
       - name: Build and push (linux/amd64 only)
