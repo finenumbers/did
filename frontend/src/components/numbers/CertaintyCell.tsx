@@ -1,15 +1,20 @@
 import { certaintyTitle, displayValue, isUncertain } from "@/lib/certainty";
+import { HighlightText } from "@/components/numbers/HighlightText";
 
 export function CertaintyCell({
   value,
   verification,
+  highlight,
 }: {
   value: string | number | boolean | null | undefined;
   verification?: string;
+  highlight?: string;
 }) {
   const text = displayValue(value, verification);
+  const content = <HighlightText text={text} query={highlight} />;
+
   if (!verification || verification === "documentation_verified") {
-    return <span>{text}</span>;
+    return <span>{content}</span>;
   }
   const cls = isUncertain(verification) ? "certainty" : "";
   const unresolved = verification === "unresolved" || verification === "missing";
@@ -18,16 +23,7 @@ export function CertaintyCell({
       className={`${cls}${unresolved ? " unresolved" : ""}`}
       title={certaintyTitle(verification)}
     >
-      {text}
+      {content}
     </span>
-  );
-}
-
-export function CertaintyLegend() {
-  return (
-    <div className="legend">
-      Обычный текст — documentation_verified. Пунктир/подсказка — example_confirmed или
-      derived. «—» — unresolved/missing. Не трактуйте example-confirmed как гарантированный факт.
-    </div>
   );
 }

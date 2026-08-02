@@ -5,79 +5,116 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.models.enums import ProviderCode
-from app.models.providers import Provider
-from app.models.sync import SyncJob, SyncJobLog
-from app.modules.sync_engine.modes import SyncMode
-from app.modules.sync_engine.service import SyncService
+from app.models.sync import SyncRun, SyncRunLog
+from app.modules.sync_engine.progress import build_initial_progress
+from app.modules.sync_engine.unified import create_run, get_latest_run, spawn_unified_run
 from app.providers.errors import ProviderError
 from app.schemas.common import Page
-from app.schemas.sync import SyncJobOut, SyncLogOut, SyncStartRequest
+from app.schemas.sync import (
+    SyncLogOut,
+    SyncProgressOut,
+    SyncRunOut,
+    SyncStageOut,
+    StageProgressOut,
+)
 
 router = APIRouter(tags=["Sync"])
 
 
-def _job_out(db: Session, job: SyncJob) -> SyncJobOut:
-    provider = db.get(Provider, job.provider_id)
-    return SyncJobOut(
-        id=job.id,
-        provider_code=provider.code.value if provider else "unknown",
-        job_type=job.job_type.value,
-        status=job.status.value,
-        started_at=job.started_at,
-        finished_at=job.finished_at,
-        stats=job.stats or {},
-        error_summary=job.error_summary,
-        triggered_by=job.triggered_by,
-        created_at=job.created_at,
+def _run_out(run: SyncRun) -> SyncRunOut:
+    progress = run.progress or build_initial_progress()
+    stages = []
+    for s in progress.get("stages") or []:
+        prog = s.get("progress") or {}
+        stages.append(
+            SyncStageOut(
+                id=s.get("id", ""),
+                group=s.get("group", ""),
+                label=s.get("label", ""),
+                status=s.get("status", "pending"),
+                detail=s.get("detail") or "",
+                substage=s.get("substage") or "",
+                progress=StageProgressOut(
+                    current=prog.get("current"),
+                    total=prog.get("total"),
+                    unit=prog.get("unit") or "",
+                ),
+                started_at=s.get("started_at"),
+                finished_at=s.get("finished_at"),
+            )
+        )
+    return SyncRunOut(
+        id=run.id,
+        status=run.status.value,
+        started_at=run.started_at,
+        finished_at=run.finished_at,
+        progress=SyncProgressOut(
+            current_stage_id=progress.get("current_stage_id"),
+            stages=stages,
+        ),
+        stats=run.stats or {},
+        error_summary=run.error_summary,
+        triggered_by=run.triggered_by,
+        created_at=run.created_at,
     )
 
 
 @router.post(
-    "/providers/{code}/sync",
-    response_model=SyncJobOut,
-    summary="Start sync job",
-    description="Modes: full, free_only, purchased_only, dictionaries_only. "
-    "Unsupported number modes for Runexis return PROVIDER_CAPABILITY_LIMITED.",
+    "/sync/start",
+    response_model=SyncRunOut,
+    summary="Start unified sync of all providers",
 )
-def start_sync(
-    code: str, payload: SyncStartRequest, db: Session = Depends(get_db)
-) -> SyncJobOut:
-    job = SyncService(db).start_and_run(
-        code,
-        SyncMode(payload.mode),
-        dry_run=payload.dry_run,
-        include_dictionaries=payload.include_dictionaries,
-    )
-    return _job_out(db, job)
-
-
-@router.get("/sync/jobs/{job_id}", response_model=SyncJobOut, summary="Get sync job status")
-def get_job(job_id: UUID, db: Session = Depends(get_db)) -> SyncJobOut:
-    job = db.get(SyncJob, job_id)
-    if not job:
-        raise ProviderError("Sync job not found", code="SYNC_JOB_NOT_FOUND")
-    return _job_out(db, job)
+def start_unified_sync(db: Session = Depends(get_db)) -> SyncRunOut:
+    run = create_run(db, triggered_by="api")
+    spawn_unified_run(run.id)
+    return _run_out(run)
 
 
 @router.get(
-    "/sync/jobs/{job_id}/logs",
-    response_model=Page[SyncLogOut],
-    summary="Get sync job logs",
+    "/sync/latest",
+    response_model=SyncRunOut | None,
+    summary="Get latest unified sync run",
 )
-def get_logs(
-    job_id: UUID,
+def get_latest_unified_sync(db: Session = Depends(get_db)) -> SyncRunOut | None:
+    run = get_latest_run(db)
+    if not run:
+        return None
+    return _run_out(run)
+
+
+@router.get(
+    "/sync/runs/{run_id}",
+    response_model=SyncRunOut,
+    summary="Get unified sync run",
+)
+def get_unified_sync_run(run_id: UUID, db: Session = Depends(get_db)) -> SyncRunOut:
+    run = db.get(SyncRun, run_id)
+    if not run:
+        raise ProviderError("Sync run not found", code="SYNC_RUN_NOT_FOUND")
+    return _run_out(run)
+
+
+@router.get(
+    "/sync/runs/{run_id}/logs",
+    response_model=Page[SyncLogOut],
+    summary="Get unified sync run logs",
+)
+def get_unified_sync_logs(
+    run_id: UUID,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     level: str | None = None,
     db: Session = Depends(get_db),
 ) -> Page[SyncLogOut]:
-    stmt = select(SyncJobLog).where(SyncJobLog.sync_job_id == job_id)
+    run = db.get(SyncRun, run_id)
+    if not run:
+        raise ProviderError("Sync run not found", code="SYNC_RUN_NOT_FOUND")
+    stmt = select(SyncRunLog).where(SyncRunLog.sync_run_id == run_id)
     if level:
-        stmt = stmt.where(SyncJobLog.level == level)
+        stmt = stmt.where(SyncRunLog.level == level)
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.scalars(
-        stmt.order_by(SyncJobLog.created_at.desc())
+        stmt.order_by(SyncRunLog.created_at.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
     ).all()
@@ -92,29 +129,3 @@ def get_logs(
         for r in rows
     ]
     return Page.of(items, page=page, page_size=page_size, total=total)
-
-
-@router.get(
-    "/providers/{code}/sync/jobs",
-    response_model=Page[SyncJobOut],
-    summary="List recent sync jobs for provider",
-)
-def list_jobs(
-    code: str,
-    page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=200),
-    db: Session = Depends(get_db),
-) -> Page[SyncJobOut]:
-    provider = db.scalar(select(Provider).where(Provider.code == ProviderCode(code)))
-    if not provider:
-        raise ProviderError(f"Provider not found: {code}")
-    stmt = select(SyncJob).where(SyncJob.provider_id == provider.id)
-    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
-    rows = db.scalars(
-        stmt.order_by(SyncJob.created_at.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    ).all()
-    return Page.of(
-        [_job_out(db, j) for j in rows], page=page, page_size=page_size, total=total
-    )

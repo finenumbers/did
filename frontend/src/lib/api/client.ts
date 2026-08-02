@@ -1,4 +1,7 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { clearSession, getAccessToken } from "@/lib/auth";
+
+/** Browser calls Next proxy by default. */
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
 
 export class ApiError extends Error {
   code: string;
@@ -11,27 +14,69 @@ export class ApiError extends Error {
   }
 }
 
+function errorMessageFromBody(
+  data: unknown,
+  fallback: string,
+): {
+  message: string;
+  code: string;
+  details?: Record<string, unknown>;
+} {
+  const body = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
+  const err = body.error as Record<string, unknown> | undefined;
+  if (err && typeof err.message === "string") {
+    return {
+      message: err.message,
+      code: typeof err.code === "string" ? err.code : "HTTP_ERROR",
+      details: (err.details as Record<string, unknown>) || undefined,
+    };
+  }
+  const detail = body.detail;
+  if (typeof detail === "string") {
+    return { message: detail, code: "HTTP_ERROR" };
+  }
+  if (Array.isArray(detail) && detail.length) {
+    const first = detail[0] as { msg?: string };
+    return { message: first?.msg || fallback, code: "HTTP_ERROR" };
+  }
+  if (detail && typeof detail === "object" && "msg" in (detail as object)) {
+    return { message: String((detail as { msg: string }).msg), code: "HTTP_ERROR" };
+  }
+  return { message: fallback, code: "HTTP_ERROR" };
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+  const token = getAccessToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
+    headers,
     cache: "no-store",
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const err = data?.error;
-    throw new ApiError(
-      err?.message || res.statusText,
-      err?.code || "HTTP_ERROR",
-      err?.details,
-    );
+    const parsed = errorMessageFromBody(data, res.statusText || "Request failed");
+    if (res.status === 401 && typeof window !== "undefined" && !path.includes("/auth/login")) {
+      clearSession();
+      if (!window.location.pathname.startsWith("/login")) {
+        window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+      }
+    }
+    throw new ApiError(parsed.message, parsed.code, parsed.details);
   }
   return data as T;
 }
 
-export function isCapabilityLimited(err: unknown): boolean {
-  return err instanceof ApiError && err.code === "PROVIDER_CAPABILITY_LIMITED";
+export function apiUrl(path: string): string {
+  const token = getAccessToken();
+  if (!token) return `${API_URL}${path}`;
+  const sep = path.includes("?") ? "&" : "?";
+  // For iframe exports that cannot set Authorization headers
+  return `${API_URL}${path}${sep}access_token=${encodeURIComponent(token)}`;
 }

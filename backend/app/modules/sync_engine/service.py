@@ -2,44 +2,37 @@
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.enums import InventoryKind, ProviderCode, SyncJobStatus, SyncJobType, SyncLogLevel
+from app.models.enums import InventoryKind, ProviderCode, SyncJobStatus, SyncLogLevel
 from app.models.providers import Provider
 from app.models.sync import SyncJob
 from app.modules.sync_engine.logging import log_job
 from app.modules.sync_engine.modes import SyncMode
 from app.modules.sync_engine.persist import (
     build_city_lookup,
+    count_present_numbers,
     persist_cities,
+    persist_finenumbers_numbers,
     persist_regions,
+    persist_runexis_numbers,
     persist_sipout_numbers,
 )
+from app.modules.sync_engine.safety import reload_allowed
 from app.providers.dto.common import ConnectionConfig
 from app.providers.dto.numbers import NormalizedNumber
-from app.providers.errors import ProviderCapabilityLimitedError, ProviderError
+from app.providers.errors import ProviderError
 from app.providers.registry import get_provider
-
-
-def _job_type_for_mode(mode: SyncMode) -> SyncJobType:
-    return SyncJobType(mode.value)
+from app.services.providers_service import persist_auth_settings
 
 
 class SyncService:
     def __init__(self, db: Session):
         self.db = db
-
-    def _get_provider_row(self, code: str) -> Provider:
-        row = self.db.scalar(select(Provider).where(Provider.code == ProviderCode(code)))
-        if not row:
-            raise ProviderError(f"Provider not found in DB: {code}")
-        return row
 
     def _connection_config(self, provider: Provider) -> ConnectionConfig:
         conn = provider.connection
@@ -47,50 +40,17 @@ class SyncService:
             raise ProviderError(f"No connection settings for provider {provider.code.value}")
         return ConnectionConfig(
             base_url=conn.base_url,
-            auth_settings=conn.auth_settings or {},
+            auth_settings=dict(conn.auth_settings or {}),
             extra_settings=conn.extra_settings or {},
         )
 
-    def start_and_run(
+    async def run_job_async(
         self,
-        provider_code: str,
-        mode: SyncMode,
+        job_id: uuid.UUID,
         *,
-        dry_run: bool = False,
-        include_dictionaries: bool = False,
-        triggered_by: str = "api",
+        phase_hook: Any | None = None,
     ) -> SyncJob:
-        provider = self._get_provider_row(provider_code)
-        adapter = get_provider(provider.code)
-        caps = adapter.capabilities()
-        if mode == SyncMode.free_only and not caps.get("free_numbers", {}).get("supported"):
-            raise ProviderCapabilityLimitedError(
-                f"{provider_code} free_numbers not supported by uploaded docs",
-                provider=provider_code,
-                capability="free_numbers",
-                doc_refs=caps.get("free_numbers", {}).get("doc_refs", []),
-            )
-        if mode == SyncMode.purchased_only and not caps.get("purchased_numbers", {}).get("supported"):
-            raise ProviderCapabilityLimitedError(
-                f"{provider_code} purchased_numbers not supported by uploaded docs",
-                provider=provider_code,
-                capability="purchased_numbers",
-                doc_refs=caps.get("purchased_numbers", {}).get("doc_refs", []),
-            )
-
-        job = SyncJob(
-            provider_id=provider.id,
-            job_type=_job_type_for_mode(mode),
-            status=SyncJobStatus.pending,
-            triggered_by=triggered_by,
-            stats={"dry_run": dry_run, "mode": mode.value},
-        )
-        self.db.add(job)
-        self.db.commit()
-        self.db.refresh(job)
-        return self.run_job(job.id, include_dictionaries=include_dictionaries)
-
-    def run_job(self, job_id: uuid.UUID, *, include_dictionaries: bool = False) -> SyncJob:
+        """Run a provider job created by unified sync (stage+atomic cutover)."""
         job = self.db.get(SyncJob, job_id)
         if not job:
             raise ProviderError("Sync job not found")
@@ -98,8 +58,12 @@ class SyncService:
         assert provider is not None
         adapter = get_provider(provider.code)
         connection = self._connection_config(provider)
-        mode = SyncMode(job.job_type.value)
-        dry_run = bool((job.stats or {}).get("dry_run"))
+        try:
+            mode = SyncMode(job.job_type.value)
+        except ValueError as exc:
+            raise ProviderError(
+                f"Unsupported sync job type for Wave-2 engine: {job.job_type.value}"
+            ) from exc
 
         job.status = SyncJobStatus.running
         job.started_at = datetime.now(timezone.utc)
@@ -108,23 +72,19 @@ class SyncService:
         self.db.commit()
 
         stats: dict[str, Any] = {
-            "dry_run": dry_run,
             "mode": mode.value,
             "limitations": [],
             "categories": {},
         }
         try:
-            stats = asyncio.run(
-                self._execute(
-                    job=job,
-                    provider=provider,
-                    adapter=adapter,
-                    connection=connection,
-                    mode=mode,
-                    dry_run=dry_run,
-                    include_dictionaries=include_dictionaries,
-                    stats=stats,
-                )
+            stats = await self._execute(
+                job=job,
+                provider=provider,
+                adapter=adapter,
+                connection=connection,
+                mode=mode,
+                stats=stats,
+                phase_hook=phase_hook,
             )
             limitations = stats.get("limitations") or []
             cats = stats.get("categories") or {}
@@ -138,10 +98,23 @@ class SyncService:
             else:
                 job.status = SyncJobStatus.success
         except Exception as exc:
+            self.db.rollback()
+            job = self.db.get(SyncJob, job_id)
+            assert job is not None
             job.status = SyncJobStatus.failed
-            job.error_summary = str(exc)
+            job.error_summary = str(exc)[:2000]
+            job.finished_at = datetime.now(timezone.utc)
             log_job(self.db, job.id, SyncLogLevel.error, f"Sync failed: {exc}")
             self.db.commit()
+            return job
+        finally:
+            try:
+                provider = self.db.get(Provider, job.provider_id) or provider
+                if provider is not None and provider.connection is not None:
+                    persist_auth_settings(provider.connection, connection.auth_settings)
+                    self.db.commit()
+            except Exception:
+                self.db.rollback()
 
         job.stats = {k: v for k, v in stats.items() if not str(k).startswith("_")}
         job.finished_at = datetime.now(timezone.utc)
@@ -157,17 +130,30 @@ class SyncService:
         adapter: Any,
         connection: ConnectionConfig,
         mode: SyncMode,
-        dry_run: bool,
-        include_dictionaries: bool,
         stats: dict[str, Any],
+        phase_hook: Any | None = None,
     ) -> dict[str, Any]:
+        async def _hook(
+            phase: str,
+            event: str,
+            detail: str = "",
+            *,
+            current: int | None = None,
+            total: int | None = None,
+        ) -> None:
+            if phase_hook is None:
+                return
+            try:
+                await phase_hook(phase, event, detail, current=current, total=total)
+            except TypeError:
+                await phase_hook(phase, event, detail)
+
         limitations: list[dict[str, Any]] = []
         city_lookup = build_city_lookup(self.db, provider.code.value)
 
-        need_dict = mode in {SyncMode.full, SyncMode.dictionaries_only} or (
-            include_dictionaries and mode in {SyncMode.free_only, SyncMode.purchased_only}
-        )
-        if need_dict:
+        # full → dictionaries + free + purchased; free_only → free only
+        if mode == SyncMode.full:
+            await _hook("dictionaries", "begin")
             try:
                 regions: list = []
                 cities: list = []
@@ -180,26 +166,20 @@ class SyncService:
                     cit = await adapter.sync_cities(connection)
                     regions = (reg.items or {}).get("regions") if isinstance(reg.items, dict) else []
                     cities = (cit.items or {}).get("cities") if isinstance(cit.items, dict) else []
-                if not dry_run:
-                    rc = persist_regions(
-                        self.db,
-                        provider_code=provider.code.value,
-                        job_id=job.id,
-                        regions=regions or [],
-                    )
-                    cc = persist_cities(
-                        self.db,
-                        provider_code=provider.code.value,
-                        job_id=job.id,
-                        cities=cities or [],
-                    )
-                    stats["categories"]["dictionaries"] = {"regions": rc, "cities": cc}
-                    city_lookup = build_city_lookup(self.db, provider.code.value)
-                else:
-                    stats["categories"]["dictionaries"] = {
-                        "would_persist_regions": len(regions or []),
-                        "would_persist_cities": len(cities or []),
-                    }
+                rc = persist_regions(
+                    self.db,
+                    provider_code=provider.code.value,
+                    job_id=job.id,
+                    regions=regions or [],
+                )
+                cc = persist_cities(
+                    self.db,
+                    provider_code=provider.code.value,
+                    job_id=job.id,
+                    cities=cities or [],
+                )
+                stats["categories"]["dictionaries"] = {"regions": rc, "cities": cc}
+                city_lookup = build_city_lookup(self.db, provider.code.value)
                 log_job(
                     self.db,
                     job.id,
@@ -208,13 +188,32 @@ class SyncService:
                     {"regions": len(regions or []), "cities": len(cities or [])},
                 )
                 self.db.commit()
+                await _hook(
+                    "dictionaries",
+                    "end",
+                    f"regions={len(regions or [])}, cities={len(cities or [])}",
+                )
             except Exception as exc:
                 log_job(self.db, job.id, SyncLogLevel.error, f"Dictionaries failed: {exc}")
                 self.db.commit()
                 stats["_fatal_error"] = str(exc)
+                await _hook("dictionaries", "fail", str(exc)[:300])
+                stats["limitations"] = limitations
+                return stats
 
         if mode in {SyncMode.full, SyncMode.free_only}:
-            result = await adapter.sync_free_numbers(connection, city_lookup=city_lookup)
+            await _hook("free", "begin")
+
+            async def _free_progress(
+                detail: str, current: int | None = None, total: int | None = None
+            ) -> None:
+                await _hook("free", "progress", detail, current=current, total=total)
+
+            result = await adapter.sync_free_numbers(
+                connection,
+                city_lookup=city_lookup,
+                on_progress=_free_progress,
+            )
             for lim in result.limitations:
                 limitations.append(
                     {
@@ -227,23 +226,117 @@ class SyncService:
                 log_job(self.db, job.id, SyncLogLevel.warning, lim.message)
             if result.limitations and not result.items:
                 stats["categories"]["free_numbers"] = {"limited": True}
+                await _hook("free", "skip", "capability limited")
             elif isinstance(result.items, list):
                 numbers = [x for x in result.items if isinstance(x, NormalizedNumber)]
-                if dry_run:
-                    stats["categories"]["free_numbers"] = {"would_upsert": len(numbers)}
-                elif provider.code == ProviderCode.sipout:
-                    stats["categories"]["free_numbers"] = persist_sipout_numbers(
+                previous = count_present_numbers(
+                    self.db,
+                    provider_id=provider.id,
+                    inventory_kind=InventoryKind.free,
+                )
+                ok, reason = reload_allowed(
+                    previous=previous, incoming=len(numbers), kind="free"
+                )
+                if not ok:
+                    stats["categories"]["free_numbers"] = {
+                        "refused_wipe": True,
+                        "previous": previous,
+                        "incoming": len(numbers),
+                        "fetched": result.fetched,
+                        "reason": reason,
+                    }
+                    stats["_fatal_error"] = reason
+                    log_job(self.db, job.id, SyncLogLevel.error, reason or "refused wipe")
+                    self.db.commit()
+                    await _hook("free", "fail", reason or "refused wipe")
+                    stats["limitations"] = limitations
+                    return stats
+
+                await _free_progress("Буфер → каталог…", 0, len(numbers))
+                log_job(
+                    self.db,
+                    job.id,
+                    SyncLogLevel.info,
+                    (
+                        f"Staging cutover provider={provider.code.value} kind=free "
+                        f"reload {len(numbers)} (previous={previous})"
+                    ),
+                )
+                if provider.code == ProviderCode.sipout:
+                    persist_stats = persist_sipout_numbers(
                         self.db,
                         provider_id=provider.id,
                         job_id=job.id,
                         inventory_kind=InventoryKind.free,
                         numbers=numbers,
-                        soft_absence=True,
+                        on_progress=lambda d, c=None, t=None: log_job(
+                            self.db,
+                            job.id,
+                            SyncLogLevel.info,
+                            f"{d} ({c}/{t})" if t is not None else d,
+                        ),
                     )
-                log_job(self.db, job.id, SyncLogLevel.info, f"Free numbers fetched={result.fetched}")
-            self.db.commit()
+                elif provider.code == ProviderCode.runexis:
+                    persist_stats = persist_runexis_numbers(
+                        self.db,
+                        provider_id=provider.id,
+                        job_id=job.id,
+                        inventory_kind=InventoryKind.free,
+                        numbers=numbers,
+                        on_progress=lambda d, c=None, t=None: log_job(
+                            self.db,
+                            job.id,
+                            SyncLogLevel.info,
+                            f"{d} ({c}/{t})" if t is not None else d,
+                        ),
+                    )
+                elif provider.code == ProviderCode.finenumbers:
+                    persist_stats = persist_finenumbers_numbers(
+                        self.db,
+                        provider_id=provider.id,
+                        job_id=job.id,
+                        inventory_kind=InventoryKind.free,
+                        numbers=numbers,
+                        on_progress=lambda d, c=None, t=None: log_job(
+                            self.db,
+                            job.id,
+                            SyncLogLevel.info,
+                            f"{d} ({c}/{t})" if t is not None else d,
+                        ),
+                    )
+                else:
+                    persist_stats = {}
+                await _free_progress(
+                    f"Записано {persist_stats.get('upserted', 0)}",
+                    persist_stats.get("upserted"),
+                    len(numbers),
+                )
+                stats["categories"]["free_numbers"] = {
+                    **persist_stats,
+                    "previous": previous,
+                }
+                log_job(
+                    self.db,
+                    job.id,
+                    SyncLogLevel.info,
+                    f"Free numbers fetched={result.fetched}",
+                )
+                self.db.commit()
+                free_detail = f"fetched={result.fetched}"
+                if isinstance(stats.get("categories", {}).get("free_numbers"), dict):
+                    free_detail += (
+                        f", upserted={stats['categories']['free_numbers'].get('upserted', 0)}"
+                    )
+                await _hook("free", "end", free_detail)
+            else:
+                self.db.commit()
+                await _hook("free", "end", f"fetched={result.fetched}")
 
-        if mode in {SyncMode.full, SyncMode.purchased_only}:
+        purchased_supported = bool(
+            adapter.capabilities().get("purchased_numbers", {}).get("supported")
+        )
+        if mode == SyncMode.full and purchased_supported:
+            await _hook("purchased", "begin")
             result = await adapter.sync_purchased_numbers(connection, city_lookup=city_lookup)
             for lim in result.limitations:
                 limitations.append(
@@ -257,23 +350,82 @@ class SyncService:
                 log_job(self.db, job.id, SyncLogLevel.warning, lim.message)
             if result.limitations and not result.items:
                 stats["categories"]["purchased_numbers"] = {"limited": True}
+                await _hook("purchased", "skip", "capability limited")
             elif isinstance(result.items, list):
                 numbers = [x for x in result.items if isinstance(x, NormalizedNumber)]
-                if dry_run:
-                    stats["categories"]["purchased_numbers"] = {"would_upsert": len(numbers)}
-                elif provider.code == ProviderCode.sipout:
-                    stats["categories"]["purchased_numbers"] = persist_sipout_numbers(
+                previous = count_present_numbers(
+                    self.db,
+                    provider_id=provider.id,
+                    inventory_kind=InventoryKind.purchased,
+                )
+                ok, reason = reload_allowed(
+                    previous=previous, incoming=len(numbers), kind="purchased"
+                )
+                if not ok:
+                    stats["categories"]["purchased_numbers"] = {
+                        "refused_wipe": True,
+                        "previous": previous,
+                        "incoming": len(numbers),
+                        "fetched": result.fetched,
+                        "reason": reason,
+                    }
+                    stats["_fatal_error"] = reason
+                    log_job(self.db, job.id, SyncLogLevel.error, reason or "refused wipe")
+                    self.db.commit()
+                    await _hook("purchased", "fail", reason or "refused wipe")
+                    stats["limitations"] = limitations
+                    return stats
+
+                log_job(
+                    self.db,
+                    job.id,
+                    SyncLogLevel.info,
+                    (
+                        f"Staging cutover provider={provider.code.value} kind=purchased "
+                        f"reload {len(numbers)} (previous={previous})"
+                    ),
+                )
+                if provider.code == ProviderCode.sipout:
+                    persist_stats = persist_sipout_numbers(
                         self.db,
                         provider_id=provider.id,
                         job_id=job.id,
                         inventory_kind=InventoryKind.purchased,
                         numbers=numbers,
-                        soft_absence=True,
                     )
+                elif provider.code == ProviderCode.runexis:
+                    persist_stats = persist_runexis_numbers(
+                        self.db,
+                        provider_id=provider.id,
+                        job_id=job.id,
+                        inventory_kind=InventoryKind.purchased,
+                        numbers=numbers,
+                    )
+                else:
+                    persist_stats = {}
+                stats["categories"]["purchased_numbers"] = {
+                    **persist_stats,
+                    "previous": previous,
+                }
                 log_job(
-                    self.db, job.id, SyncLogLevel.info, f"Purchased numbers fetched={result.fetched}"
+                    self.db,
+                    job.id,
+                    SyncLogLevel.info,
+                    f"Purchased numbers fetched={result.fetched}",
                 )
-            self.db.commit()
+                self.db.commit()
+                purch_detail = f"fetched={result.fetched}"
+                if isinstance(stats.get("categories", {}).get("purchased_numbers"), dict):
+                    purch_detail += (
+                        ", upserted="
+                        f"{stats['categories']['purchased_numbers'].get('upserted', 0)}"
+                    )
+                await _hook("purchased", "end", purch_detail)
+            else:
+                self.db.commit()
+                await _hook("purchased", "end", f"fetched={result.fetched}")
+        elif mode == SyncMode.full and not purchased_supported:
+            await _hook("purchased", "skip", "capability not supported")
 
         stats["limitations"] = limitations
         return stats

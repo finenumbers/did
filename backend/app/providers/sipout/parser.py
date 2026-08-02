@@ -123,29 +123,59 @@ def parse_number_list(raw: RawHttpResult) -> list[ParsedNumberItem]:
         if not isinstance(item, dict):
             continue
         did = _as_text(item.get("did"))
+        order_id = _as_text(item.get("order_id"))
+        doc_status = _as_text(item.get("doc_status"))
+        doc_required = _as_text(item.get("doc_required"))
+        order_doc_required = _as_text(item.get("order_doc_required"))
+        sign_raw = item.get("sign")
+        if sign_raw is None:
+            sign = None
+        elif isinstance(sign_raw, bool):
+            sign = "true" if sign_raw else "false"
+        else:
+            sign = _as_text(sign_raw)
         out.append(
             ParsedNumberItem(
                 raw_payload=item,
                 provider_number_key=did,
                 msisdn=did,  # EXAMPLE-CONFIRMED candidate; not formal E.164 guarantee
                 city_external_id=_as_text(item.get("city_id")),
-                price_amount=_parse_price(item.get("price")),
+                # Locked: SipOut free `price` → catalog period_price (not buy_price)
+                period_price=_parse_price(item.get("price")),
+                buy_price=None,
                 status_raw=_as_text(item.get("status")),
                 has_sms=_parse_has_sms(item.get("has_sms")),
+                order_id=order_id,
+                doc_status=doc_status,
+                doc_required=doc_required,
+                order_doc_required=order_doc_required,
+                sign=sign,
                 field_verification={
                     "provider_number_key": FieldVerification.example_confirmed,
                     "msisdn": FieldVerification.example_confirmed,
                     "city_external_id": FieldVerification.example_confirmed,
-                    "price_amount": FieldVerification.example_confirmed
+                    "period_price": FieldVerification.example_confirmed
                     if item.get("price") is not None
                     else FieldVerification.missing,
+                    "buy_price": FieldVerification.missing,
                     "status_raw": FieldVerification.example_confirmed
                     if item.get("status") is not None
                     else FieldVerification.missing,
-                    "has_sms": FieldVerification.example_confirmed
-                    if item.get("has_sms") is not None
+                    "order_id": FieldVerification.example_confirmed
+                    if order_id is not None
                     else FieldVerification.missing,
-                    "price_currency": FieldVerification.unresolved,
+                    "doc_status": FieldVerification.example_confirmed
+                    if doc_status is not None
+                    else FieldVerification.missing,
+                    "doc_required": FieldVerification.example_confirmed
+                    if doc_required is not None
+                    else FieldVerification.missing,
+                    "order_doc_required": FieldVerification.example_confirmed
+                    if order_doc_required is not None
+                    else FieldVerification.missing,
+                    "sign": FieldVerification.example_confirmed
+                    if sign is not None
+                    else FieldVerification.missing,
                 },
             )
         )

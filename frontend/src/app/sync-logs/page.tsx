@@ -1,114 +1,304 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api/client";
-import type { Page, SyncJob } from "@/lib/types/api";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ApiError, apiFetch } from "@/lib/api/client";
+import type { SyncRun, SyncStage } from "@/lib/types/api";
 
-export default function SyncLogsPage() {
-  const [provider, setProvider] = useState("sipout");
-  const [jobs, setJobs] = useState<Page<SyncJob> | null>(null);
+type SyncLogRow = {
+  id: string;
+  level: string;
+  message: string;
+  created_at: string;
+};
+
+function statusBadgeClass(status: string): string {
+  if (status === "success" || status === "done") return "ok";
+  if (status === "failed") return "fail";
+  if (status === "running" || status === "pending" || status === "partial") return "warn";
+  return "";
+}
+
+function statusLabel(status: string): string {
+  const map: Record<string, string> = {
+    pending: "ожидание",
+    running: "выполняется",
+    done: "готово",
+    success: "успех",
+    failed: "ошибка",
+    partial: "частично",
+    skipped: "пропуск",
+  };
+  return map[status] || status;
+}
+
+function groupStages(stages: SyncStage[]): { group: string; stages: SyncStage[] }[] {
+  const order: string[] = [];
+  const map = new Map<string, SyncStage[]>();
+  for (const stage of stages) {
+    if (!map.has(stage.group)) {
+      map.set(stage.group, []);
+      order.push(stage.group);
+    }
+    map.get(stage.group)!.push(stage);
+  }
+  return order.map((group) => ({ group, stages: map.get(group)! }));
+}
+
+export default function SyncPage() {
+  const [run, setRun] = useState<SyncRun | null>(null);
+  const [logs, setLogs] = useState<SyncLogRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<SyncJob | null>(null);
-  const [logs, setLogs] = useState<Page<{ id: string; level: string; message: string; created_at: string }> | null>(null);
+  const [cacheReady, setCacheReady] = useState<boolean | null>(null);
+  const [cacheHint, setCacheHint] = useState<string | null>(null);
 
-  const load = () => {
+  const isActive = run?.status === "pending" || run?.status === "running";
+  const canStart = cacheReady === true && !starting && !isActive;
+
+  const loadLatest = useCallback(async () => {
+    try {
+      const latest = await apiFetch<SyncRun | null>("/api/v1/sync/latest");
+      setRun(latest);
+      setError(null);
+      return latest;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка загрузки");
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadLogs = useCallback(async (runId: string) => {
+    try {
+      const page = await apiFetch<{ items: SyncLogRow[] }>(
+        `/api/v1/sync/runs/${runId}/logs?page=1&page_size=100`,
+      );
+      setLogs(page.items || []);
+    } catch (e) {
+      setLogs([]);
+      setError(e instanceof Error ? e.message : "Не удалось загрузить логи");
+    }
+  }, []);
+
+  const loadCacheGate = useCallback(async () => {
+    try {
+      const status = await apiFetch<{
+        min_cache_ready: boolean;
+        missing_required: string[];
+      }>("/api/v1/settings/pstn-inn-cache");
+      setCacheReady(status.min_cache_ready);
+      setCacheHint(
+        status.min_cache_ready
+          ? null
+          : `Сначала загрузите кеш операторов в Настройках${
+              status.missing_required?.length
+                ? ` (не готово: ${status.missing_required.join(", ")})`
+                : ""
+            }`,
+      );
+    } catch {
+      setCacheReady(false);
+      setCacheHint("Не удалось проверить кеш операторов");
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadLatest().then((latest) => {
+      if (latest) void loadLogs(latest.id);
+    });
+    void loadCacheGate();
+  }, [loadLatest, loadLogs, loadCacheGate]);
+
+  useEffect(() => {
+    if (!isActive || !run) return;
+    const t = setInterval(() => {
+      void loadLatest().then((latest) => {
+        if (latest) void loadLogs(latest.id);
+      });
+    }, 2000);
+    return () => clearInterval(t);
+  }, [isActive, run?.id, loadLatest, loadLogs]);
+
+  const startSync = async () => {
+    setStarting(true);
     setError(null);
-    apiFetch<Page<SyncJob>>(`/api/v1/providers/${provider}/sync/jobs?page=1&page_size=50`)
-      .then(setJobs)
-      .catch((e) => setError(e.message));
+    try {
+      const started = await apiFetch<SyncRun>("/api/v1/sync/start", { method: "POST" });
+      setRun(started);
+      setLogs([]);
+      void loadLogs(started.id);
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "SYNC_ALREADY_RUNNING") {
+        setError(e.message);
+        await loadLatest();
+      } else if (e instanceof ApiError && e.code === "PSTN_INN_CACHE_NOT_READY") {
+        setError(e.message);
+        await loadCacheGate();
+      } else if (e instanceof ApiError && e.code === "PSTN_INN_CACHE_REFRESH_RUNNING") {
+        setError("Идёт загрузка кеша операторов — дождитесь окончания в Настройках");
+        await loadCacheGate();
+      } else {
+        setError(e instanceof Error ? e.message : "Не удалось запустить синхронизацию");
+      }
+    } finally {
+      setStarting(false);
+    }
   };
 
-  useEffect(() => {
-    load();
-    const t = setInterval(load, 5000);
-    return () => clearInterval(t);
-  }, [provider]);
+  const stageDetail = (s: SyncStage): string => {
+    const parts: string[] = [];
+    if (s.detail) parts.push(s.detail);
+    if (s.substage && s.substage !== s.detail) parts.push(s.substage);
+    const cur = s.progress?.current;
+    const tot = s.progress?.total;
+    if (cur != null && tot != null) {
+      parts.push(`${cur} / ${tot}${s.progress?.unit ? ` ${s.progress.unit}` : ""}`);
+    } else if (cur != null) {
+      parts.push(String(cur));
+    }
+    return parts.filter(Boolean).join(" · ") || "—";
+  };
 
-  useEffect(() => {
-    if (!selected) return;
-    apiFetch<Page<{ id: string; level: string; message: string; created_at: string }>>(
-      `/api/v1/sync/jobs/${selected.id}/logs?page=1&page_size=100`,
-    )
-      .then(setLogs)
-      .catch(() => setLogs(null));
-  }, [selected]);
+  const groups = useMemo(
+    () => groupStages(run?.progress?.stages || []),
+    [run?.progress?.stages],
+  );
 
   return (
     <>
-      <h1>Логи синхронизации</h1>
       <div className="filters">
-        <select value={provider} onChange={(e) => setProvider(e.target.value)}>
-          <option value="sipout">sipout</option>
-          <option value="runexis">runexis</option>
-        </select>
-        <button className="secondary" onClick={load}>
+        <button onClick={startSync} disabled={!canStart} title={cacheHint || undefined}>
+          {starting ? "Запуск…" : isActive ? "Синхронизация…" : "Синхронизация"}
+        </button>
+        <button
+          className="secondary"
+          onClick={() => {
+            void loadLatest().then((r) => r && loadLogs(r.id));
+            void loadCacheGate();
+          }}
+        >
           Обновить
         </button>
+        {cacheReady === false && (
+          <span className="filters-meta" style={{ color: "var(--muted)" }}>
+            {cacheHint}{" "}
+            <a href="/settings" style={{ color: "inherit", textDecoration: "underline" }}>
+              Настройки
+            </a>
+          </span>
+        )}
+        {run && (
+          <span className="filters-meta">
+            Последний запуск:{" "}
+            <span className={`badge ${statusBadgeClass(run.status)}`}>
+              {statusLabel(run.status)}
+            </span>
+            {run.started_at ? ` · ${new Date(run.started_at).toLocaleString()}` : ""}
+          </span>
+        )}
       </div>
+
       {error && <div className="state error">{error}</div>}
-      <div className="grid-2">
-        <div className="panel">
-          <table>
-            <thead>
-              <tr>
-                <th>Провайдер</th>
-                <th>Mode</th>
-                <th>Status</th>
-                <th>Started</th>
-                <th>Error</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(jobs?.items || []).map((j) => (
-                <tr key={j.id} onClick={() => setSelected(j)} style={{ cursor: "pointer" }}>
-                  <td>{j.provider_code}</td>
-                  <td>{j.job_type}</td>
-                  <td>
-                    <span
-                      className={`badge ${
-                        j.status === "success" ? "ok" : j.status === "failed" ? "fail" : "warn"
-                      }`}
-                    >
-                      {j.status}
-                    </span>
-                  </td>
-                  <td>{j.started_at ? new Date(j.started_at).toLocaleString() : "—"}</td>
-                  <td>{j.error_summary || "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!jobs?.items?.length && !error && <div className="state">Нет jobs</div>}
+      {loading && <div className="state">Загрузка…</div>}
+
+      {!loading && !run && !error && cacheReady && (
+        <div className="state">
+          Запусков ещё не было. Нажмите «Синхронизация», чтобы загрузить все источники.
         </div>
-        <div className="panel">
-          <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>
-            {selected ? `Job ${selected.id.slice(0, 8)}…` : "Выберите job"}
-          </h2>
-          {selected && (
-            <pre style={{ whiteSpace: "pre-wrap", fontSize: "0.8rem" }}>
-              {JSON.stringify(selected.stats, null, 2)}
-            </pre>
-          )}
-          <table>
-            <thead>
-              <tr>
-                <th>Level</th>
-                <th>Message</th>
-                <th>Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(logs?.items || []).map((l) => (
-                <tr key={l.id}>
-                  <td>{l.level}</td>
-                  <td>{l.message}</td>
-                  <td>{new Date(l.created_at).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      )}
+
+      {run && (
+        <div className="grid-2">
+          <div className="panel">
+            <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>Этапы</h2>
+            {run.error_summary && (
+              <div className="state error" style={{ marginBottom: "0.75rem" }}>
+                {run.error_summary}
+              </div>
+            )}
+            {groups.map(({ group, stages }) => (
+              <div key={group} style={{ marginBottom: "1rem" }}>
+                <div
+                  style={{
+                    fontWeight: 600,
+                    marginBottom: "0.4rem",
+                    color: "var(--muted)",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  {group}
+                </div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Этап</th>
+                      <th>Статус</th>
+                      <th>Детали</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stages.map((s) => (
+                      <tr
+                        key={s.id}
+                        className={
+                          run.progress.current_stage_id === s.id && s.status === "running"
+                            ? "row-selected"
+                            : undefined
+                        }
+                      >
+                        <td>{s.label}</td>
+                        <td>
+                          <span className={`badge ${statusBadgeClass(s.status)}`}>
+                            {statusLabel(s.status)}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+                          {stageDetail(s)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+
+          <div className="panel">
+            <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>Лог</h2>
+            {logs.length === 0 ? (
+              <div className="state">Нет записей</div>
+            ) : (
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Level</th>
+                      <th>Message</th>
+                      <th>Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {logs.map((l) => (
+                      <tr key={l.id}>
+                        <td>{l.level}</td>
+                        <td>{l.message}</td>
+                        <td>{new Date(l.created_at).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {run.stats && Object.keys(run.stats).length > 0 && (
+              <pre style={{ whiteSpace: "pre-wrap", fontSize: "0.8rem", marginTop: "1rem" }}>
+                {JSON.stringify(run.stats, null, 2)}
+              </pre>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }

@@ -15,7 +15,7 @@ Envelope `result`/`err`/`err_text`/`data`; formal `cnt`/`list`; formal `cities`/
 
 ## EXAMPLE-CONFIRMED only
 
-Item keys for free/connected/geo — mapped optionally with `example_confirmed` markers; `price` → `price_amount` only.
+Item keys for free/connected/geo — mapped optionally with `example_confirmed` markers; free `price` → `period_price`.
 
 ## Live-test later
 

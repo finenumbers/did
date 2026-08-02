@@ -8,7 +8,12 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+psycopg://did:did@localhost:5432/did"
     backend_cors_origins: str = "http://localhost:3000"
-    docs_providers_path: str = "../docs/providers"
+    # Admin user (when both set, /api/v1 requires login session Bearer token)
+    admin_username: str = ""
+    admin_password: str = ""
+    admin_session_secret: str = ""
+    # Optional machine token (Bearer) in addition to login sessions
+    admin_api_token: str = ""
 
     @property
     def cors_origins_list(self) -> list[str]:

@@ -2,9 +2,8 @@ import { NumbersTable } from "@/components/numbers/NumbersTable";
 
 export default function FreeNumbersPage() {
   return (
-    <>
-      <h1>Свободные номера</h1>
+    <div className="numbers-page">
       <NumbersTable kind="free" />
-    </>
+    </div>
   );
 }

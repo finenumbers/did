@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.catalog import NumbersCatalogNormalized
 from app.models.enums import ConnectionTestStatus, InventoryKind, ProviderCode
@@ -20,16 +21,39 @@ from app.schemas.providers import (
     TestConnectionOut,
 )
 
+# Non-secret / display-safe auth fields (still docs-derived metadata)
+_AUTH_PLAIN_KEYS = frozenset(
+    {
+        "email",
+        "token_expire",
+        "refresh_token_expire",
+        "numbering_login",
+        "numbering_partition",
+        "numbering_base_url",
+    }
+)
+_AUTH_TOKEN_KEYS = frozenset(
+    {"token", "access_token", "refresh_token", "token_expire", "refresh_token_expire"}
+)
+_AUTH_NUMBERING_SESSION_KEYS = frozenset({"numbering_session_id"})
+
 
 def _mask_auth(auth: dict) -> dict:
     out = {}
     for k, v in (auth or {}).items():
         if v is None or v == "":
             out[k] = v
+        elif k in _AUTH_PLAIN_KEYS:
+            out[k] = v
         else:
             s = str(v)
             out[k] = ("*" * max(0, len(s) - 4)) + s[-4:] if len(s) > 4 else "****"
     return out
+
+
+def persist_auth_settings(conn: ProviderConnection, auth_settings: dict) -> None:
+    conn.auth_settings = dict(auth_settings or {})
+    flag_modified(conn, "auth_settings")
 
 
 class ProvidersService:
@@ -60,8 +84,21 @@ class ProvidersService:
     def get_settings(self, code: str) -> ProviderSettingsOut:
         p = self._provider(code)
         conn = p.connection
+        notice = (
+            "Runexis: DIDAPI email/password → Bearer (purchased); "
+            "Numbering numbering_login/password → JSON-RPC connect (free catalog). "
+            "See runexis-contract.md + runexis-numbering-api-contract.md."
+            if code == ProviderCode.runexis.value
+            else "Provider integration is based on uploaded documentation contracts "
+            "under docs/providers/*-contract.md"
+        )
         if not conn:
-            return ProviderSettingsOut(provider_code=code, auth_settings_masked={}, is_enabled=True)
+            return ProviderSettingsOut(
+                provider_code=code,
+                auth_settings_masked={},
+                is_enabled=True,
+                docs_notice=notice,
+            )
         return ProviderSettingsOut(
             provider_code=code,
             base_url=conn.base_url,
@@ -71,6 +108,7 @@ class ProvidersService:
             last_tested_at=conn.last_tested_at,
             last_test_status=conn.last_test_status.value,
             last_test_message=conn.last_test_message,
+            docs_notice=notice,
         )
 
     def upsert_settings(self, code: str, payload: ProviderSettingsUpdate) -> ProviderSettingsOut:
@@ -82,9 +120,23 @@ class ProvidersService:
         if payload.base_url is not None:
             conn.base_url = payload.base_url
         if payload.auth_settings is not None:
+            incoming = {k: v for k, v in payload.auth_settings.items() if v not in (None, "")}
             merged = dict(conn.auth_settings or {})
-            merged.update(payload.auth_settings)
-            conn.auth_settings = merged
+            password_changed = (
+                "password" in incoming and incoming.get("password") != merged.get("password")
+            )
+            numbering_password_changed = (
+                "numbering_password" in incoming
+                and incoming.get("numbering_password") != merged.get("numbering_password")
+            )
+            merged.update(incoming)
+            if code == ProviderCode.runexis.value and password_changed:
+                for key in _AUTH_TOKEN_KEYS:
+                    merged.pop(key, None)
+            if code == ProviderCode.runexis.value and numbering_password_changed:
+                for key in _AUTH_NUMBERING_SESSION_KEYS:
+                    merged.pop(key, None)
+            persist_auth_settings(conn, merged)
         if payload.extra_settings is not None:
             conn.extra_settings = payload.extra_settings
         if payload.is_enabled is not None:
@@ -101,10 +153,11 @@ class ProvidersService:
         adapter = get_provider(p.code)
         cfg = ConnectionConfig(
             base_url=conn.base_url,
-            auth_settings=conn.auth_settings or {},
+            auth_settings=dict(conn.auth_settings or {}),
             extra_settings=conn.extra_settings or {},
         )
         result = await adapter.test_connection(cfg)
+        persist_auth_settings(conn, cfg.auth_settings)
         conn.last_tested_at = result.checked_at
         conn.last_test_status = (
             ConnectionTestStatus.ok if result.ok else ConnectionTestStatus.failed

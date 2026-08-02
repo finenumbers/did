@@ -1,0 +1,853 @@
+Numbering API
+Введение
+Всё взаимодействие с сервером API осуществляется по протоколу JSON-RPC, данные отправляются через POST-запросы.
+URL для отправки запросов:
+https://did-api.runexis.ru/
+Примеры
+Вызовы методов из PHP-кода
+/**
+*  Функция получения содержимого страницы.
+*
+*  @return Содержимое страницы.
+*/
+function      send_post_request( $Host , $URL , $PostParameters )
+{
+$Params = array();
+foreach( $PostParameters as $Key => $Value )
+{
+$Params [] = $Key.'='.$Value;
+}
+$Curl = curl_init();
+curl_setopt( $Curl , CURLOPT_FOLLOWLOCATION , 1 );
+curl_setopt( $Curl , CURLOPT_MAXREDIRS , 5 );
+curl_setopt( $Curl , CURLOPT_POST , 1 );
+curl_setopt( $Curl , CURLOPT_POSTFIELDS , $PostParameters );
+curl_setopt( $Curl , CURLOPT_RETURNTRANSFER , 1 );
+curl_setopt( $Curl , CURLOPT_SSL_VERIFYPEER , 0 );
+curl_setopt( $Curl , CURLOPT_URL , "$Host/$URL" );
+curl_setopt( $Curl , CURLOPT_REFERER , "$Host/" );
+$Result = curl_exec( $Curl );
+if( $Result === false )
+{
+$Error = curl_error( $Curl );
+curl_close( $Curl );
+throw( new Exception( $Error ) );
+}
+else
+{
+curl_close( $Curl );
+}
+return( $Result );
+}
+/**
+*  Враппер для отправки запросов.
+*/
+function      rpc_did_api_send_request( $Parameters )
+{
+global      $DIDAPIHost;
+$PostParameters = array( 'jsonrpc' => $Parameters );
+$Result = send_post_request( $DIDAPIHost , '' , $PostParameters );
+$Result = json_decode( $Result );
+return( $Result->result );
+}
+/**
+*  Коннект к Numbering API.
+*/
+function      rpc_did_api_connect( $Login , $Password )
+{
+return(
+rpc_did_api_send_request(
+'{ "jsonrpc" : "2.0" , "method" : "connect" , "params" : [ "'.$Login.
+'" , "'.$Password.'" ] , "id" : 1 }'
+)
+);
+}
+Полный список PHP-врапперов для API можно посмотреть в файле php-did-api-functions.php.
+Заголовки и тело корректного запроса
+Host: did-api.runexis.ru\r\n
+User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:30.0) Gecko/20100101 Firefox/30.0\r\n
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n
+Accept-Language: ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3\r\n
+Accept-Encoding: gzip, deflate\r\n
+Cookie: PHPSESSID=b0402fadd0b922015af72f1e5e448fe7\r\n
+Cache-Control: max-age=0\r\n
+Content-Type: application/x-www-form-urlencoded\r\n
+Content-Length: 153\r\n
+Connection: close\r\n\r\n
+jsonrpc=%7B+%22jsonrpc%22+%3A+%222.0%22+%2C+%22method%22+%3A+%22connect%22+%2C+%22params%22+%3A+%5B+%22admin%22+%2C+%22root%22+%5D+%2C+%22id%22+%3A+1+%7D
+Отправка заголовков через сокеты
+function      post_request( $URL , $Data , $Referer = '' )
+{
+$Data = http_build_query( $Data );
+$URL = parse_url( $URL );
+$Host = $URL[ 'host' ];
+$Path = $URL[ 'path' ];
+$fp = fsockopen( $Host , 80 , $errno , $errstr , 10 );
+if( $fp )
+{
+fputs( $fp , "POST {$URL['path']} HTTP/1.1\r\n" );
+fputs( $fp , "Host: {$URL['host']}\r\n" );
+if( $Referer != '' )
+{
+fputs( $fp , "Referer: $Referer\r\n" );
+}
+fputs( $fp , "User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:30.0) Gecko/20100101 Firefox/30.0\r\n" );
+fputs( $fp , "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n" );
+fputs( $fp , "Accept-Language: ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3\r\n" );
+fputs( $fp , "Accept-Encoding: gzip, deflate\r\n" );
+fputs( $fp , "Cookie: PHPSESSID=b0402fadd0b922015af72f1e5e448fe7\r\n" );
+fputs( $fp , "Cache-Control: max-age=0\r\n" );
+fputs( $fp , "Content-type: application/x-www-form-urlencoded\r\n" );
+fputs( $fp , "Content-length: ".strlen( $Data )."\r\n" );
+fputs( $fp , "Connection: close\r\n\r\n" );
+fputs( $fp , $Data );
+$Result = '';
+while( !feof( $fp ) )
+{
+$Result .= fgets( $fp , 128 );
+}
+}
+else
+{
+return(
+array(
+'status' => 'err' ,
+'error' => "$errstr ($errno)"
+)
+);
+}
+fclose( $fp );
+$Result = explode( "\r\n\r\n" , $Result , 2 );
+$Header = isset( $Result[ 0 ] ) ? $Result[ 0 ] : '';
+$Content = isset( $Result[ 1 ] ) ? $Result[ 1 ] : '';
+return(
+array(
+'status' => 'ok',
+'header' => $Header,
+'content' => $Content
+)
+);
+}
+var_dump( post_request(
+'http://did-api.runexis.ru/' , array( 'jsonrpc' => '{ "jsonrpc" : "2.0" , "method" : "connect" , "params" : [ "gdever" , "root" ] , "id" : 1 }' )
+) );
+Вопрос-ответ
+«Получаю ошибку при авторизации "Invalid Request"»
+{
+"id": null,
+"jsonrpc": "2.0",
+"error": {
+"code": -32600,
+"message": "Invalid Request"
+}
+}
+Это не ошибка авторизации, а ошибка отправки запроса. Запрос необходимо отправлять в поле формы JSON-RPC, как это сделать – описано в примере 1.
+Модель данных
+Meta-поля
+Это поля, содержащие существенную для бизнеса информацию, но которая не влияет на отображение и выборки номеров из Numbering API.
+"ready"
+Поле содержит информацию о том, через сколько месяцев мы сможем подключить данный номер. Если в поле хранится значение "0", значит номер будет подключён сразу после оплаты. Если, например, "3", такой номер может быть подключён в течение трёх месяцев.
+Номера с ready = N могут быть доступны для продажи. Однако, в этом случае клиентам необходимо открытым текстом сообщать о том, что данный номер будет доступен только через N месяцев.
+Тарификация
+Цена номеров рассчитывается автоматически, на основании тарифов, указанных в Numbering API.
+Тариф состоит из информации о том, для какого класса в каком регионе какую цену указывать. Есть возможность указать для каждого агента свои тарифы и, как следствие, свои цены.
+Например, (495, 0, 900) – цена простого номера в коде 495 составляет 900 руб.
+Порядок действий с номерами
+Для продажи свободного номера его необходимо зарезервировать – в течение 1 часа никто не сможет его перехватить. Резерв автоматически снимается через 1 час. Если клиент дал своё согласие на покупку этого номера, то этот номер бронируется. Бронь автоматически снимается через 31 день. После поступления денег номер необходимо переместить в статус Продан. Проданные номера необходимо отрулить на оборудование.
+Доступы
+Все операции закрыты доступами. Необходимые доступы для выполнения того или иного метода указаны в описании методов ниже.
+Помимо этого есть ещё дополнительные доступы, которые ограничивают видимость номеров:
+view-all-numbers – если такого доступа у пользователя нет, то он может видеть только свободные номера и те, в которых он указан ответственным менеджером;
+view-type-all – просмотр номеров всех классов (простые, бронзовые, серебряные, золотые, платиновые и эксклюзивные);
+view-type-simple – просмотр номеров с классом Простой;
+view-type-bronze – просмотр номеров с классом Бронзовый;
+view-type-silver – просмотр номеров с классом Серебряный;
+view-type-golden – просмотр номеров с классом Золотой;
+view-type-platinum – просмотр номеров с классом Платиновый;
+view-type-exclusive – просмотр номеров с классом Эксклюзивный.
+Базовые методы
+Подключение к API-серверу
+{
+"jsonrpc": "2.0",
+"method": "connect ",
+"params": ["<login>", "<password>", "<partition>"],
+"id": 1
+}
+Метод возвращает идентификатор сессии, которую необходимо использовать в других вызовах API-методов.
+Длительность сессии — 1 час, после чего необходимо получать новый идентификатор сессии
+Если подключение не произошло, то возвращается объект:
+{
+"result": "error%",
+"id": 1,
+"jsonrpc": "2.0"
+}
+Здесь и далее поле id – это идентификатор запроса. Используется при асинхронном выполнении запросов к серверу.Если же API-методы вызываются в синхронном режиме (например из PHP-скриптов), то в этом поле можно указывать любое целочисленное значение.
+Аутентификация по токену доступа
+{
+"jsonrpc": "2.0",
+"method": "connect_by_acces_token",
+"params": ["<session-id>", "<access-token>"],
+"id": 27
+}
+Методы изменения статусов номеров
+Резервирование номеров
+{
+"jsonrpc": "2.0",
+"method": "reserv_numbers",
+"params": ["<session-id>", "<client-login>", [ <numbers> ], "<timeout>"],
+"id": 3
+}
+Метод возвращает список номеров, которые удалось зарезервировать для указанного клиента. Резервированию поддаются только те номера, которые ещё никто не зарезервировал для себя.
+Резервирование осуществляется на timeout минут, где timeout – значение от 15 до 7200 (5 дней). Если это параметр не указан, то номер резервируется на 15 минут.
+Пример вызова:
+{
+"jsonrpc": "2.0",
+"method": "reserv_numbers",
+"params": ["ttkafq919po8f7ad8hc0lqrm01", "example-user-login", ["4951234567", "4952345678"]],
+"id": 3
+}
+Метод возвращает следующий объект:
+{
+"result": {
+"reserved_numbers": [ <список_зарезервированных_номеров> ],
+"numbers_not_found": [ <ненайденные_номера> ],
+"error_numbers": [ <прочие_незагруженные_номера> ]
+},
+"id": 3,
+"jsonrpc": "2.0"
+}
+Бронирование номеров
+{
+"jsonrpc": "2.0",
+"method": "book_numbers",
+"params": ["<session-id>", [ <numbers> ]],
+"id": 4
+}
+Метод возвращает список номеров, которые удалось забронировать. Забронировать можно только те номера, которые были зарезервированы. Номера бронируются на 31 день.
+Если номер уже забронирован, то для него бронь будет продлена.
+Продажа номеров
+{
+"jsonrpc": "2.0",
+"method": "sell_numbers",
+"params": ["<session-id>", [ <numbers> ]],
+"id": 5
+}
+Метод возвращает список номеров, которые удалось продать. Продать можно свободные, зарезервированные или забронированные номера.
+Дополнительные ограничения:
+sell-numbers – доступ на выполнение этого метода
+Отруливание номеров
+{
+"jsonrpc": "2.0",
+"method": "install_numbers",
+"params": ["<session-id>", [ <numbers> ], "<operator-id>", "<equipment-group-id>", "<grace>"],
+"id": 20
+}
+operator-id – идентификатор оператора
+equipment-group-id – идентификатор группы оборудования
+grace – маркер промо-периода:
+0 – если промо-период не задан (или можно вообще не передавать этот параметр)
+1 – если промо-период задан
+Метод отруливает только номера, у которых код города и номер состоят суммарно из 10 символов, остальные номера игнорируются.
+Дополнительные ограничения:
+install-numbers – доступ на выполнение этого метода
+install-numbers-limit – суточный лимит на количество отруливаемых номеров (по умолчанию – 1 000 номеров в сутки)
+В случае ошибки возвращается объект с полем error_message, содержащим описание ошибки.
+Возврат номеров
+{
+"jsonrpc": "2.0",
+"method": "return_numbers",
+"params": ["<session-id>", [ <numbers> ]],
+"id": 21
+}
+Смена статуса номера из Зарезервирован / Забронирован / Продан на статус Свободен (доступен для резервирования).
+Пример вызова:
+{
+"jsonrpc": "2.0",
+"method": "return_numbers",
+"params": ["ttkafq919po8f7ad8hc0lqrm01", ["4951234567", "4952345678"]],
+"id": 21
+}
+Метод возвращает следующий объект:
+{
+"result": {
+"returned_numbers": [ <список_обработанных_номеров> ],
+"numbers_not_found": [ <ненайденные_номера> ],
+"error_numbers": [ <прочие_необработанные_номера> ]
+},
+"id": 21,
+"jsonrpc": "2.0"
+}
+Перемещение номера в отстойник
+{
+"jsonrpc": "2.0",
+"method": "buffer_numbers",
+"params": ["<session-id>", [ <numbers> ]],
+"id": 36
+}
+Перемещение отруленного номера в буфер-отстойник.
+Пример вызова:
+{
+"jsonrpc": "2.0",
+"method": "buffer_numbers",
+"params": ["ttkafq919po8f7ad8hc0lqrm01", ["4951234567", "4952345678"]],
+"id": 36
+}
+Метод возвращает список перемещённых в буфер номеров.
+Необходим доступ buffer-numbers.
+В данный момент перемещение в отстойник осуществляется вручную.
+Номер находится в отстойнике в течение трёх месяцев. После чего перемещается в свободные автоматически.
+С помощью API-методов есть возможность вынуть номер из отстойника в любой момент, переместив его в свободные.
+Открепление номера
+{
+"jsonrpc": "2.0",
+"method": "detach_numbers",
+"params": ["<session-id>", [ <numbers> ], "<operator-id>", "<equipment-id>", "<owner-id>"],
+"id": 64
+}
+Метод возвращает список откреплённых номеров.
+Необходим доступ detach-numbers.
+Методы выборки записей
+Поиск номеров
+{
+"jsonrpc": "2.0",
+"method": "search_numbers",
+"params": ["<session-id>", {
+"<search-field>": "<search-pattern>"
+}, "<from>", "<limit>"],
+"id": 9
+}
+Здесь search-field – поле, по которому осуществляется поиск, а search-pattern – это искомое значение. Поиск может осуществляться сразу по нескольким полям.
+Поля from и limit используются для ограничения размеров выборок:будут выбраны номера в количестве limit, начиная с номера from в выборке.
+В случае успеха метод возвращает:
+{
+"result": "<список_номеров>",
+"id": 9,
+"jsonrpc": "2.0"
+}
+Поиск можно осуществлять по следующим полям:
+owners – массив идентификаторов владельцев номеров
+regions – массив идентификаторов регионов
+access_state – массив статусов номераДопустимые значения – free, reserved, booked, unbooked, installed, sold, undefined. Соответственно, свободен для резервирования, зарезервирован, забронирован, бронь снята, отрулен, продан, неопределён, технический:
+0 – Свободен
+1 – Зарезервирован
+2 – Забронирован
+3 – Продан
+4 – Отрулен
+5 – Неопределён
+6 – В отстойнике
+7 – Открепленный
+city_code_near / phone_number_near – код города и номер телефона, для которого надо вывести ближайшие номера, поиск работает только если заданы оба этих поля
+city_code – код города
+Обратите внимание – все коды городов и DEF-номеров – трехзначные
+phone_number – номер телефона, без кода городаПри осуществлении поиска по номеру телефона в запросе можно указывать спецсимволы:
+? – любой один символ
+* – последовательность любых символов
+booked_from – начало периода, за который осуществляется поиск забронированных номеров
+booked_to – конец периода, за который осуществляется поиск забронированных номеров
+reserved_from – начало периода, за который осуществляется поиск зарезервированных номеров
+reserved_to – конец периода, за который осуществляется поиск зарезервированных номеров
+action_from – начало периода, за который осуществляется поиск номеров, дата последнего действия с которыми больше этой даты
+action_to – конец периода, за который осуществляется поиск номеров, дата последнего действия с которыми меньше этой даты
+numbers – список номеров телефонов для выборки (номера телефонов указываются вместе с кодами регионов)
+managers – идентификаторы ответственных менеджеров
+operators – идентификаторы операторов
+number_type – тип номера:
+0 – простой
+1 – серебряный
+2 – золотой
+3 – платиновый
+4 – эксклюзивный
+5 — бронзовый
+number_types – массив типов номеров:
+0 – простые
+1 – серебряные
+2 – золотые
+3 – платиновые
+4 – эксклюзивные
+5 — бронзовые
+notes – примечания
+ready – готовность номера (online / not-ready / дата готовности)
+operator_fas – оператор по реестру федерального агентства связи
+phone_number_mask – маска, по которой будет осуществляться поиск номеров (например, XYYZZZZ)
+pretty - id фильтра красивых номеро (список фильтров получаетя отдельным методом get_pretty_filters)
+Все поля могут быть использованы как по отдельности, так и в любой комбинации друг с другом.
+Область действия метода ограничивается доступом view-all-numbers – если он есть у пользователя, то можно получать доступ даже к чужим номерам. Без этого доступа можно получить доступ только к свободным номерам и своим.
+Дополнительно метод целиком закрывается доступом view-numbers.
+Пример поиска по статусам:
+{
+"jsonrpc": "2.0",
+"method": "search_numbers",
+"params": ["ttkafq919po8f7ad8hc0lqrm01",
+{
+"usage_statuses": ["free", "sold"]
+}
+],
+"id": 9
+}
+Форматирование найденных номеров
+Функция search_numbers помимо прочих данных о номере возвращает поле display_mask, в котором выводится рекомендованный шаблон красивого форматирования номера.
+Например, вместо стандартного форматирования 100 02 22 лучше использовать 1 000 222, это позволит подчеркнуть красоту номера и обосновать его принадлежность к тому или иному классу красивости (серебро, золото и т.д.).
+Получение списка владельцев
+{
+"jsonrpc": "2.0",
+"method": "get_owners",
+"params": ["<session-id>"],
+"id": 10
+}
+В случае успеха метод возвращает:
+{
+"result": "<список_владельцев>",
+"id": 10,
+"jsonrpc": "2.0"
+}
+Количество найденных номеров
+{
+"jsonrpc": "2.0",
+"method": "search_numbers_count",
+"params": ["<session-id>", {
+"<search-field>": "<search-pattern>"
+}],
+"id": 11
+}
+Здесь search-field – это поле, по которому осуществляется поиск, а search-pattern – это искомое значение. Поиск может осуществляться сразу по нескольким полям.
+В случае успеха метод возвращает:
+{
+"result": "<количество_номеров>",
+"id": 11,
+"jsonrpc": "2.0"
+}
+Область действия метода ограничивается доступом view-all-numbers – если он есть у пользователя, то можно получать доступ даже к чужим номерам. Без этого доступа можно получить доступ только к свободным номерам и своим.
+Получение списка регионов
+{
+"jsonrpc": "2.0",
+"method": "get_regions",
+"params": ["<session-id>"],
+"id": 13
+}
+В случае успеха метод возвращает:
+{
+"result": <список_регионов> ,
+"id": 13,
+"jsonrpc": "2.0"
+}
+Получение списка операторов
+{
+"jsonrpc": "2.0",
+"method": "get_operators",
+"params": ["<session-id>"],
+"id": 16
+}
+В случае успеха метод возвращает:
+{
+"result": <список_операторов> ,
+"id": 16,
+"jsonrpc": "2.0"
+}
+Если у пользователя есть доступ view-operators, то этот метод вернёт всех доступных в системе операторов. Иначе будет возвращён тот оператор, за которым закреплён данный пользователь.
+Получение списка менеджеров
+{
+"jsonrpc": "2.0",
+"method": "get_managers",
+"params": ["<session-id>"],
+"id": 17
+}
+В случае успеха метод возвращает:
+{
+"result": <список_менеджеров> ,
+"id": 17,
+"jsonrpc": "2.0"
+}
+Получение списка фильтров красивых номеров
+{
+"jsonrpc": "2.0",
+"method": "get_pretty_filters",
+"params": ["<session-id>"],
+"id": 78
+}
+В случае успеха метод возвращает:
+{
+"result": <список_фильтров_красивых_номеров> ,
+"id": 17,
+"jsonrpc": "2.0"
+}
+Получение списка кодов городов
+{
+"jsonrpc": "2.0",
+"method": "get_city_codes",
+"params": ["<session-id>"],
+"id": 18
+}
+В случае успеха метод возвращает:
+{
+"result": <список_кодов_городов> ,
+"id": 18,
+"jsonrpc": "2.0"
+}
+Выборка действий пользователя за период
+{
+"jsonrpc": "2.0",
+"method": "show_log",
+"params": ["<session-id>", "<managers-id>", "<date-time-from>", "<date-time-to>"],
+"id": 32
+}
+managers-id – массив идентификаторов менеджеров.
+Необходим доступ show-log.
+Выборка действий с номерами за период
+{
+"jsonrpc": "2.0",
+"method": "show_number_log",
+"params": ["<session-id>", "<number>", "<date-time-from>", "<date-time-to>"],
+"id": 35
+}
+Необходим доступ show-log.
+Выборка версий номеров
+{
+"jsonrpc": "2.0",
+"method": "show_number_versions",
+"params": ["<session-id>", "<number>"],
+"id": 53
+}
+Необходим доступ show-log.
+Методы создания записей
+Загрузка диапазона номеров
+{
+"jsonrpc": "2.0",
+"method": "load_numbers_range",
+"params": ["<session-id>", "<city-code>", "<range-from>", "<range-to>", "<abc-def>", "<owner>", "<operator>", "<approx-price>", "<operator-fas>", "<notes>"],
+"id": 12
+}
+city-code – код города
+Обратите внимание – все коды городов и DEF-номеров – трехзначные
+range-from – начало диапазона
+range-to – конец диапазона
+owner – владелец номера
+operator – оператор
+approx-price – ориентировочная цена
+operator-fas – оператор по реестру федерального агентства связи
+notes – примечания к номеру
+В случае успеха метод возвращает:
+{
+"result": {
+"code": 0,
+"duplicates": ["<список_дубликатов>"],
+"added": ["<список_добавленных_номеров>"]
+},
+"id": 12,
+"jsonrpc": "2.0"
+}
+Загрузка одного номера
+"jsonrpc": "2.0",
+"method": "create_number",
+"params": ["<session-id>", "<city-code>", "<number>", "<type>", "<from-block>", "<abcdef>", "<owner>", "<mera-operator-id>", "<operator-fas>", "<vanity-index>", "<notes>"],
+"id": 25
+}
+Параметры метода аналогичны методу load_numbers_range.
+Необходим доступ create-numbers.
+Если type == -1, то класс номера будет рассчитан автоматически.
+Создание региона
+{
+"jsonrpc": "2.0",
+"method": "create_region",
+"params": ["<session-id>", "<region>"],
+"id": 30
+}
+Необходим доступ create-region.
+Методы модификации полей номеров
+Установка ответственного (менеджера) в номере
+{
+"jsonrpc": "2.0",
+"method": "set_manager",
+"params": ["<session-id>", [ <numbers> ], <manager_id> ],
+"id": 22
+}
+Необходим доступ set-manager.
+Установка статуса «Технический» и времени этого действия
+{
+"jsonrpc": "2.0",
+"method": "set_install_status",
+"params": ["<session-id>", [ <numbers> ], "<set-install-status-date>"],
+"id": 23
+}
+Необходим доступ set-install-status.
+Установка статуса "Неопределён" и времени этого действия
+{
+"jsonrpc": "2.0",
+"method": "undefined_numbers",
+"params": ["<session-id>", [ <numbers> ]],
+"id": 24
+}
+Необходим доступ undefine-number.
+Если до этого номер был отрулен, то маршрут на коммутаторе тоже удаляется.
+Установка владельца для номеров
+{
+"jsonrpc": "2.0",
+"method": "set_owner",
+"params": ["<session-id>", [ <numbers> ], <owner_id> ],
+"id": 26
+}
+Необходим доступ set-owner.
+Указание примечаний к номеру
+{
+"jsonrpc": "2.0",
+"method": "set_notes",
+"params": ["<session-id>", [ <numbers> ], <notes> ],
+"id": 27
+}
+Необходим доступ set-notes.
+Получение групп оборудования
+{
+"jsonrpc": "2.0",
+"method": "get_equipment_groups",
+"params": ["<session-id>"],
+"id": 28
+}
+В случае успеха метод возвращает:
+{
+"result": <список_групп_оборудования> ,
+"id": 28,
+"jsonrpc": "2.0"
+}
+Если у пользователя есть доступ view-operators, то будут возвращены группы оборудования для всех операторов. Иначе – только для того оператора, который закреплён за этим пользователем.
+Установка цены номера
+{
+"jsonrpc": "2.0",
+"method": "set_price",
+"params": ["<session-id>", [ <numbers> ], <buy_price> , <period_price> , <book_price> ],
+"id": 29
+}
+Необходим доступ set-price.
+Установка класса номера
+{
+"jsonrpc": "2.0",
+"method": "set_type",
+"params": ["<session-id>", [ <numbers> ], <type> ],
+"id": 31
+}
+Необходим доступ set-type.
+Установка готовности номера
+{
+"jsonrpc": "2.0",
+"method": "set_ready",
+"params": ["<session-id>", [ <numbers> ], "<ready>"],
+"id": 33
+}
+Необходим доступ set-ready.
+Установка оператора по ФАС
+{
+"jsonrpc": "2.0",
+"method": "set_operator_fas",
+"params": ["<session-id>", [ <numbers> ], "<operator-fas>"],
+"id": 65
+}
+Необходим доступ set-operator-fas.
+Установка баллов красивости для номера
+{
+"jsonrpc": "2.0",
+"method": "set_points_type",
+"params": ["<session-id>", [{
+"city_code": "<city_code_1>",
+"phone_number": "<phone_number_1>",
+"points": <points_1> ,
+"number_type": <number_type_1>
+}, {
+"city_code": "<city_code_2>",
+"phone_number": "<phone_number_2>",
+"points": <points_2> ,
+"number_type": <number_type_2>
+},
+...,
+{
+"city_code": "<city_code_N>",
+"phone_number": "<phone_number_N>",
+"points": <points_N> ,
+"number_type": <number_type_N>
+}
+]],
+"id": 42
+}
+Необходим доступ set-points.
+Методы биллинга
+Для выполнения методов биллинга требуется доступ billing.
+Получение списка агентов
+{
+"jsonrpc": "2.0",
+"method": "get_agents",
+"params": ["<session-id>"],
+"id": 38
+}
+Получение номеров агентов
+{
+"jsonrpc": "2.0",
+"method": "get_agents_numbers",
+"params": ["<session-id>", ["agents"]],
+"id": 39
+}
+Получение тарифов для номеров агентов
+{
+"jsonrpc": "2.0",
+"method": "get_numbers_for_agents",
+"params": ["<session-id>", ["agents"], "<billing-start-date>"],
+"id": 40
+}
+Создание начислений агентов
+{
+"jsonrpc": "2.0",
+"method": "create_charges_for_customers",
+"params": ["<session-id>", ["customer-ids"]],
+"id": 41
+}
+Установка даты биллинга
+{
+"jsonrpc": "2.0",
+"method": "set_bill_date",
+"params": ["<session-id>", [{
+"city_code": "<city_code1>",
+"phone_number": "<phone_number1>",
+"bill_date": "<bill_date1>"
+},
+{
+"city_code": "<city_code2>",
+"phone_number": "<phone_number2>",
+"bill_date": "<bill_date2>"
+}, ...,
+{
+"city_code": "<city_codeN>",
+"phone_number": "<phone_numberN>",
+"bill_date": "<bill_dateN>"
+}
+]],
+"id": 43
+}
+Получение начислений для агентов
+{
+"jsonrpc": "2.0",
+"method": "get_agents_charges",
+"params": ["<session-id>", [ <porta_agent_ids> ], "<date-from>", "<date-to>"],
+"id": 44
+}
+Получение стоимости номера в указанный момент времени
+{
+"jsonrpc": "2.0",
+"method": "get_numbers_tariffs_for_date",
+"params": ["<session-id>", [ <number_data> ]],
+"id": 45
+}
+Получение скидок для агентов
+{
+"jsonrpc": "2.0",
+"method": "get_discounts_for_agents_numbers",
+"params": ["<session-id>", [ <agents> ]],
+"id": 47
+}
+Получение списка операторов по ФАС
+{
+"jsonrpc": "2.0",
+"method": "get_operators_fas",
+"params": ["<session-id>"],
+"id": 48
+}
+Назначение тарифа для пользователя
+{
+"jsonrpc": "2.0",
+"method": "set_tarif",
+"params": ["<session-id>", "<sso-user-id>", "<tarif-id>"],
+"id": 49
+}
+Удаление тарифа для пользователя
+{
+"jsonrpc": "2.0",
+"method": "remove_tarif",
+"params": ["<session-id>", "<sso-user-id>"],
+"id": 50
+}
+Добавление скидки
+{
+"jsonrpc": "2.0",
+"method": "add_discount",
+"params": ["<session-id>", "<sso-user-id>", "<buy-discount>", "<period-discount>", "<book-discount>", "<city-code>", "<number-type>"
+],
+"id": 51
+}
+Удаление скидок
+{
+"jsonrpc": "2.0",
+"method": "remove_discounts",
+"params": ["<session-id>", "<sso-user-id>"],
+"id": 52
+}
+Получение строк тарифа для агента
+{
+"jsonrpc": "2.0",
+"method": "get_agent_tarif_items",
+"params": ["<session-id>", "<sso-user-id>"],
+"id": 54
+}
+Получение скидок для агента
+{
+"jsonrpc": "2.0",
+"method": "get_agent_discounts",
+"params": ["<session-id>", "<sso-user-id>"],
+"id": 55
+}
+Добавление строки в тариф
+{
+"jsonrpc": "2.0",
+"method": "add_tarif_item",
+"params": ["<session-id>", "<city-code>", "<number-type>", "<buy>", "<period>", "<book>", "<detach>", "<detach-period>", "<tarif>"
+],
+"id": 56
+}
+Удаление строки тарифа
+{
+"jsonrpc": "2.0",
+"method": "delete_tarif_items",
+"params": ["<session-id>", ["<tarif-items-id>"]],
+"id": 57
+}
+Удаление скидки
+{
+"jsonrpc": "2.0",
+"method": "delete_discounts",
+"params": ["<session-id>", ["<discounts-id>"]],
+"id": 58
+}
+Установка пользователя для тарификации
+{
+"jsonrpc": "2.0",
+"method": "set_tarif_user",
+"params": ["<session-id>", "<user-id>"],
+"id": 59
+}
+В данный момент алгоритм назначения цен в соответствии с тарифами работает так:
+если у номера указан владелец, у которого есть тариф, то берётся тариф владельца
+иначе берётся пользователь, назначенный методом set_tarif_user, и если для него есть тариф, то берётся этот тариф
+иначе берётся тариф сессионного пользователя, под которым вошли в Numbering API
+иначе берётся тариф с идентификатором "1"
+Получение списка тарифов
+{
+"jsonrpc": "2.0",
+"method": "get_tarifs",
+"params": ["<session-id>"],
+"id": 60
+}
+Получение элементов тарифа
+{
+"jsonrpc": "2.0",
+"method": "get_tarif_items",
+"params": ["<session-id>", "<tarif-id>"],
+"id": 61
+}
+Получение тарифа агента
+{
+"jsonrpc": "2.0",
+"method": "get_agent_tarif",
+"params": ["<session-id>", "<agent-id>"],
+"id": 62
+}
+Добавление тарифа
+{
+"jsonrpc": "2.0",
+"method": "add_tarif",
+"params": ["<session-id>", "<title>"],
+"id": 63
+}

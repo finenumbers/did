@@ -1,6 +1,6 @@
 # DID — telecom numbering analytics
 
-Internal service for loading and analyzing phone numbers from independent providers (Runexis, SipOut).
+Internal admin console for loading and analyzing phone number inventory from independent providers (**SipOut**, **Runexis**, **Finenumbers**), with PSTN-based operator enrichment.
 
 ## Stack
 
@@ -8,36 +8,69 @@ Internal service for loading and analyzing phone numbers from independent provid
 - Frontend: Next.js + TypeScript
 - Compose: `db` + `backend` + `frontend`
 
-## Documentation-driven providers
+## What it does
 
-Uploaded HTML is the only source of truth for external APIs:
+- Unified sync of free/purchased numbers (wipe-and-reload per `(provider, inventory_kind)` with safety guards)
+- Normalized catalog UI (filters, infinite scroll, XLSX export)
+- Local PSTN INN ranges cache used **only** to fill the **Оператор** column
+- Daily schedule option at 21:00 Europe/Moscow (requires ready min cache)
 
-- [`docs/providers/runexis/raw/Runexis.html`](docs/providers/runexis/raw/Runexis.html)
-- [`docs/providers/sipout/raw/SipOut.html`](docs/providers/sipout/raw/SipOut.html)
+This is **not** a CDR / RADIUS / softswitch platform.
 
-See also `*-contract.md`, `*-field-mapping.md`, `*-implementation-notes.md`.
+## Provider docs
 
-**Locked product decisions:** SipOut `connected_list` → purchased; Runexis free/purchased sync capability-limited; SipOut `price` → `price_amount` only; soft-absence on; single `free_list` call.
+- SipOut HTML: [`docs/providers/sipout/raw/SipOut.html`](docs/providers/sipout/raw/SipOut.html)
+- Runexis DIDAPI HTML + Numbering API DOCX: see [`docs/providers/runexis/SOURCE.md`](docs/providers/runexis/SOURCE.md)
+- Finenumbers/PSTN: [`docs/providers/finenumbers-contract.md`](docs/providers/finenumbers-contract.md)
+
+**Locked product decisions:** provider APIs are read-only; wipe is per inventory slice (not full catalog purge); sync requires manually loaded min PSTN INN cache (СИПАУТНЭТ, ИНТЕРНОД, Фронтир Нетворк).
+
+## Admin login
+
+Set in `.env` (not committed):
+
+```env
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=...
+ADMIN_SESSION_SECRET=...
+```
+
+UI: http://localhost:3000/login → session Bearer token for `/api/v1`.
 
 ## Local run (Docker)
 
 ```bash
 cp .env.example .env
+# edit ADMIN_USERNAME / ADMIN_PASSWORD
 docker compose up --build
 ```
 
 - API: http://localhost:8000/docs
 - UI: http://localhost:3000
 
-Configure provider credentials in **Настройки**, then run sync.
+1. Sign in as admin
+2. Configure provider credentials in **Настройки**
+3. Load PSTN operator cache (**Загрузить кеш**)
+4. Run sync on **Синхронизация**
+
+## GHCR images (linux/amd64 only)
+
+Published by GitHub Actions to:
+
+- `ghcr.io/finenumbers/did-backend`
+- `ghcr.io/finenumbers/did-frontend`
+
+```bash
+docker compose -f docker-compose.ghcr.yml --env-file .env up -d
+```
+
+No ARM / multi-arch builds.
 
 ## Local run (without Compose frontend)
 
 ```bash
-# DB
 docker compose up -d db
 
-# Backend
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
@@ -45,7 +78,6 @@ export DATABASE_URL=postgresql+psycopg://did:did@localhost:5432/did
 alembic upgrade head
 uvicorn app.main:app --reload
 
-# Frontend
 cd frontend
 npm install
 NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev

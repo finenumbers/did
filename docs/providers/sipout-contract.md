@@ -55,6 +55,6 @@ Sync default: **single** call without `city_id` crawl.
 ## UNVERIFIED / limitations
 
 - No formal item schema beyond examples.
-- No currency; no setup/monthly split (`price` → `price_amount` only).
+- No currency; free `price` → catalog `period_price` (buy_price unused for SipOut free).
 - No pagination documented for did list actions.
 - Status string semantics (`ok`/`default`) not defined.

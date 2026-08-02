@@ -3,31 +3,54 @@
 ## Boundaries
 
 ```
-UI (Next.js) → Admin API (FastAPI) → Sync engine → Providers registry
-                                              ↓
-                         provider.py → client → parser → mapper
-                                              ↓
-                         raw tables → numbers_catalog_normalized → history
+UI (Next.js)
+  → Admin API (FastAPI)
+    → Unified sync + scheduler
+    → Provider settings / PSTN INN cache
+    → Numbers browse/export
+         ↓
+    SyncService (wipe+reload per provider kind)
+         ↓
+    provider.py → client → parser → mapper
+         ↓
+    raw tables → numbers_catalog_normalized
+         ↓
+    operator_enrichment (local INN cache → operator only, then PSTN lookup)
 ```
 
 ## Modules
 
 | Area | Path | Role |
 |---|---|---|
-| Providers | `backend/app/providers/` | Doc-driven adapters (contract/client/parser/mapper/provider) |
-| Sync | `backend/app/modules/sync_engine/` | Jobs, fetch/persist, soft-absence, dry-run |
-| Settings | DB `provider_connections` + API | Auth/base URL/test connection |
-| Catalog | `numbers_catalog_normalized` | Cross-provider UI with `field_verification` |
+| Providers | `backend/app/providers/` | Doc-driven adapters (SipOut, Runexis, Finenumbers) |
+| Sync | `backend/app/modules/sync_engine/` | Unified runs, jobs, wipe+reload, progress, schedule |
+| PSTN INN cache | `backend/app/modules/pstn_inn_cache/` | Contour B: ranges cache for `catalog.operator` only |
+| Settings | `provider_connections` + PSTN cache APIs | Credentials, test connection, cache refresh, schedule |
+| Catalog | `numbers_catalog_normalized` | Cross-provider UI + `field_verification` |
+
+## Contours (do not mix)
+
+| Contour | Purpose | Writes |
+|---|---|---|
+| **A. Inventory** | Load FN free numbers via `OPERATOR_INN` / provider sync | Catalog rows (msisdn, presence, …) |
+| **B. Operator cache** | by-inn ranges for enabled INNs in Settings | **Only** `catalog.operator` |
 
 ## CONTRACT_BACKED vs OPERATIONAL
 
-- **CONTRACT_BACKED:** which HTTP methods/actions run; which fields are extracted; SipOut free/purchased/geo; Runexis me/regions/cities; Runexis free/purchased limitations.
-- **OPERATIONAL:** job tables, upsert hashes, soft-absence, pagination of our API, dry-run, UI polling.
+- **CONTRACT_BACKED:** which HTTP methods/actions run; which fields are extracted from provider docs/APIs.
+- **OPERATIONAL:** `sync_runs` / `sync_jobs`, wipe-guard, bulk/ORM persist, pagination of our API, UI polling, schedule.
+
+## Sync model
+
+- Primary UI/API path: `POST /api/v1/sync/start` (unified only).
+- Modes: `full` (dictionaries + free + purchased) and `free_only` (Finenumbers).
+- Production reload: stage into TEMP tables, then atomic wipe+cutover per `(provider, inventory_kind)`; refuse incomplete free fetches (~90% / count completeness).
+- Optional `ADMIN_API_TOKEN`: when set, `/api/v1` requires Bearer; UI uses Next `/api/backend` proxy.
 
 ## Adding a provider
 
-1. Add uploaded docs under `docs/providers/<code>/raw/`
-2. Write `*-contract.md` and `*-field-mapping.md`
-3. Implement `backend/app/providers/<code>/` layers
-4. Register in `registry.py` + seed `providers` row
-5. Add raw tables if needed + migration
+1. Add docs under `docs/providers/<code>/` (or code contract if API is owned)
+2. Implement `backend/app/providers/<code>/` layers
+3. Register in `registry.py` + seed `providers` row
+4. Add raw tables if needed + migration
+5. Wire stage in unified progress plan

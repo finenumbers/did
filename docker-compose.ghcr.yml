@@ -1,0 +1,51 @@
+# Production-style compose using GHCR images (linux/amd64).
+# Example:
+#   docker compose -f docker-compose.ghcr.yml --env-file .env up -d
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-did}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-did}
+      POSTGRES_DB: ${POSTGRES_DB:-did}
+    volumes:
+      - did_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-did} -d ${POSTGRES_DB:-did}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: ghcr.io/finenumbers/did-backend:${DID_IMAGE_TAG:-latest}
+    platform: linux/amd64
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://did:did@db:5432/did}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:3000}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-changeme-session-secret}
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    image: ghcr.io/finenumbers/did-frontend:${DID_IMAGE_TAG:-latest}
+    platform: linux/amd64
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/backend}
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:8000}
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  did_pgdata:

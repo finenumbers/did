@@ -1,12 +1,14 @@
 from app.models.enums import ProviderCode
 from app.providers.base import AbstractProvider
 from app.providers.errors import ProviderError
+from app.providers.finenumbers import FinenumbersProvider
 from app.providers.runexis import RunexisProvider
 from app.providers.sipout import SipOutProvider
 
 PROVIDER_REGISTRY: dict[ProviderCode, type[AbstractProvider]] = {
     ProviderCode.runexis: RunexisProvider,
     ProviderCode.sipout: SipOutProvider,
+    ProviderCode.finenumbers: FinenumbersProvider,
 }
 
 

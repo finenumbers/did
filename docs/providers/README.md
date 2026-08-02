@@ -2,12 +2,14 @@
 
 ## Source of truth
 
-Uploaded HTML files are the **only** specification for external provider APIs:
+External provider APIs are documented from uploaded vendor materials:
 
-- Runexis: [`runexis/raw/Runexis.html`](runexis/raw/Runexis.html)
-- SipOut: [`sipout/raw/SipOut.html`](sipout/raw/SipOut.html)
+- **SipOut:** [`sipout/raw/SipOut.html`](sipout/raw/SipOut.html) (HTML)
+- **Runexis DIDAPI:** [`runexis/raw/Runexis.html`](runexis/raw/Runexis.html) (HTML)
+- **Runexis Numbering API:** see [`runexis/SOURCE.md`](runexis/SOURCE.md) and `runexis-numbering-api-contract.md` (DOCX-derived)
+- **Finenumbers / PSTN:** [`finenumbers-contract.md`](finenumbers-contract.md), [`finenumbers-implementation-notes.md`](finenumbers-implementation-notes.md) (Contour A inventory vs Contour B operator cache); code constants in `backend/app/providers/finenumbers/contract.py`
 
-Derived artifacts (`*-contract.md`, `*-field-mapping.md`, `*-implementation-notes.md`) must not invent methods, fields, or semantics beyond those files.
+Derived artifacts (`*-contract.md`, `*-field-mapping.md`, `*-implementation-notes.md`) must not invent methods, fields, or semantics beyond those sources.
 
 ## Markers
 
@@ -19,4 +21,4 @@ Derived artifacts (`*-contract.md`, `*-field-mapping.md`, `*-implementation-note
 
 ## Strict mode
 
-If documentation is insufficient: isolate uncertainty, keep `raw_payload`, stop short of unsafe assumptions.
+If documentation is insufficient: isolate uncertainty, keep `raw_payload`, stop short of unsafe assumptions. Provider integrations are **read-only**.

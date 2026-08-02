@@ -1,30 +1,33 @@
 # Runexis implementation notes
 
+## Dual API surface
+
+| Surface | Base | Auth keys | Product use |
+|---|---|---|---|
+| DIDAPI (Scribe HTML) | `base_url` / `https://didapi.runexis.ru` | `email`, `password` → Bearer `token` | purchased, dictionaries, DIDAPI half of testConnection |
+| Numbering API (DOCX) | `numbering_base_url` / `https://did-api.runexis.ru/` | `numbering_login`, `numbering_password`, optional `numbering_partition` → `numbering_session_id` | **free / purchasable** catalog |
+
 ## Implemented
 
-| Operation | Endpoint |
+| Operation | Implementation |
 |---|---|
-| testConnection | `GET api/v1/me` |
-| sync regions | `GET api/v1/regions` |
-| sync cities | `GET api/v1/regions/cities` |
+| DIDAPI login/refresh/me | `RunexisClient` |
+| Numbering connect | `RunexisNumberingClient.connect` (read session only) |
+| testConnection | DIDAPI `GET me` and/or Numbering `connect` when respective creds set |
+| sync regions/cities | DIDAPI |
+| sync purchased | DIDAPI `GET api/v1/numbers/management` exclude free mnemonic |
+| sync free | Numbering `search_numbers` with free filter (`access_state` then fallback `usage_statuses`) |
 
-Optional client helpers (not free/purchased sync): `GET api/v1/numbers`, `GET api/v1/numbers/management`, load-data upload/status.
+## Settings UI
 
-## Not implemented as inventory sync
+Runexis panel has two credential blocks: DIDAPI + Numbering. Mutating Numbering/DIDAPI number methods are never called.
 
-- free numbers — no documented free inventory endpoint → `PROVIDER_CAPABILITY_LIMITED`
-- purchased numbers — same
+## Open / live-verify
 
-## VERIFIED
+- Exact `search_numbers` item JSON keys (parser is flexible; raw preserved)
+- Whether live filter key is `access_state` or `usage_statuses`
+- Whether `partition` is required for this account
 
-Bearer auth; base URL; me/regions/cities paths; management `number_status_id` 1..10 without labels.
+## Forbidden
 
-## EXAMPLE-CONFIRMED / uncertain
-
-Region/city/number example keys; E.164 assembly; price field meanings; SMS absent.
-
-## Live-test later
-
-- token flow login/refresh
-- pagination meta on numbers search
-- clarify free/purchased mapping with provider docs update
+`reserv_numbers`, `book_numbers`, `sell_numbers`, DIDAPI book/buy, and other mutators — see `.cursor/rules/provider-api-read-only.mdc`.

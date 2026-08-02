@@ -4,6 +4,7 @@ import enum
 class ProviderCode(str, enum.Enum):
     runexis = "runexis"
     sipout = "sipout"
+    finenumbers = "finenumbers"
 
 
 class InventoryKind(str, enum.Enum):
@@ -12,6 +13,8 @@ class InventoryKind(str, enum.Enum):
 
 
 class SyncJobType(str, enum.Enum):
+    """DB/Alembic enum. Active sync modes: full, free_only. Other values are historical."""
+
     free_numbers = "free_numbers"
     purchased_numbers = "purchased_numbers"
     regions = "regions"
@@ -19,8 +22,8 @@ class SyncJobType(str, enum.Enum):
     connection_test = "connection_test"
     full = "full"
     free_only = "free_only"
-    purchased_only = "purchased_only"
-    dictionaries_only = "dictionaries_only"
+    purchased_only = "purchased_only"  # legacy DB value; unused by engine
+    dictionaries_only = "dictionaries_only"  # legacy DB value; unused by engine
 
 
 class SyncJobStatus(str, enum.Enum):

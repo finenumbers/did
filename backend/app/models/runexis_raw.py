@@ -29,11 +29,7 @@ class RunexisCityRaw(RawSyncMixin, Base):
 
 
 class RunexisFreeNumberRaw(RawSyncMixin, Base):
-    """
-    Bucket for free inventory IF/WHEN docs confirm a source endpoint.
-    Currently capability-limited — do not populate from guessed endpoints.
-    TODO: VERIFY_WITH_DOC_FILE — free inventory endpoint mapping
-    """
+    """Free inventory from GET api/v1/numbers/management where status.mnemonic=free."""
 
     __tablename__ = "runexis_free_numbers_raw"
 
@@ -52,11 +48,7 @@ class RunexisFreeNumberRaw(RawSyncMixin, Base):
 
 
 class RunexisPurchasedNumberRaw(RawSyncMixin, Base):
-    """
-    Bucket for purchased inventory IF/WHEN docs confirm a source endpoint.
-    Currently capability-limited.
-    TODO: VERIFY_WITH_DOC_FILE — purchased inventory endpoint mapping
-    """
+    """Purchased/partner inventory from GET api/v1/numbers/management (non-free statuses)."""
 
     __tablename__ = "runexis_purchased_numbers_raw"
 

@@ -1,16 +1,9 @@
 from math import ceil
-from typing import Generic, Literal, TypeVar
+from typing import Generic, TypeVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 T = TypeVar("T")
-
-
-class PageParams(BaseModel):
-    page: int = Field(1, ge=1)
-    page_size: int = Field(50, ge=1, le=200)
-    sort_by: str | None = None
-    sort_dir: Literal["asc", "desc"] = "desc"
 
 
 class Page(BaseModel, Generic[T]):

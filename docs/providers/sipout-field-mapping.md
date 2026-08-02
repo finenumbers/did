@@ -10,7 +10,7 @@ Legend — meaning confirmed?: **yes** | **example-only** | **no**
 |---|---|---|---|---|---|---|
 | `list[]` | formal response `list` | yes | raw + catalog source | iterate | n/a | formal container |
 | `did` | free_list example item | example-only | `provider_number_key`, candidate `msisdn` | string as-is | yes | E.164 not formal for free item |
-| `price` | free_list example item | example-only | `price_amount` only | decimal parse; no currency | yes | Locked: no setup/monthly split |
+| `price` | free_list example item | example-only | `period_price` | decimal parse; no currency | yes | Locked: SipOut free price → period_price; buy_price unused |
 | `city_id` | example + formal GET param | yes (param) / example-only (item) | `city_external_id` | → text | yes | city name via dictionary = derived |
 | *(category)* | action «Свободные номера» | yes | `inventory_kind=free` | constant | no | |
 | SMS / status / region on item | — | no | — | — | — | absent on free item |
@@ -23,7 +23,12 @@ Legend — meaning confirmed?: **yes** | **example-only** | **no**
 | `did` | example | example-only | `provider_number_key` / `msisdn` | as-is | yes | |
 | `status` | example | example-only | `status_raw` | as-is; no enum meaning | yes | |
 | `city_id` | example | example-only | `city_external_id` | → text | yes | |
-| `has_sms` | example | example-only | `has_sms` | parse 0/1 | yes | |
+| `has_sms` | example | example-only | raw only (`sipout_purchased_numbers_raw.has_sms` / raw_payload) | parse 0/1 | yes | not in catalog |
+| `order_id` | example | example-only | `order_id` | as-is | yes | purchased catalog |
+| `doc_status` | example | example-only | `doc_status` | as-is | yes | purchased catalog |
+| `doc_required` | example | example-only | `doc_required` | as-is | yes | purchased catalog |
+| `order_doc_required` | example | example-only | `order_doc_required` | as-is | yes | purchased catalog |
+| `sign` | example | example-only | `sign` | bool → true/false text | yes | purchased catalog |
 | setup/monthly/tariff | — | no | — | — | — | not in connected_list |
 
 ## Geo (`did` / `get_cities`)

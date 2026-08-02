@@ -8,16 +8,6 @@ class ProviderError(Exception):
         self.details = details or {}
 
 
-class ProviderContractError(ProviderError):
-    def __init__(self, message: str, **kwargs):
-        super().__init__(message, code="PROVIDER_CONTRACT_ERROR", **kwargs)
-
-
-class ProviderNotImplementedError(ProviderError):
-    def __init__(self, message: str, **kwargs):
-        super().__init__(message, code="PROVIDER_NOT_IMPLEMENTED", **kwargs)
-
-
 class ProviderCapabilityLimitedError(ProviderError):
     """Documentation does not confirm a required capability."""
 
@@ -44,8 +34,3 @@ class ProviderTransportError(ProviderError):
 class ProviderParseError(ProviderError):
     def __init__(self, message: str, **kwargs):
         super().__init__(message, code="PROVIDER_PARSE_ERROR", **kwargs)
-
-
-class ProviderMappingError(ProviderError):
-    def __init__(self, message: str, **kwargs):
-        super().__init__(message, code="PROVIDER_MAPPING_ERROR", **kwargs)

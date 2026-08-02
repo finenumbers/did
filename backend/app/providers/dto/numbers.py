@@ -16,10 +16,36 @@ class ParsedNumberItem:
     region_external_id: str | None = None
     city_name: str | None = None
     region_name: str | None = None
-    price_amount: Decimal | None = None
+    buy_price: Decimal | None = None
+    period_price: Decimal | None = None
     status_raw: str | None = None
+    # Kept for SipOut purchased raw typed column; not mapped to catalog
     has_sms: bool | None = None
-    tariff_name: str | None = None
+    mask: str | None = None
+    display_mask: str | None = None
+    book_date: str | None = None
+    number_type: str | None = None
+    points: Decimal | None = None
+    date_from: str | None = None
+    operator_fas: str | None = None
+    operator_id: str | None = None
+    last_operation_date: str | None = None
+    manager_id: str | None = None
+    notes: str | None = None
+    abcdef: str | None = None
+    # SipOut purchased → catalog
+    order_id: str | None = None
+    doc_status: str | None = None
+    doc_required: str | None = None
+    order_doc_required: str | None = None
+    sign: str | None = None
+    # Runexis purchased → catalog (display labels)
+    tariff: str | None = None
+    number_class: str | None = None
+    operator: str | None = None
+    partner: str | None = None
+    project: str | None = None
+    equipment: str | None = None
     field_verification: dict[str, FieldVerification] = field(default_factory=dict)
 
 
@@ -32,12 +58,35 @@ class NormalizedNumber:
     region_external_id: str | None
     city_name: str | None
     region_name: str | None
-    price_amount: Decimal | None
-    price_currency: str | None
+    buy_price: Decimal | None
+    period_price: Decimal | None
     status_raw: str | None
-    has_sms: bool | None
-    tariff_name: str | None
     field_verification: dict[str, str]
     mapping_confidence: MappingConfidence
     normalized_payload: dict[str, Any]
     raw_payload: dict[str, Any]
+    abc_code: str | None = None
+    number_local: str | None = None
+    mask: str | None = None
+    display_mask: str | None = None
+    book_date: str | None = None
+    number_type: str | None = None
+    points: Decimal | None = None
+    date_from: str | None = None
+    operator_fas: str | None = None
+    operator_id: str | None = None
+    last_operation_date: str | None = None
+    manager_id: str | None = None
+    notes: str | None = None
+    abcdef: str | None = None
+    order_id: str | None = None
+    doc_status: str | None = None
+    doc_required: str | None = None
+    order_doc_required: str | None = None
+    sign: str | None = None
+    tariff: str | None = None
+    number_class: str | None = None
+    operator: str | None = None
+    partner: str | None = None
+    project: str | None = None
+    equipment: str | None = None
