@@ -66,6 +66,16 @@ docker compose -f docker-compose.ghcr.yml --env-file .env up -d
 
 No ARM / multi-arch builds.
 
+## Portainer + Nginx Proxy Manager
+
+Use the existing Docker network `proxy` (NPM). No host ports published.
+
+- Stack file: [`docker-compose.portainer.yml`](docker-compose.portainer.yml)
+- Env template: [`deploy/portainer.env.example`](deploy/portainer.env.example)
+- Full guide: [`deploy/PORTAINER.md`](deploy/PORTAINER.md)
+
+NPM forward: `did-frontend:3000` (UI). Optional API: `did-backend:8000`.
+
 ## Local run (without Compose frontend)
 
 ```bash

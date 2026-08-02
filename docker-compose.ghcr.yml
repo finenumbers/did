@@ -18,7 +18,7 @@ services:
       retries: 10
 
   backend:
-    image: ghcr.io/finenumbers/did-backend:${DID_IMAGE_TAG:-latest}
+    image: ghcr.io/finenumbers/did-backend:${DID_IMAGE_TAG:-0.1.1}
     platform: linux/amd64
     env_file:
       - .env
@@ -36,7 +36,7 @@ services:
         condition: service_healthy
 
   frontend:
-    image: ghcr.io/finenumbers/did-frontend:${DID_IMAGE_TAG:-latest}
+    image: ghcr.io/finenumbers/did-frontend:${DID_IMAGE_TAG:-0.1.1}
     platform: linux/amd64
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/backend}
