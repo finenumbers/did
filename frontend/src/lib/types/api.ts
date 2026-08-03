@@ -1,10 +1,3 @@
-export type FieldVerification =
-  | "documentation_verified"
-  | "example_confirmed"
-  | "derived"
-  | "unresolved"
-  | "missing";
-
 export interface Page<T> {
   items: T[];
   page: number;
@@ -53,7 +46,6 @@ export interface NumberItem {
   last_seen_at: string;
   is_currently_present: boolean;
   mapping_confidence: string;
-  field_verification: Record<string, FieldVerification | string>;
 }
 
 export interface FacetItem {

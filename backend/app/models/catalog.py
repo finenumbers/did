@@ -13,7 +13,7 @@ from app.models.enums import HistoryChangeSource, InventoryKind, MappingConfiden
 
 
 class NumbersCatalogNormalized(Base, TimestampMixin):
-    """Cross-provider UI catalog with field_verification metadata."""
+    """Cross-provider UI catalog."""
 
     __tablename__ = "numbers_catalog_normalized"
     __table_args__ = (

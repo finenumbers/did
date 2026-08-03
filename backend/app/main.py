@@ -19,6 +19,7 @@ from app.modules.sync_engine.scheduler import sync_schedule_loop
 from app.providers.finenumbers import contract as finenumbers_contract
 from app.providers.runexis import contract as runexis_contract
 from app.providers.sipout import contract as sipout_contract
+from app.providers.uis import contract as uis_contract
 
 
 def mark_interrupted_runs() -> None:
@@ -56,6 +57,7 @@ def seed_providers() -> None:
                 finenumbers_contract.EXAMPLE_BASE_URL,
                 {},
             ),
+            (ProviderCode.uis, "UIS", uis_contract.EXAMPLE_BASE_URL, {}),
         ]
         for code, name, base_url, auth in seeds:
             existing = db.scalar(select(Provider).where(Provider.code == code))

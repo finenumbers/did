@@ -19,6 +19,7 @@ export function formatFacetCount(n: number): string {
 const PROVIDER_LABELS: Record<string, string> = {
   sipout: "SipOut",
   runexis: "Runexis",
+  uis: "UIS",
   finenumbers: "Finenumbers",
 };
 

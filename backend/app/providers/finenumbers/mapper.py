@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.models.enums import FieldVerification, InventoryKind, MappingConfidence
+from app.models.enums import InventoryKind, MappingConfidence
 from app.providers.dto.numbers import NormalizedNumber
 
 
@@ -56,17 +56,6 @@ def expand_range_to_numbers(range_row: dict[str, Any]) -> list[NormalizedNumber]
     for local in range(start, end + 1):
         msisdn = msisdn_from_abc_local(abc, local)
         number_local = f"{local:07d}"
-        verification = {
-            "msisdn": FieldVerification.documentation_verified.value,
-            "abc_code": FieldVerification.documentation_verified.value,
-            "number_local": FieldVerification.documentation_verified.value,
-            "region_name": FieldVerification.documentation_verified.value
-            if region
-            else FieldVerification.missing.value,
-            "operator": FieldVerification.documentation_verified.value
-            if operator
-            else FieldVerification.missing.value,
-        }
         items.append(
             NormalizedNumber(
                 inventory_kind=InventoryKind.free,
@@ -79,7 +68,6 @@ def expand_range_to_numbers(range_row: dict[str, Any]) -> list[NormalizedNumber]
                 buy_price=None,
                 period_price=None,
                 status_raw=None,
-                field_verification=verification,
                 mapping_confidence=MappingConfidence.high,
                 normalized_payload={
                     "source": "finenumbers_pstn_by_inn",

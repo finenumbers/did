@@ -21,6 +21,7 @@ from app.modules.sync_engine.persist import (
     persist_regions,
     persist_runexis_numbers,
     persist_sipout_numbers,
+    persist_uis_numbers,
 )
 from app.modules.sync_engine.safety import reload_allowed
 from app.providers.dto.common import ConnectionConfig
@@ -160,56 +161,79 @@ class SyncService:
 
         # full → dictionaries + free + purchased; free_only → free only
         if mode == SyncMode.full:
-            await _hook("dictionaries", "begin")
-            try:
-                regions: list = []
-                cities: list = []
-                if provider.code == ProviderCode.sipout:
-                    geo = await adapter.sync_cities(connection)
-                    regions = (geo.items or {}).get("regions") if isinstance(geo.items, dict) else []
-                    cities = (geo.items or {}).get("cities") if isinstance(geo.items, dict) else []
-                else:
-                    reg = await adapter.sync_regions(connection)
-                    cit = await adapter.sync_cities(connection)
-                    regions = (reg.items or {}).get("regions") if isinstance(reg.items, dict) else []
-                    cities = (cit.items or {}).get("cities") if isinstance(cit.items, dict) else []
-                rc = persist_regions(
-                    self.db,
-                    provider_code=provider.code.value,
-                    job_id=job.id,
-                    regions=regions or [],
-                )
-                cc = persist_cities(
-                    self.db,
-                    provider_code=provider.code.value,
-                    job_id=job.id,
-                    cities=cities or [],
-                )
-                stats["categories"]["dictionaries"] = {"regions": rc, "cities": cc}
-                city_lookup = build_city_lookup(self.db, provider.code.value)
-                log_job(
-                    self.db,
-                    job.id,
-                    SyncLogLevel.info,
-                    "Dictionaries fetch completed",
-                    {"regions": len(regions or []), "cities": len(cities or [])},
-                )
-                self.db.commit()
-                await _hook(
-                    "dictionaries",
-                    "end",
-                    f"regions={len(regions or [])}, cities={len(cities or [])}",
-                )
-            except Exception as exc:
-                summary = _exc_summary(exc)
-                log_job(
-                    self.db, job.id, SyncLogLevel.error, f"Dictionaries failed: {summary}"
-                )
-                self.db.commit()
-                stats["_fatal_error"] = summary
-                await _hook("dictionaries", "fail", summary[:300])
-                stats["limitations"] = limitations
-                return stats
+            dict_supported = bool(
+                adapter.capabilities().get("dictionaries", {}).get("supported")
+            )
+            if not dict_supported:
+                stats["categories"]["dictionaries"] = {"limited": True}
+                await _hook("dictionaries", "skip", "capability not supported")
+            else:
+                await _hook("dictionaries", "begin")
+                try:
+                    regions: list = []
+                    cities: list = []
+                    if provider.code == ProviderCode.sipout:
+                        geo = await adapter.sync_cities(connection)
+                        regions = (
+                            (geo.items or {}).get("regions")
+                            if isinstance(geo.items, dict)
+                            else []
+                        )
+                        cities = (
+                            (geo.items or {}).get("cities")
+                            if isinstance(geo.items, dict)
+                            else []
+                        )
+                    else:
+                        reg = await adapter.sync_regions(connection)
+                        cit = await adapter.sync_cities(connection)
+                        regions = (
+                            (reg.items or {}).get("regions")
+                            if isinstance(reg.items, dict)
+                            else []
+                        )
+                        cities = (
+                            (cit.items or {}).get("cities")
+                            if isinstance(cit.items, dict)
+                            else []
+                        )
+                    rc = persist_regions(
+                        self.db,
+                        provider_code=provider.code.value,
+                        job_id=job.id,
+                        regions=regions or [],
+                    )
+                    cc = persist_cities(
+                        self.db,
+                        provider_code=provider.code.value,
+                        job_id=job.id,
+                        cities=cities or [],
+                    )
+                    stats["categories"]["dictionaries"] = {"regions": rc, "cities": cc}
+                    city_lookup = build_city_lookup(self.db, provider.code.value)
+                    log_job(
+                        self.db,
+                        job.id,
+                        SyncLogLevel.info,
+                        "Dictionaries fetch completed",
+                        {"regions": len(regions or []), "cities": len(cities or [])},
+                    )
+                    self.db.commit()
+                    await _hook(
+                        "dictionaries",
+                        "end",
+                        f"regions={len(regions or [])}, cities={len(cities or [])}",
+                    )
+                except Exception as exc:
+                    summary = _exc_summary(exc)
+                    log_job(
+                        self.db, job.id, SyncLogLevel.error, f"Dictionaries failed: {summary}"
+                    )
+                    self.db.commit()
+                    stats["_fatal_error"] = summary
+                    await _hook("dictionaries", "fail", summary[:300])
+                    stats["limitations"] = limitations
+                    return stats
 
         if mode in {SyncMode.full, SyncMode.free_only}:
             await _hook("free", "begin")
@@ -288,6 +312,20 @@ class SyncService:
                     )
                 elif provider.code == ProviderCode.runexis:
                     persist_stats = persist_runexis_numbers(
+                        self.db,
+                        provider_id=provider.id,
+                        job_id=job.id,
+                        inventory_kind=InventoryKind.free,
+                        numbers=numbers,
+                        on_progress=lambda d, c=None, t=None: log_job(
+                            self.db,
+                            job.id,
+                            SyncLogLevel.info,
+                            f"{d} ({c}/{t})" if t is not None else d,
+                        ),
+                    )
+                elif provider.code == ProviderCode.uis:
+                    persist_stats = persist_uis_numbers(
                         self.db,
                         provider_id=provider.id,
                         job_id=job.id,
@@ -405,6 +443,14 @@ class SyncService:
                     )
                 elif provider.code == ProviderCode.runexis:
                     persist_stats = persist_runexis_numbers(
+                        self.db,
+                        provider_id=provider.id,
+                        job_id=job.id,
+                        inventory_kind=InventoryKind.purchased,
+                        numbers=numbers,
+                    )
+                elif provider.code == ProviderCode.uis:
+                    persist_stats = persist_uis_numbers(
                         self.db,
                         provider_id=provider.id,
                         job_id=job.id,

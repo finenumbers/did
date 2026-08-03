@@ -5,7 +5,6 @@ from __future__ import annotations
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from app.models.enums import FieldVerification
 from app.providers.dto.common import RawHttpResult
 from app.providers.dto.geo import ParsedCity, ParsedRegion
 from app.providers.dto.numbers import ParsedNumberItem
@@ -94,11 +93,7 @@ def parse_regions(raw: RawHttpResult) -> list[ParsedRegion]:
             ParsedRegion(
                 raw_payload=item,
                 region_external_id=_as_text(item.get("id")),
-                name=_as_text(item.get("name")),
-                field_verification={
-                    "region_external_id": FieldVerification.example_confirmed,
-                    "name": FieldVerification.example_confirmed,
-                },
+                name=_as_text(item.get("name"))
             )
         )
     return out
@@ -114,13 +109,7 @@ def parse_cities(raw: RawHttpResult) -> list[ParsedCity]:
                 city_external_id=_as_text(item.get("city_id")),
                 name=_as_text(item.get("city_name")),
                 region_external_id=_as_text(item.get("region_id")),
-                region_name=_as_text(item.get("region_name")),
-                field_verification={
-                    "city_external_id": FieldVerification.example_confirmed,
-                    "name": FieldVerification.example_confirmed,
-                    "region_external_id": FieldVerification.example_confirmed,
-                    "region_name": FieldVerification.example_confirmed,
-                },
+                region_name=_as_text(item.get("region_name"))
             )
         )
     return out
@@ -205,49 +194,7 @@ def parse_management_items(raw: RawHttpResult) -> list[ParsedNumberItem]:
                 operator=operator,
                 partner=partner,
                 project=project,
-                equipment=equipment,
-                field_verification={
-                    "provider_number_key": FieldVerification.derived
-                    if msisdn
-                    else FieldVerification.example_confirmed,
-                    "msisdn": FieldVerification.derived
-                    if msisdn
-                    else FieldVerification.missing,
-                    "city_external_id": FieldVerification.example_confirmed
-                    if city.get("id") is not None
-                    else FieldVerification.missing,
-                    "city_name": FieldVerification.example_confirmed
-                    if city.get("name") is not None
-                    else FieldVerification.missing,
-                    "status_raw": FieldVerification.example_confirmed
-                    if (mnemonic or status_name)
-                    else FieldVerification.missing,
-                    "buy_price": FieldVerification.example_confirmed
-                    if price_key
-                    else FieldVerification.missing,
-                    "period_price": FieldVerification.missing,
-                    "status_mnemonic": FieldVerification.example_confirmed
-                    if mnemonic
-                    else FieldVerification.missing,
-                    "tariff": FieldVerification.example_confirmed
-                    if tariff is not None
-                    else FieldVerification.missing,
-                    "class": FieldVerification.example_confirmed
-                    if number_class is not None
-                    else FieldVerification.missing,
-                    "operator": FieldVerification.example_confirmed
-                    if operator is not None
-                    else FieldVerification.missing,
-                    "partner": FieldVerification.example_confirmed
-                    if partner is not None
-                    else FieldVerification.missing,
-                    "project": FieldVerification.example_confirmed
-                    if project is not None
-                    else FieldVerification.missing,
-                    "equipment": FieldVerification.example_confirmed
-                    if equipment is not None
-                    else FieldVerification.missing,
-                },
+                equipment=equipment
             )
         )
     return out
@@ -402,13 +349,6 @@ def parse_numbering_search_items(items: list[Any]) -> list[ParsedNumberItem]:
         notes = _as_text(item.get("notes"))
         abcdef = _as_text(item.get("abcdef"))
 
-        def _fv(present: bool) -> FieldVerification:
-            return (
-                FieldVerification.example_confirmed
-                if present
-                else FieldVerification.missing
-            )
-
         out.append(
             ParsedNumberItem(
                 raw_payload=item,
@@ -432,41 +372,7 @@ def parse_numbering_search_items(items: list[Any]) -> list[ParsedNumberItem]:
                 last_operation_date=last_operation_date,
                 manager_id=manager_id,
                 notes=notes,
-                abcdef=abcdef,
-                field_verification={
-                    "provider_number_key": FieldVerification.derived
-                    if key
-                    else FieldVerification.missing,
-                    "msisdn": FieldVerification.derived
-                    if msisdn
-                    else FieldVerification.unresolved,
-                    "city_external_id": FieldVerification.unresolved
-                    if (city_id or city_code)
-                    else FieldVerification.missing,
-                    "city_name": FieldVerification.unresolved
-                    if city_name
-                    else FieldVerification.missing,
-                    "region_name": FieldVerification.unresolved
-                    if region_name
-                    else FieldVerification.missing,
-                    "status_raw": FieldVerification.documentation_verified
-                    if status
-                    else FieldVerification.missing,
-                    "buy_price": _fv(buy_price is not None),
-                    "period_price": _fv(period_price is not None),
-                    "mask": _fv(mask is not None),
-                    "display_mask": _fv(display_mask is not None),
-                    "book_date": _fv(book_date is not None),
-                    "number_type": _fv(number_type is not None),
-                    "points": _fv(points is not None),
-                    "date_from": _fv(date_from is not None),
-                    "operator_fas": _fv(operator_fas is not None),
-                    "operator_id": _fv(operator_id is not None),
-                    "last_operation_date": _fv(last_operation_date is not None),
-                    "manager_id": _fv(manager_id is not None),
-                    "notes": _fv(notes is not None),
-                    "abcdef": _fv(abcdef is not None),
-                },
+                abcdef=abcdef
             )
         )
     return out

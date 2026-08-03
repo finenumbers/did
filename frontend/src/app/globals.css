@@ -191,12 +191,6 @@ th { color: var(--muted); font-weight: 600; font-size: 0.8rem; }
 .badge.fail { color: var(--danger); border-color: #e2b4b4; background: #fbf0f0; }
 .badge.warn { color: var(--warn); border-color: #e2d3a8; background: #fbf6ea; }
 
-.certainty {
-  border-bottom: 1px dotted var(--muted);
-  cursor: help;
-}
-.certainty.unresolved { color: var(--muted); border: none; }
-
 mark.search-hit {
   background: #ffe566;
   color: inherit;

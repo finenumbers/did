@@ -25,8 +25,11 @@ from app.schemas.providers import (
 _AUTH_PLAIN_KEYS = frozenset(
     {
         "email",
+        "login",
+        "user_id",
         "token_expire",
         "refresh_token_expire",
+        "session_expire_at",
         "numbering_login",
         "numbering_partition",
         "numbering_base_url",
@@ -84,14 +87,23 @@ class ProvidersService:
     def get_settings(self, code: str) -> ProviderSettingsOut:
         p = self._provider(code)
         conn = p.connection
-        notice = (
-            "Runexis: DIDAPI email/password → Bearer (purchased); "
-            "Numbering numbering_login/password → JSON-RPC connect (free catalog). "
-            "See runexis-contract.md + runexis-numbering-api-contract.md."
-            if code == ProviderCode.runexis.value
-            else "Provider integration is based on uploaded documentation contracts "
-            "under docs/providers/*-contract.md"
-        )
+        if code == ProviderCode.runexis.value:
+            notice = (
+                "Runexis: DIDAPI email/password → Bearer (purchased); "
+                "Numbering numbering_login/password → JSON-RPC connect (free catalog). "
+                "See runexis-contract.md + runexis-numbering-api-contract.md."
+            )
+        elif code == ProviderCode.uis.value:
+            notice = (
+                "UIS Data API: access_token (preferred) or login/password → login.user; "
+                "optional user_id for agent. IP whitelist required in UIS ЛК. "
+                "See uis-contract.md. Read-only get.* only."
+            )
+        else:
+            notice = (
+                "Provider integration is based on uploaded documentation contracts "
+                "under docs/providers/*-contract.md"
+            )
         if not conn:
             return ProviderSettingsOut(
                 provider_code=code,

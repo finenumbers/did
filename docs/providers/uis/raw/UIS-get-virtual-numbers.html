@@ -1,0 +1,1942 @@
+
+
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+	<meta charset="UTF-8">
+	<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport">
+			<meta property="og:image" content="https://uiscom.ru/upload/uf/559/i3r59ju902oygfqjtrgko6zgmij0lxf8.jpg"/>
+	
+	
+	<!-- Favicon -->
+	<link rel="shortcut icon" href="/local/templates/uiscom/images/favicon/16x16.png" type="image/png">
+	<link rel="icon" type="image/png" sizes="16x16" href="/local/templates/uiscom/images/favicon/16x16.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="/local/templates/uiscom/images/favicon/32x32.png">
+	<link rel="icon" type="image/png" sizes="48x48" href="/local/templates/uiscom/images/favicon/48x48.png">
+	<link rel="icon" type="image/png" sizes="96x96" href="/local/templates/uiscom/images/favicon/96x96.png">
+	<link rel="icon" type="image/png" sizes="120x120" href="/local/templates/uiscom/images/favicon/120x120.png">
+	<!-- End favicon -->
+
+	<title>Получение списка подключенных виртуальных номеров - Параметры запроса - API UIS</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<link href="/bitrix/cache/css/s1/uiscom/page_bc1fad23b722e8582a32a2b8867779e4/page_bc1fad23b722e8582a32a2b8867779e4_v1.css?1784896207118642" type="text/css"  rel="stylesheet" />
+<link href="/bitrix/cache/css/s1/uiscom/template_8e3cf6f11e020f4f5b02bf8ff223fd36/template_8e3cf6f11e020f4f5b02bf8ff223fd36_v1.css?178291384532580" type="text/css"  data-template-style="true" rel="stylesheet" />
+<script>if(!window.BX)window.BX={};if(!window.BX.message)window.BX.message=function(mess){if(typeof mess==='object'){for(let i in mess) {BX.message[i]=mess[i];} return true;}};</script>
+<script>(window.BX||top.BX).message({"JS_CORE_LOADING":"Загрузка...","JS_CORE_NO_DATA":"- Нет данных -","JS_CORE_WINDOW_CLOSE":"Закрыть","JS_CORE_WINDOW_EXPAND":"Развернуть","JS_CORE_WINDOW_NARROW":"Свернуть в окно","JS_CORE_WINDOW_SAVE":"Сохранить","JS_CORE_WINDOW_CANCEL":"Отменить","JS_CORE_WINDOW_CONTINUE":"Продолжить","JS_CORE_H":"ч","JS_CORE_M":"м","JS_CORE_S":"с","JSADM_AI_HIDE_EXTRA":"Скрыть лишние","JSADM_AI_ALL_NOTIF":"Показать все","JSADM_AUTH_REQ":"Требуется авторизация!","JS_CORE_WINDOW_AUTH":"Войти","JS_CORE_IMAGE_FULL":"Полный размер"});</script>
+
+<script src="/bitrix/js/main/core/core.min.js?1782245646225181"></script>
+
+<script>BX.Runtime.registerExtension({"name":"main.core","namespace":"BX","loaded":true});</script>
+<script>BX.setJSList(["\/bitrix\/js\/main\/core\/core_ajax.js","\/bitrix\/js\/main\/core\/core_promise.js","\/bitrix\/js\/main\/polyfill\/promise\/js\/promise.js","\/bitrix\/js\/main\/loadext\/loadext.js","\/bitrix\/js\/main\/loadext\/extension.js","\/bitrix\/js\/main\/polyfill\/promise\/js\/promise.js","\/bitrix\/js\/main\/polyfill\/find\/js\/find.js","\/bitrix\/js\/main\/polyfill\/includes\/js\/includes.js","\/bitrix\/js\/main\/polyfill\/matches\/js\/matches.js","\/bitrix\/js\/ui\/polyfill\/closest\/js\/closest.js","\/bitrix\/js\/main\/polyfill\/fill\/main.polyfill.fill.js","\/bitrix\/js\/main\/polyfill\/find\/js\/find.js","\/bitrix\/js\/main\/polyfill\/matches\/js\/matches.js","\/bitrix\/js\/main\/polyfill\/core\/dist\/polyfill.bundle.js","\/bitrix\/js\/main\/core\/core.js","\/bitrix\/js\/main\/polyfill\/intersectionobserver\/js\/intersectionobserver.js","\/bitrix\/js\/main\/lazyload\/dist\/lazyload.bundle.js","\/bitrix\/js\/main\/polyfill\/core\/dist\/polyfill.bundle.js","\/bitrix\/js\/main\/parambag\/dist\/parambag.bundle.js"]);
+</script>
+<script>(window.BX||top.BX).message({"LANGUAGE_ID":"ru","FORMAT_DATE":"DD.MM.YYYY","FORMAT_DATETIME":"DD.MM.YYYY HH:MI:SS","COOKIE_PREFIX":"BITRIX_SM","SERVER_TZ_OFFSET":"10800","UTF_MODE":"Y","SITE_ID":"s1","SITE_DIR":"\/","USER_ID":"","SERVER_TIME":1785753368,"USER_TZ_OFFSET":0,"USER_TZ_AUTO":"Y","bitrix_sessid":"d00f344bb1b2c5afeb9e2abd5d29328e"});</script>
+
+
+<script>BX.setJSList(["\/local\/vendor\/techart\/bitrix.tao\/scripts\/forms\/jquery.form.js","\/local\/vendor\/techart\/bitrix.tao\/scripts\/forms\/form.js","\/local\/templates\/uiscom\/scripts\/intlTelInput.js","\/local\/templates\/uiscom\/scripts\/watch.js"]);</script>
+<script>BX.setCSSList(["\/local\/templates\/uiscom\/components\/bitrix\/news\/documentation-api\/style.css","\/upload\/documentation\/api\/comagic.github.io-master\/chat_api\/assets\/stylesheets\/palette.3f5d1f46.min.css","\/upload\/documentation\/api\/comagic.github.io-master\/chat_api\/assets\/stylesheets\/main.f7f47774.min.css","\/upload\/documentation\/api\/comagic.github.io-master\/call_api\/assets\/stylesheets\/glightbox.min.css","\/local\/vendor\/techart\/bitrix.tao\/styles\/forms\/form.css","\/local\/templates\/uiscom\/styles\/demo.css","\/local\/templates\/uiscom\/components\/bitrix\/breadcrumb\/navigation\/style.css","\/local\/templates\/uiscom\/styles.css","\/local\/templates\/uiscom\/template_styles.css"]);</script>
+<script>
+					(function () {
+						"use strict";
+
+						var counter = function ()
+						{
+							var cookie = (function (name) {
+								var parts = ("; " + document.cookie).split("; " + name + "=");
+								if (parts.length == 2) {
+									try {return JSON.parse(decodeURIComponent(parts.pop().split(";").shift()));}
+									catch (e) {}
+								}
+							})("BITRIX_CONVERSION_CONTEXT_s1");
+
+							if (cookie && cookie.EXPIRE >= BX.message("SERVER_TIME"))
+								return;
+
+							var request = new XMLHttpRequest();
+							request.open("POST", "/bitrix/tools/conversion/ajax_counter.php", true);
+							request.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+							request.send(
+								"SITE_ID="+encodeURIComponent("s1")+
+								"&sessid="+encodeURIComponent(BX.bitrix_sessid())+
+								"&HTTP_REFERER="+encodeURIComponent(document.referrer)
+							);
+						};
+
+						if (window.frameRequestStart === true)
+							BX.addCustomEvent("onFrameDataReceived", counter);
+						else
+							BX.ready(counter);
+					})();
+				</script>
+<link href="/local/templates/uiscom/builds/prod/css/index/a22/a220c160651f8bf2d4c9.css" media="screen" rel="stylesheet">
+<script src="/local/templates/uiscom/builds/prod/js/index/a22/a220c160651f8bf2d4c9.js" ></script>
+
+
+
+<script  src="/bitrix/cache/js/s1/uiscom/template_ad2f9b4e281217400b9dff6c8b997202/template_ad2f9b4e281217400b9dff6c8b997202_v1.js?1782913845139611"></script>
+<script>var _ba = _ba || []; _ba.push(["aid", "0d7aa3ac41565a7640e31813344ba8e0"]); _ba.push(["host", "www.uiscom.ru"]); (function() {var ba = document.createElement("script"); ba.type = "text/javascript"; ba.async = true;ba.src = (document.location.protocol == "https:" ? "https://" : "http://") + "bitrix.info/ba.js";var s = document.getElementsByTagName("script")[0];s.parentNode.insertBefore(ba, s);})();</script>
+
+
+
+	
+
+		
+	<link rel="stylesheet" href="/local/templates/uiscom/styles/visitors.css" />
+    <link rel="stylesheet" href="/local/templates/uiscom/styles/custom.css?1783953551" />
+    <script>window.dataLayer = window.dataLayer || [];</script>
+	<script src="/local/templates/uiscom/scripts/cookie.js"></script>
+	<!-- <script src="/local/templates/uiscom/scripts/watch.js?33"></script> -->
+	<script src="https://smartcaptcha.yandexcloud.net/captcha.js?render=onload&onload=onloadSmartcapcha" defer></script>
+
+		<meta name="og:title" content="Получение списка подключенных виртуальных номеров - Параметры запроса - API UIS" />
+
+	<script src="https://cdn.botfaqtor.ru/one.js"></script>
+<!-- Yandex.Metrika counter -->
+<script type="text/javascript" >
+   (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+   m[i].l=1*new Date();
+   for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+   k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+   (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+
+   ym(172145, "init", {
+        clickmap:true,
+        trackLinks:true,
+        accurateTrackBounce:true,
+        webvisor:true,
+        trackHash:true,
+        ecommerce:"dataLayer"
+   });
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/172145" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+<!-- /Yandex.Metrika counter -->
+
+
+<!-- Incorrect display of numbers on iOS -->
+<meta name="format-detection" content="telephone=no"> 
+<!-- End Incorrect display of numbers on iOS -->
+
+<!-- Сalltracking -->
+<script type="text/javascript">
+var __cs = __cs || [];
+__cs.push(["setCsAccount", "EDW1CXigcLS1YTvPRMMvd6iGFY6K8UaM"]);
+__cs.push(["setDynamicalReplacement", true]); 
+</script>
+<!-- End Сalltracking -->
+
+<!-- Mindbox DeviceUUID -->
+<script>var Comagic = { getSessionId: function(){return ''} };</script>
+<script type="text/javascript" src="//custom.comagic.ru/static/mindbox_proxy/custom.js"></script>
+<!-- End Mindbox DeviceUUID -->
+
+<!-- CoMagic -->
+<script type="text/javascript" async src="https://app2.comagic.ru/static/cs.min.js"></script>
+<!-- End CoMagic -->
+
+<!-- Mindbox JavaScript SDK (трекер) -->
+<script>
+    mindbox = window.mindbox || function() { mindbox.queue.push(arguments); };
+    mindbox.queue = mindbox.queue || [];
+    mindbox('create');
+</script>
+<script src="https://api.mindbox.ru/scripts/v1/tracker.js" async></script>
+<!-- End Mindbox  JavaScript SDK (трекер) -->
+
+<script type="text/javascript">window._ab_id_=165843</script>	</head>
+
+<body class="b-layout b-layout--default">
+
+	<!-- Varioqub experiments -->
+<script type="text/javascript">
+    (function(e, x, pe, r, i, me, nt){
+    e[i]=e[i]||function(){(e[i].a=e[i].a||[]).push(arguments)},
+    me=x.createElement(pe),me.async=1,me.src=r,nt=x.getElementsByTagName(pe)[0],nt.parentNode.insertBefore(me,nt)})
+    (window, document, 'script', 'https://abt.s3.yandex.net/expjs/latest/exp.js', 'ymab');
+    ymab('metrika.172145', 'init'/*, {clientFeatures}, {callback}*/);
+</script>
+<!--End Varioqub experiments -->
+	<!-- Блок отображения сетки на сайте -->
+	
+        <div class="b-layout__global">
+                                        <div class="b-layout__cookie">
+                    <div class="b-cookie-banner">
+		<div class="b-cookie-banner__desc js-b-cookie-banner-desc little-head"><p>Для обеспечения оптимальной работы и&nbsp;улучшения пользовательского опыта на&nbsp;сайте используются технологии cookie. Продолжая пользоваться сайтом, вы&nbsp;соглашаетесь с&nbsp;размещением cookie файлов на&nbsp;вашем устройстве на&nbsp;условиях, изложенных в&nbsp;<a href="/politika-konfidencialnosti/">Политике конфиденциальности</a>.</p></div>
+		<div class="b-cookie-banner__desc js-b-cookie-banner-more little-head" style="display: none;"><p>Для обеспечения оптимальной работы и&nbsp;улучшения пользовательского опыта на&nbsp;сайте могут использоваться системы веб аналитики (в&nbsp;том числе Яндекс.Метрика, CoMagic), которые могут размещать на&nbsp;вашем устройстве cookie-файлы.</p>
+
+							<p>Продолжая пользоваться сайтом, вы&nbsp;соглашаетесь с&nbsp;применением указанных технологий, в&nbsp;том числе для аналитики с&nbsp;использованием внешних сервисов, и&nbsp;размещением cookie-файлов. Вы&nbsp;можете удалить cookie-файлы с&nbsp;вашего устройства через настройки браузера, а&nbsp;также заблокировать размещение cookie-файлов, однако при этом некоторые функции сайта могут перестать работать.</p>
+
+							<p>Дополнительную информацию вы&nbsp;можете найти в&nbsp;<a href="/politika-konfidencialnosti/">Политике конфиденциальности</a>.</p></div>
+		<div class="b-cookie-banner__buttons">
+
+				<div class="b-button">
+	<div class="b-button__content pink" style="" data-button="more">
+					<div class="b-button__name h5">
+								Больше
+			</div>
+				<div class="b-button__arrow dissable"></div>
+			</div>
+</div>
+
+				<div class="b-button">
+	<div class="b-button__content blue" style="" data-button="close">
+					<div class="b-button__name h5">
+								Все понятно
+			</div>
+				<div class="b-button__arrow dissable"></div>
+			</div>
+</div>
+		</div>
+		<!-- <div class="b-cookie-banner__close"></div> -->
+</div>                </div>
+            
+                            <div class="b-link-widget">
+	<div class="b-link-widget__content" style="background-color: #0000AA">
+		<div class="b-link-widget__icon" style="background-color: white"></div>
+		<a target="_blank" rel="nofollow" href="/poluchit-konsultatsiyu/" onclick="ym(172145, 'reachGoal', 'vidjet'); return true;"></a>
+	</div>
+</div>
+                                    </div>
+
+	<div class="b-layout__content">
+											<header class="b-layout__header">
+						<div class="b-header">
+	<div class="b-header__top">
+		<a href="/" class="b-header__logo"></a>
+		<form class="b-header__search lg-show-flex" action="/uis-search/">
+			<input type="search" class="b-header__search-text" name="q" placeholder="Поиск по сайту">
+			<input type="submit" class="b-header__search-button" value="">
+		</form>
+					<a href="tel:+7 (495) 151-11-55" class="b-header__phone phone-number lg-show">+7 (495) 151-11-55</a>
+				<a href="/poluchit-konsultatsiyu/" class="b-header__button-blue lg-hidden">
+			<span class="bg-hidden">Связаться</span>
+			<span class="bg-show">Получить консультацию</span>			
+		</a>
+		<div class="b-header__menu-btn lg-hidden"><svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M3.75 15H26.25" stroke="#0000AA" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M3.75 7.5H26.25" stroke="#0000AA" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M3.75 22.5H26.25" stroke="#0000AA" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+</div>
+		
+		<div class="b-header__top-links">
+			<a class="b-header__basket " rel="nofollow" href="/basket/">
+				<svg width="17" height="18" viewBox="0 0 17 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M12.6334 14.3775C11.89 14.3775 11.2722 14.9954 11.2722 15.7388C11.2722 16.4842 11.89 17.1 12.6334 17.1C13.3789 17.1 13.9947 16.4842 13.9947 15.7388C13.9947 14.9954 13.3789 14.3775 12.6334 14.3775ZM6.7773 14.3573C6.03185 14.3573 5.41605 14.9731 5.41605 15.7185C5.41605 16.4842 6.03185 17.0797 6.7773 17.0797C7.52072 17.0797 8.13853 16.4619 8.13853 15.7185C8.13853 14.9731 7.52072 14.3573 6.7773 14.3573ZM15.3559 4.74764L4.36475 3.59909H4.17436L3.68414 1.23921C3.68414 1.19668 3.66389 1.15415 3.64159 1.11162C3.55653 0.919172 3.40866 0.771304 3.19596 0.706494L0.876605 0.0278843C0.516035 -0.0794807 0.133211 0.133222 0.0278734 0.493792C-0.0794916 0.856389 0.133211 1.23921 0.495784 1.34455L2.43026 1.89755L4.76988 13.1662C4.81241 13.5065 5.11018 13.7617 5.44849 13.7617H14.2924C14.6753 13.7617 14.973 13.464 14.973 13.0811C14.973 12.6983 14.6753 12.4005 14.2924 12.4005H6.00149L5.68345 10.8489H14.4626C14.973 10.8489 15.441 10.4883 15.5261 10.0204L16.312 5.93669C16.4396 5.34317 15.994 4.81042 15.3559 4.74764Z" fill="white"/>
+</svg>
+			</a>
+			<a class="b-header__button-bordered" href="/podderzhka/">Поддержка</a>
+			<a href="https://uis-prod-msk-uc-sso-api.uiscom.ru/login?continue=https://app.uiscom.ru" rel="nofollow" class="b-header__button-bordered">Личный кабинет</a>			
+		</div>
+	</div>
+
+	<div class="b-header__bottom">
+		<nav class="b-header__menu">
+
+			<div class="b-header__bottom-bar">
+				<form class="b-header__search" action="/uis-search/">
+					<input type="search" class="b-header__search-text" name="q" placeholder="Поиск по сайту">
+					<input type="submit" class="b-header__search-button" value="">
+				</form>
+				<div class="b-header__menu-btn"><svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M22.5 7.5L7.5 22.5" stroke="#0000AA" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M7.5 7.5L22.5 22.5" stroke="#0000AA" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+</div>
+			</div>
+
+							<div class="b-header__menu-item">
+											<a href="/producty/" class="b-header__menu-link" data-id-item=1>Продукты</a>
+																<div class="b-header__menu-sub" data-id-container=1>							
+															<div>
+																			<a href="/producty/" class="b-header__menu-sub-title">Управление коммуникациями</a>
+																		<div class="b-header__menu-sub-inner">
+										<div class="b-header__menu-sub-items">
+																							
+												<a href="/producty/virtualnaya-ats/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/5ec/hq2jp29v4vz8vb5dcnm9y2dc53w37rjd.svg" alt="Виртуальная АТС">
+																										<span>Виртуальная АТС</span>
+												</a>
+																																			
+												<a href="/producty/sim-karty/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/c4c/1hrhaulzng153em82cjwa5bg8vvxcrzx.svg" alt="SIM-карты">
+																										<span>SIM-карты</span>
+												</a>
+																																			
+												<a href="/producty/rabochee-mesto-operatora/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/617/43tx4ke23jn6j34jnmmolmps2ktg89o2.svg" alt="Текстовые коммуникации">
+																										<span>Текстовые коммуникации</span>
+												</a>
+																																			
+												<a href="/producty/#omni" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/883/ciumbq3ymk62t7csyygymnxxlo6kexvg.svg" alt="Омниканальное рабочее место  ">
+																										<span>Омниканальное рабочее место  </span>
+												</a>
+																																			
+												<a href="/producty/rechevaya-analitika-s-iskusstvennym-intellektom/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/42f/3vy21ei0xb0m7tvyv7wr283j0jkwfgyb.svg" alt="Речевая аналитика ИИ">
+																										<span>Речевая аналитика ИИ</span>
+												</a>
+																																			
+												<a href="/producty/etiketka-dlya-markirovki-zvonkov/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/c83/2gxvys2woe74m4e37644bmpk1f1pra7z.svg" alt="Этикетка">
+																										<span>Этикетка</span>
+												</a>
+																																			
+												<a href="/producty/mav/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/cec/l399ujvvedlchwibiwdd5pwfxf9stvlb.svg" alt="МАВ">
+																										<span>МАВ</span>
+												</a>
+																																	</div>
+																			</div>
+								</div>
+															<div>
+																			<a href="/producty/produkty-analitika-reklamy/" class="b-header__menu-sub-title">Аналитика рекламы</a>
+																		<div class="b-header__menu-sub-inner">
+										<div class="b-header__menu-sub-items">
+																							
+												<a href="/producty/skvoznaja-analitika/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/696/4g25y70idw5920qd3pzghqrhtyvjsgpr.svg" alt="Сквозная аналитика">
+																										<span>Сквозная аналитика</span>
+												</a>
+																																			
+												<a href="/producty/multikanalnaya-analitika/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/f29/bddkg18yfg6spmx5c6h20pd7gyg24k5w.svg" alt="Мультиканальная аналитика">
+																										<span>Мультиканальная аналитика</span>
+												</a>
+																																			
+												<a href="/producty/omnividzhet/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/4d3/svc8mcyxt96hybwg1n3rz5iljs2yh6ti.svg" alt="Чаттрекинг">
+																										<span>Чаттрекинг</span>
+												</a>
+																																			
+												<a href="/producty/calltracking/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/2a7/xbqq5nynk8319y517dwae8idok40128n.svg" alt="Коллтрекинг">
+																										<span>Коллтрекинг</span>
+												</a>
+																																			
+												<a href="/producty/email-tracking/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/b5c/w61wvcfrxrhqb9d55x2xq47tvayadbmg.svg" alt="Имейлтрекинг">
+																										<span>Имейлтрекинг</span>
+												</a>
+																																	</div>
+																			</div>
+								</div>
+															<div>
+																			<a href="/producty/integracii/" class="b-header__menu-sub-title">Интеграции</a>
+																		<div class="b-header__menu-sub-inner">
+										<div class="b-header__menu-sub-items">
+																							
+												<a href="/producty/integracii/crm/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/0c7/1u3d51b4zzb2li2mmh5xqkc52ywomlz0.svg" alt="amoCRM, Битрикс24 и другие CRM ">
+																										<span>amoCRM, Битрикс24 и другие CRM </span>
+												</a>
+																																			
+												<a href="/producty/integracii/messendzhery-i-klassifaydy/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/c08/a7pko0lc2iusxvcqv4bpltp8fm46zhpw.svg" alt="Мессенджеры и классифайды">
+																										<span>Мессенджеры и классифайды</span>
+												</a>
+																																			
+												<a href="/producty/integracii/reklamnye-sistemy/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/5c5/ia23qz1pgwjeqy4ged5p8wofss8teu1b.svg" alt="Рекламные системы ">
+																										<span>Рекламные системы </span>
+												</a>
+																																			
+												<a href="/producty/integracii/mis/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/56b/02tamyvsgzl65kpajvfoec35ntdc4g4i.svg" alt="Медицинские информационные системы">
+																										<span>Медицинские информационные системы</span>
+												</a>
+																																			
+												<a href="/producty/integracii/api/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/597/9kc4i37bx4t1ijc03wi12cceru9vzod9.svg" alt="API">
+																										<span>API</span>
+												</a>
+																																	</div>
+																			</div>
+								</div>
+														
+							<!-- 								<div class="b-header__menu-another-content c-content">
+									<div class="h5"><a href="/producty/integracii/" target="_blank" rel="nofollow"><span style="color:#000;"><span>Интеграции</span></span></a></div><div class="little"><a href="/producty/integracii/crm/">amoCRM, Битрикс24 и другие CRM</a> <br><a href="/producty/integracii/messendzhery-i-klassifaydy/">Мессенджеры и классифайды</a> <br><a href="/producty/integracii/reklamnye-sistemy/">Рекламные системы</a> <br><a href="/producty/integracii/meditsina/">Медицинские информационные системы</a> <br><a href="/producty/integracii/api/">API</a> <br><a href="/producty/integracii/">Все интеграции</a></div>
+								</div>
+							 -->
+						</div>
+									</div>
+							<div class="b-header__menu-item">
+											<a href="/reshenija/" class="b-header__menu-link" data-id-item=2>Решения</a>
+																<div class="b-header__menu-sub" data-id-container=2>							
+															<div>
+																			<a href="/reshenija/?category=biznes" class="b-header__menu-sub-title">Задачи бизнеса</a>
+																		<div class="b-header__menu-sub-inner">
+										<div class="b-header__menu-sub-items">
+																							
+												<a href="/reshenija/udalennyj-ofis/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/75b/6frrjpd0fsjr0ydtuxjxwpj9qa23gjev.svg" alt="Удаленный офис">
+																										<span>Удаленный офис</span>
+												</a>
+																																			
+												<a href="/reshenija/gibridnaya-telefoniya/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/5ec/hq2jp29v4vz8vb5dcnm9y2dc53w37rjd.svg" alt="Гибридная телефония">
+																										<span>Гибридная телефония</span>
+												</a>
+																																			
+												<a href="/reshenija/holodnyj-obzvon/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/450/3bj47ize1mzpknm9vpbf2ngacwhrzts4.svg" alt="Холодный обзвон">
+																										<span>Холодный обзвон</span>
+												</a>
+																																			
+												<a href="/reshenija/kontrol-vyezdnykh-sotrudnikov/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/437/ka5vhwqjuvyay7dkj5ndgqoabrewwdls.svg" alt="Контроль выездных сотрудников">
+																										<span>Контроль выездных сотрудников</span>
+												</a>
+																																			
+												<a href="/reshenija/nomera-dlya-marketpleysov/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/4d1/x2jh8lhi69lx7o6lmoksawsnj8qw2lm5.svg" alt="Номера для маркетплейсов">
+																										<span>Номера для маркетплейсов</span>
+												</a>
+																																			
+												<a href="/reshenija/avtostrategii-yandex-direct/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/9da/ihkd34tbto91c911wql16ayv9h1ic8hd.svg" alt="Автоматизация рекламы">
+																										<span>Автоматизация рекламы</span>
+												</a>
+																																			
+												<a href="/reshenija/podklyuchenie-svoego-nomera/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/700/ydz16iqmo15e5hljqjjojh7slxes1b2n.svg" alt="Подключение своего номера">
+																										<span>Подключение своего номера</span>
+												</a>
+																																	</div>
+																			</div>
+								</div>
+															<div>
+																			<a href="/reshenija/?category=otrasli" class="b-header__menu-sub-title">Отрасли бизнеса</a>
+																		<div class="b-header__menu-sub-inner">
+										<div class="b-header__menu-sub-items">
+																							
+												<a href="/reshenija/meditsina/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/56b/02tamyvsgzl65kpajvfoec35ntdc4g4i.svg" alt="Медицина">
+																										<span>Медицина</span>
+												</a>
+																																			
+												<a href="/reshenija/stomatologija/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/cae/1p1k7rixjk8tffpl9lahemnsslk5xqeb.svg" alt="Стоматология">
+																										<span>Стоматология</span>
+												</a>
+																																			
+												<a href="/reshenija/fitnes/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/fb5/w3jw1wy7r95oczz1c09u0glywv0jkkvf.svg" alt="Фитнес">
+																										<span>Фитнес</span>
+												</a>
+																																			
+												<a href="/reshenija/auto/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/d93/t66jhogc1lzei7rcejssjxtvsoc00gs0.svg" alt="Авто">
+																										<span>Авто</span>
+												</a>
+																																			
+												<a href="/reshenija/koll-centr/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/291/ja7pynawgchya042nbiqg7b9phmbpeo9.svg" alt="Колл-центр">
+																										<span>Колл-центр</span>
+												</a>
+																																			
+												<a href="/reshenija/franshizy/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/d53/0ywhcncunzwbw2jqw8bhyf84uq9a06hi.svg" alt="Франшизы">
+																										<span>Франшизы</span>
+												</a>
+																																	</div>
+																			</div>
+								</div>
+															<div>
+																			<a href="/blog/?category=keisy" class="b-header__menu-sub-title">Кейсы</a>
+																		<div class="b-header__menu-sub-inner">
+										<div class="b-header__menu-sub-items">
+																							
+												<a href="/blog/?category=keisy&tag=functions" class="b-header__menu-sub-item">
+																										<span>#функции_платформы</span>
+												</a>
+																																			
+												<a href="/blog/?category=keisy&tag=kolltreking" class="b-header__menu-sub-item">
+																										<span>#коллтрекинг</span>
+												</a>
+																																			
+												<a href="/blog/?tag=it-solution" class="b-header__menu-sub-item">
+																										<span>#IT_решения</span>
+												</a>
+																																			
+												<a href="/blog/?tag=medicine" class="b-header__menu-sub-item">
+																										<span>#медицина</span>
+												</a>
+																																			
+												<a href="/blog/?tag=callcenter" class="b-header__menu-sub-item">
+																										<span>#колл_центр</span>
+												</a>
+																																			
+												<a href="/blog/?tag=realty" class="b-header__menu-sub-item">
+																										<span>#недвижимость</span>
+												</a>
+																																			
+												<a href="/blog/?tag=franchise" class="b-header__menu-sub-item">
+																										<span>#франшиза</span>
+												</a>
+																																	</div>
+																			</div>
+								</div>
+														
+							<!--  -->
+						</div>
+									</div>
+							<div class="b-header__menu-item">
+											<a href="/tarify/" class="b-header__menu-link" data-id-item=3>Тарифы</a>
+																<div class="b-header__menu-sub" data-id-container=3>							
+															<div>
+																			<a href="/tarify/" class="b-header__menu-sub-title">Тарифы</a>
+																		<div class="b-header__menu-sub-inner">
+										<div class="b-header__menu-sub-items">
+																							
+												<a href="/tarify/omni/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/8b5/bn8d4xk9hnm4vv6xyr1ou3cc2szzyc44.svg" alt="Объединение коммуникаций">
+																										<span>Объединение коммуникаций</span>
+												</a>
+																																			
+												<a href="/tarify/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/5ec/hq2jp29v4vz8vb5dcnm9y2dc53w37rjd.svg" alt="Виртуальная АТС">
+																										<span>Виртуальная АТС</span>
+												</a>
+																																			
+												<a href="/tarify/analitika/" class="b-header__menu-sub-item">
+																											<img src="/upload/uf/696/4g25y70idw5920qd3pzghqrhtyvjsgpr.svg" alt="Аналитика рекламы">
+																										<span>Аналитика рекламы</span>
+												</a>
+																																	</div>
+																			</div>
+								</div>
+															<div>
+																			<a href="/vozmozhnosti/virtualnye-nomera/#select" class="b-header__menu-sub-title">Выбрать номер</a>
+																		<div class="b-header__menu-sub-inner">
+										<div class="b-header__menu-sub-items">
+																							
+												<a href="/vozmozhnosti/virtualnye-nomera/federalnyj-nomer-8-800/" class="b-header__menu-sub-item">
+																										<span>Номера 8-800 </span>
+												</a>
+																																			
+												<a href="/vozmozhnosti/virtualnye-nomera/nomera-495/" class="b-header__menu-sub-item">
+																										<span>Номера 495</span>
+												</a>
+																																			
+												<a href="/vozmozhnosti/virtualnye-nomera/nomera-812/" class="b-header__menu-sub-item">
+																										<span>Номера 812</span>
+												</a>
+																																			
+												<a href="/vozmozhnosti/virtualnye-nomera/regionalnye-nomera/" class="b-header__menu-sub-item">
+																										<span>Региональные номера</span>
+												</a>
+																																			
+												<a href="/vozmozhnosti/virtualnye-nomera/#link" class="b-header__menu-sub-item">
+																										<span>Тарифы на связь</span>
+												</a>
+																																	</div>
+																			</div>
+								</div>
+														
+							<!-- 								<div class="b-header__menu-another-content c-content">
+									<div class="h5"><span style="color:#000;"><span>Виртуальные номера</span></span></div><div class="little"><a href="/vozmozhnosti/virtualnye-nomera/federalnyj-nomer-8-800/"><span style="color:#000;"><span>Номера 8-800</span></span></a> <br><a href="/vozmozhnosti/virtualnye-nomera/nomera-495/"><span style="color:#000;"><span>Номера 495</span></span></a> <br><a href="/vozmozhnosti/virtualnye-nomera/nomera-812/"><span style="color:#000;"><span>Номера 812</span></span></a> <br><a href="/vozmozhnosti/virtualnye-nomera/regionalnye-nomera/"><span style="color:#000;"><span>Региональные номера</span></span></a> <br><a href="/vozmozhnosti/virtualnye-nomera/"><span style="color:#000;"><span>Виртуальные номера</span></span></a></div>
+								</div>
+							 -->
+						</div>
+									</div>
+							<div class="b-header__menu-item">
+											<a href="/partnery/" class="b-header__menu-link" data-id-item=4>Партнерам</a>
+																<div class="b-header__menu-sub" data-id-container=4>							
+															<div>
+																			<a href="/partnery/" class="b-header__menu-sub-title">Партнерские программы</a>
+																		<div class="b-header__menu-sub-inner">
+										<div class="b-header__menu-sub-items">
+																							
+												<a href="/partnery/amocrm/" class="b-header__menu-sub-item">
+																										<span>amoCRM</span>
+												</a>
+																																			
+												<a href="/partnery/bitrix/" class="b-header__menu-sub-item">
+																										<span>Битрикс24</span>
+												</a>
+																																			
+												<a href="/partnery/kompanijam/" class="b-header__menu-sub-item">
+																										<span>Различные IT‑решения</span>
+												</a>
+																																			
+												<a href="/poluchit-konsultatsiyu/" class="b-header__menu-sub-item">
+																										<span>Вендоры</span>
+												</a>
+																																			
+												<a href="/partnery/consenta/" class="b-header__menu-sub-item">
+																										<span>Физические лица (Consenta)</span>
+												</a>
+																																	</div>
+																			</div>
+								</div>
+															<div>
+																			<a href="/partnery/reklamnym-agentstvam/" class="b-header__menu-sub-title">Рекламные агентства</a>
+																		<div class="b-header__menu-sub-inner">
+										<div class="b-header__menu-sub-items">
+																							
+												<a href="/partnery/reklamnym-agentstvam/obuchenie/" class="b-header__menu-sub-item">
+																										<span>Обучение</span>
+												</a>
+																																			
+												<a href="/partnery/reklamnym-agentstvam/sertifikatsiya/" class="b-header__menu-sub-item">
+																										<span>Сертификация</span>
+												</a>
+																																	</div>
+																			</div>
+								</div>
+														
+							<!-- 								<div class="b-header__menu-another-content c-content">
+									<div class="h5"><span style="color:#000;"><span>Рекламным агентствам</span></span></div><div class="little"><a href="/partnery/reklamnym-agentstvam/obuchenie/">Обучение</a>    <br><a href="/partnery/reklamnym-agentstvam/sertifikatsiya/">Сертификация</a></div>
+								</div>
+							 -->
+						</div>
+									</div>
+							<div class="b-header__menu-item">
+											<div class="b-header__menu-link" data-id-item=5>Клиентам</div>
+																<div class="b-header__menu-sub" data-id-container=5>							
+															<div>
+																			<div class="b-header__menu-sub-title">Полезные материалы</div>
+																		<div class="b-header__menu-sub-inner">
+										<div class="b-header__menu-sub-items">
+																							
+												<a href="/blog/" class="b-header__menu-sub-item">
+																										<span>Блог</span>
+												</a>
+																																			
+												<a href="/blog/?category=keisy" class="b-header__menu-sub-item">
+																										<span>Кейсы</span>
+												</a>
+																																			
+												<a href="/blog/?category=statyi" class="b-header__menu-sub-item">
+																										<span>Статьи</span>
+												</a>
+																																			
+												<a href="/blog/?category=research" class="b-header__menu-sub-item">
+																										<span>Исследования</span>
+												</a>
+																																			
+												<a href="/blog/?category=novosti" class="b-header__menu-sub-item">
+																										<span>Новости</span>
+												</a>
+																																			
+												<a href="/academiya/events/" class="b-header__menu-sub-item">
+																										<span>Афиша</span>
+												</a>
+																																	</div>
+																			</div>
+								</div>
+															<div>
+																			<a href="/podderzhka/" class="b-header__menu-sub-title">Помощь</a>
+																		<div class="b-header__menu-sub-inner">
+										<div class="b-header__menu-sub-items">
+																							
+												<a href="/podderzhka/dokumenty/" class="b-header__menu-sub-item">
+																										<span>Документы</span>
+												</a>
+																																			
+												<a href="/podderzhka/nastrojka-oborudovanija/" class="b-header__menu-sub-item">
+																										<span>Настройка оборудования</span>
+												</a>
+																																			
+												<a href="/kontakty/" class="b-header__menu-sub-item">
+																										<span>Контакты</span>
+												</a>
+																																			
+												<a href="https://yandex.ru/maps/-/CCU4fEuz-D" class="b-header__menu-sub-item">
+																										<span>Схема проезда</span>
+												</a>
+																																			
+												<a href="/academiya/instrumenty-marketologa/" class="b-header__menu-sub-item">
+																										<span>Инструменты маркетолога</span>
+												</a>
+																																			
+												<a href="/academiya/spravochnyj-centr/dokumentatsiya-api/" class="b-header__menu-sub-item">
+																										<span>Документация API</span>
+												</a>
+																																	</div>
+																			</div>
+								</div>
+															<div>
+																			<a href="/academiya/spravochnyj-centr/" class="b-header__menu-sub-title">Справочный центр</a>
+																		<div class="b-header__menu-sub-inner">
+										<div class="b-header__menu-sub-items">
+																							
+												<a href="/academiya/spravochnyj-centr/obrabotka-vkhodyashchikh-zvonkov/perevod-zvonka-na-drugogo-sotrudnika-transfer/" class="b-header__menu-sub-item">
+																										<span>Трансфер звонка</span>
+												</a>
+																																			
+												<a href="/academiya/spravochnyj-centr/upravlenie-akkauntom-faq/sroki-i-sposoby-oplaty-uslug/" class="b-header__menu-sub-item">
+																										<span>Способы оплаты</span>
+												</a>
+																																			
+												<a href="/academiya/spravochnyj-centr/integratsiya-s-amocrm/podklyuchenie-integratsii-s-amocrm/" class="b-header__menu-sub-item">
+																										<span>UIS в amoCRM</span>
+												</a>
+																																			
+												<a href="/academiya/spravochnyj-centr/obrabotka-vkhodyashchikh-zvonkov/nastroyka-sip-telefonii/" class="b-header__menu-sub-item">
+																										<span>SIP-линии</span>
+												</a>
+																																			
+												<a href="/academiya/spravochnyj-centr/upravlenie-akkauntom-faq/dobavlenie-konechnykh-polzovateley/?view=1" class="b-header__menu-sub-item">
+																										<span>Конечные пользователи номеров</span>
+												</a>
+																																	</div>
+																			</div>
+								</div>
+														
+							<!-- 								<div class="b-header__menu-another-content c-content">
+									<h5 style="text-align:center;"><a href="/oborudovanie/"><span style="color:#000;"><span>Оборудование</span></span></a></h5><p style="text-align:center;"> </p><p style="text-align:center;"><a href="/oborudovanie/"><img src="/upload/menu/phone.png"></a></p><div class="little" style="text-align:center;">Выбирайте подходящее вам</div>
+								</div>
+							 -->
+						</div>
+									</div>
+						<div class="b-header__bottom-footer">
+				<div><a class="b-header__button-bordered" href="/basket/">Корзина</a></div>
+				<div><a class="b-header__button-bordered" href="/podderzhka/">Поддержка</a></div>
+				<div><a class="b-header__button-bordered" href="https://yandex.ru/maps/-/CCU4fEuz-D" target="_blank">Схема проезда</a></div>
+				<div><a href="/user/" rel="nofollow" class="b-header__button-bordered">Личный кабинет</a></div>
+				<div>
+											<a href="https://vk.com/uiscom" rel="nofollow"><img src="/images/header/vk.svg" alt="vk"></a>
+																<a href="https://rutube.ru/channel/24800224/" rel="nofollow"><img src="/images/header/rt.svg" alt="rt"></a>
+									</div>
+				<div><a href="mailto:info@uiscom.ru" class="b-header__phone">info@uiscom.ru</a></div>
+									<div><a href="tel:+7 (495) 151-11-55" class="b-header__phone phone-number">+7 (495) 151-11-55</a></div>
+							</div>
+			<a href="/poluchit-konsultatsiyu/" class="b-header__button-blue lg-show">Получить консультацию</a>
+		</nav>
+		
+	</div>
+
+	<div class="b-header__fade"></div>
+
+</div>					</header>
+						
+		<main class="b-layout__main">
+			<div class="b-layout__main-global">
+							</div>
+			<div class="b-layout__main-content">
+								<link href="/bitrix/css/main/font-awesome.css?178224562528777" type="text/css" rel="stylesheet" />
+<div class="b-breadcrumbs" itemprop="http://schema.org/breadcrumb" itemscope itemtype="http://schema.org/BreadcrumbList">
+			<div class="little" id="bx_breadcrumb_0" itemprop="itemListElement" itemscope itemtype="http://schema.org/ListItem">
+				<a href="/" title="Главная" itemprop="item"><p class="little" itemprop="name">Главная</p></a><span>/</span>
+				<meta itemprop="position" content="1"/>
+			</div>
+			<div class="little" id="bx_breadcrumb_1" itemprop="itemListElement" itemscope itemtype="http://schema.org/ListItem">
+				<a href="/academiya/" title="Академия" itemprop="item"><p class="little" itemprop="name">Академия</p></a><span>/</span>
+				<meta itemprop="position" content="2"/>
+			</div>
+			<div class="little" id="bx_breadcrumb_2" itemprop="itemListElement" itemscope itemtype="http://schema.org/ListItem">
+				<a href="/academiya/spravochnyj-centr/" title="Справочный центр" itemprop="item"><p class="little" itemprop="name">Справочный центр</p></a><span>/</span>
+				<meta itemprop="position" content="3"/>
+			</div>
+			<div class="little" id="bx_breadcrumb_3" itemprop="itemListElement" itemscope itemtype="http://schema.org/ListItem">
+				<a href="/academiya/spravochnyj-centr/dokumentatsiya-api/" title="Документация API" itemprop="item"><p class="little" itemprop="name">Документация API</p></a><span>/</span>
+				<meta itemprop="position" content="4"/>
+			</div>
+			<div class="little" style="flex: 1 1 auto">get_virtual_numbers</div><div style="clear:both"></div></div>				<article itemscope itemtype="http://schema.org/Article">
+					<div itemprop="articleBody">
+ 
+  
+  
+  
+  <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+  <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+  <label class="md-overlay" for="__drawer"></label>
+  <div data-md-component="skip">
+   
+    
+    <a href="#_1" class="md-skip">
+     Skip to content
+    </a>
+   
+  </div>
+  <div data-md-component="announce">
+   
+  </div>
+  
+   <header class="md-header" data-md-component="header"><meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+ 
+</header>
+  
+  <div class="md-container" data-md-component="container">
+   
+   
+    
+   
+   <main class="md-main" data-md-component="main">
+    <div class="md-main__inner md-grid">
+     
+      
+       
+       <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+        <div class="md-sidebar__scrollwrap">
+         <div class="md-sidebar__inner">
+          
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+ <label class="md-nav__title" for="__drawer">
+  <a href="../.." title="DATA API" class="md-nav__button md-logo" aria-label="DATA API" data-md-component="logo">
+   
+ 
+ <svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54z"></path></svg>
+
+  </a>
+  DATA API
+ </label>
+ 
+ <ul class="md-nav__list" data-md-scrollfix>
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../changelog/" class="md-nav__link">
+    Changelog
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../.." class="md-nav__link">
+    Общая информация
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../components/" class="md-nav__link">
+    Права и компоненты
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../account/get_account/" class="md-nav__link">
+    Аккаунт
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../" class="md-nav__link">
+    Виртуальные номера и правила
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../sip/" class="md-nav__link">
+    SIP-линии
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../scenario/get_scenarios/" class="md-nav__link">
+    Сценарии
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../user_media/get_media_files/" class="md-nav__link">
+    Медиафайлы
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../campaigns/" class="md-nav__link">
+    Рекламные кампании
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../sources/" class="md-nav__link">
+    Источники
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../auto_calls/" class="md-nav__link">
+    Исходящий обзвон
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../sales_funnel_and_deals/" class="md-nav__link">
+    Воронки продаж и Сделки
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../sites/" class="md-nav__link">
+    Сайты
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../reports/" class="md-nav__link">
+    Отчеты
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../tags/" class="md-nav__link">
+    Теги
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../employees/" class="md-nav__link">
+    Сотрудники
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../contacts/" class="md-nav__link">
+    Адресная книга
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../blacklist/" class="md-nav__link">
+    Черный список
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../schedules/" class="md-nav__link">
+    Графики активности
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../partners/" class="md-nav__link">
+    Клиенты агентов
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../communications/" class="md-nav__link">
+    Загрузка коммуникаций
+   </a>
+  </li>
+ 
+
+  
+   
+   
+   
+
+ 
+ 
+ 
+  <li class="md-nav__item">
+   <a href="../../persons/" class="md-nav__link">
+    Персона/Визитор
+   </a>
+  </li>
+ 
+
+  
+ </ul>
+</nav>
+         </div>
+        </div>
+       </div>
+      
+      
+       
+       
+      
+     
+     <div class="md-content" data-md-component="content">
+      <article class="md-content__inner md-typeset">
+       
+        
+        
+         <h1>Получение списка подключенных виртуальных номеров</h1>
+        
+        <nav>
+<a href="../../vn">Виртуальные номера </a> &gt;
+Получение списка подключенных виртуальных номеров
+</nav>
+
+<table>
+<thead>
+<tr>
+<th align="left">Метод</th>
+<th align="left"><code class="p">get.virtual_numbers</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left">Описание</td>
+<td align="left">Получение списка подключенных виртуальных номеров</td>
+</tr>
+<tr>
+<td align="left">Кому доступен</td>
+<td align="left">Агент, Клиент</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_1">Параметры запроса</h3>
+<table>
+<thead>
+<tr>
+<th align="left">Название</th>
+<th align="left">Тип</th>
+<th align="center">Обязательный</th>
+<th align="left">Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left"><code class="p">access_token</code></td>
+<td align="left">string</td>
+<td align="center">да</td>
+<td align="left">Ключ сессии аутентификации</td>
+</tr>
+<tr>
+<td align="left"><code class="p">user_id</code></td>
+<td align="left">number</td>
+<td align="center">нет</td>
+<td align="left">Уникальный идентификатор пользователя клиента агента от имени которого делается запрос <blockquote>Является обязательным для агента</blockquote> Для получения списка пользователей клиента необходимо использовать метод <a href="../../partner/get_customer_users">"get.customer_users"</a>
+</td>
+</tr>
+<tr>
+<td align="left"><code class="p">limit</code></td>
+<td align="left">number</td>
+<td align="center">нет</td>
+<td align="left">Количество возвращаемых записей. См. раздел <a href="../..#_paging">"Постраничный вывод"</a>
+</td>
+</tr>
+<tr>
+<td align="left"><code class="p">offset</code></td>
+<td align="left">number</td>
+<td align="center">нет</td>
+<td align="left">Сдвиг, определяет с какого номера записи возвращать <code class="p">"limit"</code> записей. По умолчанию "0". См. раздел <a href="../..#_paging">"Постраничный вывод"</a>
+</td>
+</tr>
+<tr>
+<td align="left"><code class="p">filter</code></td>
+<td align="left">object</td>
+<td align="center">нет</td>
+<td align="left">См. раздел <a href="../..#_filters">"Критерии фильтрации"</a>
+</td>
+</tr>
+<tr>
+<td align="left"><code class="p">fields</code></td>
+<td align="left">array</td>
+<td align="center">нет</td>
+<td align="left">См. раздел <a href="../..#_views">"Представление возвращаемых данных"</a>
+</td>
+</tr>
+<tr>
+<td align="left"><code class="p">sort</code></td>
+<td align="left">array</td>
+<td align="center">нет</td>
+<td align="left">См. раздел <a href="../..#_sort">"Сортировка данных"</a>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_2">Параметры ответа</h3>
+<table>
+  <tbody>
+    <tr>
+      <th>Название</th>
+      <th>Тип</th>
+      <th>Допустимые значения</th>
+      <th>Фильтрация</th>
+      <th>Сортировка</th>
+      <th>Описание</th>
+    </tr>
+    <tr>
+      <td><code class="p">id</code></td>
+      <td>number</td>
+      <td></td>
+      <td>да</td>
+      <td></td>
+      <td>Уникальный идентификатор виртуального номера</td>
+    </tr>
+  <tr>
+      <td><code class="p">child_customer_id</code></td>
+      <td>number</td>
+      <td></td>
+      <td>да</td>
+      <td>да</td>
+      <td>Уникальный идентификатор клиента агента</td>
+    </tr>
+    <tr>
+      <td><code class="p">virtual_phone_number</code></td>
+      <td>string</td>
+      <td></td>
+      <td>да</td>
+      <td></td>
+      <td>Виртуальный номер</td>
+    </tr>
+    <tr>
+      <td><code class="p">redirection_phone_number</code></td>
+      <td>string</td>
+      <td></td>
+      <td>да</td>
+      <td></td>
+      <td>
+        Связанный номер
+        <blockquote>
+        Часто используется для 800 номеров
+        </blockquote>
+      </td>
+    </tr>
+    <tr>
+      <td><code class="p">activation_date</code></td>
+      <td>iso8601</td>
+      <td>
+      YYYY-MM-DD hh:mm:ss
+      </td>
+      <td>да</td>
+      <td></td>
+      <td>Дата активации номера</td>
+    </tr>
+    <tr>
+      <td><code class="p">status</code></td>
+      <td>enum</td>
+      <td>
+        <ul>
+        <li>active</li>
+        <li>waiting</li>
+        <li>cleaning</li>
+        <li>prereserved</li>
+        <li>reserved</li>
+        <li>manual_lock</li>
+        <li>limit_lock</li>
+        </ul>
+      </td>
+      <td>да</td>
+      <td>да</td>
+      <td>Статус номера</td>
+    </tr>
+    <tr>
+      <td><code class="p">category</code></td>
+      <td>enum</td>
+      <td>
+        <ul>
+        <li>usual</li>
+        <li>bronze</li>
+        <li>silver</li>
+        <li>gold</li>
+        <li>platinum</li>
+        </ul>
+      </td>
+      <td>да</td>
+      <td>да</td>
+      <td>Категория номера</td>
+    </tr>
+    <tr>
+      <td><code class="p">type</code></td>
+      <td>enum</td>
+      <td>
+        <ul>
+        <li>va</li>
+        <li>call_tracking</li>
+        <li>dynamic_call_tracking</li>
+        </ul>
+      </td>
+      <td>да</td>
+      <td>да</td>
+      <td>Тип номера</td>
+    </tr>
+    <tr>
+      <td><code class="p">comment</code></td>
+      <td>string</td>
+      <td></td>
+      <td>да</td>
+      <td>да</td>
+      <td>Комментарий к номеру</td>
+    </tr>
+    <tr>
+      <td><code class="p">name</code></td>
+      <td>string</td>
+      <td></td>
+      <td>да</td>
+      <td>да</td>
+      <td>Название номера</td>
+    </tr>
+    <tr>
+      <td colspan="6">Рекламные кампании в которых используется виртуальный номер</td>
+    </tr>
+    <tr>
+      <td><code class="p">campaigns</code></td>
+      <td>array</td>
+      <td></td>
+      <td>да</td>
+      <td></td>
+      <td>Список рекламных кампаний в которых используется виртуальный номер</td>
+    </tr>
+    <tr>
+      <td><code class="p">campaign_id</code></td>
+      <td>number</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>Уникальный идентификатор рекламной кампании</td>
+    </tr>
+    <tr>
+      <td><code class="p">campaign_name</code></td>
+      <td>string</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>Название рекламной кампании</td>
+    </tr>
+<tr>
+      <td><code class="p">site_id</code></td>
+      <td>number</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>Уникальный идентификатор сайта с которым связана рекламная кампания</td>
+    </tr>
+    <tr>
+      <td><code class="p">site_domain_name</code></td>
+      <td>string</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>Адрес сайта в интернете с которым связана рекламная кампания. Без указания протокола - "http://" или "https://"</td>
+    </tr>
+    <tr>
+      <td colspan="6">Блоки номеров рекламной кампании в которых используется номер</td>
+    </tr>
+    <tr>
+      <td><code class="p">site_blocks</code></td>
+      <td>array</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>Список блоков номеров сайта, в которых используется виртуальный номер номер</td>
+    </tr>
+    <tr>
+      <td><code class="p">site_block_id</code></td>
+      <td>number</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>Уникальный идентификатор блока номеров</td>
+    </tr>
+    <tr>
+      <td><code class="p">site_block_name</code></td>
+      <td>string</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>Название блока номеров</td>
+    </tr>
+    <tr>
+      <td colspan="6">Правила обработки звонка:</td>
+    </tr>
+    <tr>
+      <td colspan="6">Сценарии</td>
+    </tr>
+    <tr>
+      <td><code class="p">scenarios</code></td>
+      <td>array</td>
+      <td></td>
+      <td>да</td>
+      <td></td>
+      <td>Список сценариев, которые связанны с виртуальным номером</td>
+    </tr>
+    <tr>
+      <td><code class="p">scenario_id</code></td>
+      <td>number</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>Уникальный идентификатор сценария
+      </td>
+    </tr>
+    <tr>
+      <td><code class="p">scenario_name</code></td>
+      <td>string</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>Название сценария</td>
+    </tr>
+    <tr>
+      <td><code class="p">call_processing_rule_id</code></td>
+      <td>number</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>Уникальный идентификатор правила обработки вызова</td>
+    </tr>
+    <tr>
+      <td><code class="p">is_active</code></td>
+      <td>boolean</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>Активно ли правило</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="json">JSON структура запроса</h3>
+<div class="b-copy-content b-copy-content--js_init">
+    <div class="b-copy-content__copy b-copy-content__copy--js_init">Копировать</div>
+    <div class="b-copy-content__main b-copy-content__main--js_init ps ps--active-x">
+		<pre class="b-copy-content__content"><code class="language-json">{
+ "jsonrpc":"2.0",
+ "id":"number",
+ "method":"get.virtual_numbers",
+ "params":{
+  "access_token":"string",
+  "user_id":"number",
+  "offset":"number",
+  "limit":"number",
+  "filter":{
+
+  },
+  "sort":[
+   {
+    "field":"string",
+    "order":"string"
+   }
+  ],
+  "fields":[
+   "string"
+  ]
+ }
+}
+</code></pre></div></div>
+<h3 id="json_1">JSON структура ответа</h3>
+<div class="b-copy-content b-copy-content--js_init">
+    <div class="b-copy-content__copy b-copy-content__copy--js_init">Копировать</div>
+    <div class="b-copy-content__main b-copy-content__main--js_init ps ps--active-x">
+		<pre class="b-copy-content__content"><code class="language-json">{
+ "jsonrpc": "2.0",
+ "id": "number",
+ "result": {
+  "metadata": {},
+  "data": [
+   {
+    "id": "number",
+    "child_customer_id": "number",
+    "virtual_phone_number": "string",
+    "redirection_phone_number": "string",
+    "activation_date": "iso8601",
+    "status": "enum",
+    "category": "enum",
+    "type": "enum",
+    "comment": "string",
+    "name": "string",
+    "campaigns": [
+     {
+      "campaign_id": "number",
+      "site_id": "number",
+      "site_domain_name": "string",
+      "campaign_name": "string",
+      "site_blocks": [
+       {
+        "site_block_id": "number",
+        "site_block_name": "string",
+        "is_tracking": "boolean"
+       }
+      ]
+     }
+    ],
+    "scenarios": [
+     {
+      "scenario_id": "number",
+      "scenario_name": "string",
+      "call_processing_rule_id": "number",
+      "is_active": "boolean"
+     }
+    ]
+   }
+  ]
+ }
+}
+</code></pre></div></div>
+<h3 id="_3">Список возвращаемых ошибок</h3>
+<p>Смотрим раздел <a href="../..#_getErrors">"Список ошибок для методов с глаголом get"</a></p>
+        
+         
+        
+       
+       
+        
+
+
+       
+      </article>
+     </div>
+    </div>
+    
+   </main>
+   
+    
+<footer class="md-footer">
+ 
+ <div class="md-footer-meta md-typeset">
+  <div class="md-footer-meta__inner md-grid">
+   <div class="md-footer-copyright">
+    
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+     Material for MkDocs
+    </a>
+    
+   </div>
+   
+  </div>
+ </div>
+</footer>
+   
+  </div>
+  <div class="md-dialog" data-md-component="dialog">
+   <div class="md-dialog__inner md-typeset"></div>
+  </div>
+  
+  
+  
+   
+   
+    
+   
+    
+   
+    
+   
+  
+ <script>
+    $('table').addClass('fixed-scrollbar-container');
+    $(function($){
+        let fixedBarTemplate = '<div class="fixed-scrollbar"> <div></div> </div>';
+
+        $('.fixed-scrollbar-container').each(function() {
+            let $bar = $(fixedBarTemplate).appendTo($(this));
+            $bar.scroll(function() {
+                $bar.parent().scrollLeft($(this).scrollLeft());
+            });
+            $bar.data("status", "off");
+        });
+
+        let fixSize = function() {
+            $('.fixed-scrollbar').each(function() {
+                let $container = $('.fixed-scrollbar').parent();
+                $(this).children('div').height(1).width($(this).siblings('tbody').width());
+                $(this).width($container.width()).scrollLeft($container.scrollLeft());
+            });
+
+            $(window).trigger("scroll.fixedbar");
+        };
+
+        $(window).on("load.fixedbar resize.fixedbar", function() {
+            fixSize();
+        });
+
+        $(window).on("scroll.fixedbar", function() {
+
+            $('.fixed-scrollbar-container').each(function() {
+                let $bar = $(this).children('.fixed-scrollbar');
+                if($bar.length && ($(this)[0].scrollWidth > $(this).width())) {
+                    let containerOffset = {top: $(this).offset().top, bottom: $(this).offset().top + $(this).height() };
+                    let windowOffset = {top: $(window).scrollTop(), bottom: $(window).scrollTop() + $(window).height() };
+
+                    if((containerOffset.top > windowOffset.bottom) || (windowOffset.bottom > containerOffset.bottom)) {
+                        if($bar.data("status") == "on") {
+                            $bar.hide().data("status", "off");
+                        }
+                    } else {
+                        if($bar.data("status") == "off") {
+                            $bar.show().data("status", "on");
+                            $bar.scrollLeft($container.scrollLeft());
+                        }
+                    }
+                } else {
+                    if($bar.data("status") == "on") {
+                        $bar.hide().data("status", "off");
+                    }
+                }
+            })
+        });
+
+        $(window).trigger("scroll.fixedbar");
+
+    });
+</script>	</div>
+				</article>
+			</div>
+		</main>
+		
+	</div>
+	<div class="b-margin-bottom content-margin-top"></div><section class="b-subscribe-form" data-text-color="#FFF0E6" data-site-key="ysc1_f7h0ufcSRZf7v0ziwTc97VAkWyY0nf6qGHYcrNbo2ad9594d" data-utm-campaign="" data-comagic-text="" data-gtm="{&quot;event&quot;:&quot;&quot;,&quot;eventCategory&quot;:&quot;&quot;,&quot;eventAction&quot;:&quot;&quot;}" style="color: #FFF0E6">
+	<aside class="b-subscribe-form__container l-stretch-all" style="background: #0A0A0A">
+		<img class="b-subscribe-form__icon" src="/upload/iblock/f2b/inz7h3rz522whtdkh41hzzpq4ffu19h6.webp">
+		<div class="b-subscribe-form__content">
+			<div class="b-subscribe-form__title h2">Проверенные советы для вашего бизнеса</div>
+			<div class="b-subscribe-form__untitle">Рассказываем, что сработало у других, и даем пошаговый план</div>
+			<div class="b-form">
+				<style>
+					.b-subscribe-form__input::placeholder,
+					.b-subscribe-form__input {
+						color: #FFF0E6;
+					}
+				</style>
+				<form class="b-subscribe-form__form b-form__form">
+					<div class="b-subscribe-form__input-row">
+						<input type="email" name="email" class="b-subscribe-form__input input-text" placeholder="E-mail">
+						<div class="b-subscribe-form__error little"></div>
+						<div class="b-subscribe-form__button">
+							<div class="b-button">
+	<div class="b-button__content green" style="" >
+					<div class="b-button__name h5">
+								Подписаться
+			</div>
+				<div class="b-button__arrow dissable"></div>
+			</div>
+</div>						</div>
+					</div>
+
+
+					<label class="policy-form">
+						<input type="checkbox" name="politicagree" id="politicagree" required>
+						<span>Я&nbsp;даю&nbsp;<a href="/politika-konfidencialnosti/podrobnee/">согласие</a>&nbsp;на&nbsp;обработку моих персональных данных в&nbsp;соответствии с&nbsp;<a href="/politika-konfidencialnosti/">Политикой конфиденциальности</a>.</span>
+					</label>
+
+
+					<label class="policy-form">
+						<input type="checkbox" name="agree" id="agree" checked required>
+						<span>
+							Даю&nbsp;<a href="/soglasie-na-obrabotku-personalnykh-dannykh-i-poluchenie-reklamy/">согласие</a>&nbsp;на&nbsp;рекламу и&nbsp;полезные материалы: кейсы, обзоры функций и&nbsp;советы экспертов для&nbsp;роста бизнеса.
+						</span>
+					</label>
+
+				</form>
+			</div>
+		</div>
+		<div class="b-subscribe-form__success h3" style="color: #FFF0E6">Вы успешно подписаны! </div>
+	</aside>
+</section>	<footer class="b-layout__footer">
+		<div class="b-footer">
+	<div class="b-footer__back"></div>
+	<div class="b-footer__content">
+		<div class="b-footer__top">
+												<a href="/blog/" class="h4">Блог</a>
+																<a href="/academiya/" class="h4">Академия UIS</a>
+																<a href="/reshenija/" class="h4">Решения</a>
+																																																										</div>
+
+																								<nav class="b-footer__list">
+					<div class="b-footer__list-label h4">
+													<a href="/producty/">Продукты</a>
+											</div>
+					<div class="b-footer__list-items">
+													<a href="/producty/" class="b-footer__little-head-mobile">Продукты</a>
+																										<a href="/producty/virtualnaya-ats/" class="little-head">Виртуальная АТС</a>
+																				<a href="/producty/sim-karty/" class="little-head">SIM-карты</a>
+																				<a href="/producty/skvoznaja-analitika/" class="little-head">Сквозная аналитика</a>
+																				<a href="/producty/multikanalnaya-analitika/" class="little-head">Мультиканальная аналитика</a>
+																				<a href="/producty/omnividzhet/" class="little-head">Чаттрекинг</a>
+																				<a href="/producty/rabochee-mesto-operatora/" class="little-head">Текстовые коммуникации</a>
+																				<a href="/producty/#omni" class="little-head">Омниканальное рабочее место</a>
+																					<a href="/producty/" class="b-footer__all little-head">Показать все</a>
+													</div>
+				</nav>
+												<nav class="b-footer__list">
+					<div class="b-footer__list-label h4">
+													<a href="/tarify/">Тарифы</a>
+											</div>
+					<div class="b-footer__list-items">
+													<a href="/tarify/" class="b-footer__little-head-mobile">Тарифы</a>
+																										<a href="/tarify/" class="little-head">Телефония</a>
+																				<a href="/tarify/analitika/" class="little-head">Аналитика рекламы</a>
+																				<a href="/tarify/omni/" class="little-head">Омниканальное рабочее место</a>
+																				<a href="/vozmozhnosti/virtualnye-nomera/nomera-495/" class="little-head">Номера 495</a>
+																				<a href="/vozmozhnosti/virtualnye-nomera/nomera-812/" class="little-head">Номера 812</a>
+																				<a href="/vozmozhnosti/virtualnye-nomera/regionalnye-nomera/" class="little-head">Региональные номера</a>
+																				<a href="/upload/dokumenty/Tarify-na-svyaz-UIS.pdf" class="little-head">Тарифы на связь</a>
+																					<a href="/tarify/" class="b-footer__all little-head">Показать все</a>
+													</div>
+				</nav>
+												<nav class="b-footer__list">
+					<div class="b-footer__list-label h4">
+													<a href="/vozmozhnosti/">Возможности</a>
+											</div>
+					<div class="b-footer__list-items">
+													<a href="/vozmozhnosti/" class="b-footer__little-head-mobile">Возможности</a>
+																										<a href="/vozmozhnosti/tekhnologii-svyazi/" class="little-head">Технологии связи</a>
+																				<a href="/vozmozhnosti/analitika/" class="little-head">Аналитика</a>
+																				<a href="/vozmozhnosti/raspredelenie-zvonkov/" class="little-head">Распределение звонков</a>
+																				<a href="/vozmozhnosti/personalnyy-podkhod-k-obsluzhivaniyu/" class="little-head">Персональный подход к обслуживанию</a>
+																				<a href="/vozmozhnosti/kontrol/" class="little-head">Контроль</a>
+																				<a href="/vozmozhnosti/organizatsiya-rabochego-mesta-sotrudnika/" class="little-head">Организация рабочего места сотрудника</a>
+																				<a href="/vozmozhnosti/vozvrat-poteryannykh-kommunikatsiy/" class="little-head">Возврат потерянных коммуникаций</a>
+																					<a href="/vozmozhnosti/" class="b-footer__all little-head">Показать все</a>
+													</div>
+				</nav>
+												<nav class="b-footer__list">
+					<div class="b-footer__list-label h4">
+													<a href="/o-kompanii/">О компании</a>
+											</div>
+					<div class="b-footer__list-items">
+													<a href="/o-kompanii/" class="b-footer__little-head-mobile">О компании</a>
+																										<a href="/kontakty/" class="little-head">Контакты</a>
+																				<a href="/o-kompanii/otzivy/" class="little-head">Отзывы</a>
+																				<a href="/o-kompanii/vakansii/" class="little-head">Вакансии</a>
+																				<a href="/blog/?category=novosti" class="little-head">Новости</a>
+																				<a href="/academiya/events/" class="little-head">Афиша</a>
+											</div>
+				</nav>
+												<nav class="b-footer__list">
+					<div class="b-footer__list-label h4">
+													<a href="/partnery/">Партнерам</a>
+											</div>
+					<div class="b-footer__list-items">
+													<a href="/partnery/" class="b-footer__little-head-mobile">Партнерам</a>
+																										<a href="/partnery/amocrm/" class="little-head">amoCRM</a>
+																				<a href="/partnery/bitrix/" class="little-head">Битрикс24</a>
+																				<a href="/partnery/reklamnym-agentstvam/" class="little-head">Рекламные агентства</a>
+																				<a href="/partnery/kompanijam/" class="little-head">Другие IT-решения</a>
+																				<a href="/partnery/consenta/" class="little-head">Физические лица (Consenta)</a>
+											</div>
+				</nav>
+												<nav class="b-footer__list">
+					<div class="b-footer__list-label h4">
+													<a href="/podderzhka/">Клиентам</a>
+											</div>
+					<div class="b-footer__list-items">
+													<a href="/podderzhka/" class="b-footer__little-head-mobile">Клиентам</a>
+																										<a href="/podderzhka/" class="little-head">Техподдержка</a>
+																				<a href="/academiya/spravochnyj-centr/" class="little-head">Справочный центр</a>
+																				<a href="/podderzhka/dokumenty/" class="little-head">Документы</a>
+																				<a href="/academiya/spravochnyj-centr/dokumentatsiya-api/" class="little-head">Документация API</a>
+																				<a href="/podderzhka/nastrojka-oborudovanija/" class="little-head">Софтфон UIS</a>
+											</div>
+				</nav>
+												<nav class="b-footer__list">
+					<div class="b-footer__list-label h4">
+													<a href="/producty/integracii/">Интеграции</a>
+											</div>
+					<div class="b-footer__list-items">
+													<a href="/producty/integracii/" class="b-footer__little-head-mobile">Интеграции</a>
+																										<a href="/producty/integracii/integracija-s-amocrm/" class="little-head">amoCRM</a>
+																				<a href="/producty/integracii/integracija-s-bitrix/" class="little-head">Битрикс24</a>
+																				<a href="/producty/integracii/integracija-s-1c-rarus/" class="little-head">1С Рарус</a>
+																				<a href="/producty/integracii/integracija-s-yandeks-metrika/" class="little-head">Яндекс.Метрика</a>
+																				<a href="/producty/integracii/basic-api/" class="little-head">Базовый API</a>
+																				<a href="/producty/integracii/extended-api/" class="little-head">Расширенный API</a>
+																				<a href="/producty/integracii/" class="little-head">Готовые решения</a>
+											</div>
+				</nav>
+							<div class="b-footer__logo" style="background-image: url('/images/logo-white.svg?2')"></div>
+		<div class="b-footer__soc">
+			<div class="b-footer__soc-block">
+				<div class="b-footer__soc-title">
+					Информация о сервисах UIS:
+				</div>
+				<div class="b-footer__soc-elems">
+																<a target="_blank" href="https://vk.com/uiscom" class="b-footer__vk"></a>
+														</div>
+			</div>
+			<div class="b-footer__soc-block">
+				<div class="b-footer__soc-title">
+					Полезные материалы для бизнеса:
+				</div>
+				<div class="b-footer__soc-elems">
+																<a target="_blank" href="https://vc.ru/uiscom" class="b-footer__vc"></a>
+																<a target="_blank" href="https://dzen.ru/uiscom_ru" class="b-footer__zen"></a>
+																<a target="_blank" href="https://rutube.ru/channel/24800224/" class="b-footer__rutube"></a>
+									</div>
+			</div>
+		</div>
+		<div class="b-footer__info little">
+			ООО «НОВОСИСТЕМ», ИНН: 7710311878, ОГРН: 1037739054682<br>
+			Юридический адрес: 117638, г. Москва, ул. Одесская, дом 2, К/Э/П<br>
+			С/17/21Н<br>
+							Телефон: <a href='tel:' class="phone-number little-head noselect">+7 (495) 151-11-55</a><br>
+						E-mail: <a href='mailto:info@uiscom.ru' class="little-head">info@uiscom.ru</a><br>
+			1999-2026 UIS (Unique Intelligent Services)<br>
+			Все права защищены. 18+
+			<div class="b-footer__another mini">
+				<a target="_blank" href="/politika-konfidencialnosti/" class="little-head">Политика обработки персональных данных</a>
+				<a target="_blank" href="/soglasie-na-rasprostranenie-personalnyh-dannyh/" class="little-head">Согласие на распространение персональных данных</a>
+				<div class="b-footer__techart little-head">
+				<span>На информационном ресурсе применяются </span><a target="_blank" href="/pravila-primeneniya-rekomendatelnykh-tekhnologiy/" class="little-head">рекомендательные технологии</a>
+				</div>
+<!--div class="b-footer__techart little-head">
+					<span>Разработка сайта</span> —
+					<span>Текарт</span>
+				</div-->
+				<div class="b-footer__soc-block">
+					<div class="b-footer__soc-title">
+						Платежные системы:
+					</div>
+					<img src="/images/social/mir.svg" class="b-footer__payment" alt="">
+					<img src="/images/social/visa.svg" class="b-footer__payment" alt="">
+					<img src="/images/social/mastercard.svg" class="b-footer__payment" alt="">
+				</div>
+				<div class="b-footer__techart little-head">
+					<span>Digital маркетинг - I'm Trend</span>
+				</div>
+				<div class="b-footer__techart" style="font-size: 0.6rem; width: 80%;">
+					<span><b>*</b>На сайте могут содержаться упоминания о сервисах WhatsApp*, Facebook*, Instagram*, принадлежащих компании Meta* Platforms Inc., которая признана экстремистской организацией и запрещена в РФ.</span>
+				</div>
+				<!--div class="b-footer__techart little-head">
+					<span><a target="_blank" href="https://awards.ratingruneta.ru/awards_vote/?site_id=226" class="little-head"><img src="/upload/images/rejting-runeta.png"></a> </span>
+				</div-->
+			</div>
+		</div>
+		<div class="b-footer__another">
+			<a target="_blank" href="/politika-konfidencialnosti/" class="little-head">Политика обработки персональных данных</a>
+			<a target="_blank" href="/soglasie-na-rasprostranenie-personalnyh-dannyh/" class="little-head">Согласие на распространение персональных данных</a>
+				<div class="b-footer__techart little-head">
+				<span>На информационном ресурсе применяются </span><a target="_blank" href="/pravila-primeneniya-rekomendatelnykh-tekhnologiy/" class="little-head">рекомендательные технологии</a>
+				</div>
+<!--div class="b-footer__techart little-head">
+				<span>Разработка сайта</span> —
+				<span>Текарт</span>
+			</div-->
+			<div class="b-footer__soc-block">
+				<div class="b-footer__soc-title">
+					Платежные системы:
+				</div>
+				<img src="/images/social/mir.svg" class="b-footer__payment" alt="">
+				<img src="/images/social/visa.svg" class="b-footer__payment" alt="">
+				<img src="/images/social/mastercard.svg" class="b-footer__payment" alt="">
+			</div>
+			<div class="b-footer__techart little-head">
+				<span>ООО &laquo;Новосистем&raquo; оказывает услуги связи только на&nbsp;территории Российской Федерации</span>
+			</div>
+			<div class="b-footer__techart little-head">
+				<span>Digital маркетинг - I'm Trend</span>
+			</div>
+			<div class="b-footer__techart" style="font-size: 0.6rem;">
+				<span><b>*</b>На сайте могут содержаться упоминания о сервисах WhatsApp*, Facebook*, Instagram*, принадлежащих компании Meta* Platforms Inc., которая признана экстремистской организацией и запрещена в РФ.</span>
+			</div>
+			<!--div class="b-footer__techart little-head">
+				<span><a target="_blank" href="https://awards.ratingruneta.ru/awards_vote/?site_id=226" class="little-head"><img src="/upload/images/rejting-runeta.png"></a> </span>
+			</div-->
+
+		</div>
+	</div>
+</div>	</footer>
+
+	<div class="b-alert">
+	<div class="b-alert__content">
+		<div class="b-alert__content-text">Спасибо за обращение</div>
+		<div class="b-alert__content-button">
+			<div class="b-alert__content-button-text">Понятно</div>
+		</div>
+	</div>
+</div>
+	<div class="b-modal" id="modal-news">
+	<div class="b-modal__fade"></div>
+	<div class="b-modal__inner">
+		<div class="b-modal__close"></div>
+		
+	</div>
+</div><div class="b-modal" id="modal-pd">
+	<div class="b-modal__fade"></div>
+	<div class="b-modal__inner">
+		<div class="b-modal__close"></div>
+		
+	</div>
+</div>
+
+<!-- динамически заголовок -->
+<!-- Ищет элемент с классом utm_campaign и заменяет в нем на нужный текст-->
+<!-- динамически заголовок -->
+<div id="captcha-container"></div>
+<!-- cбор контактов из рассылок -->
+<!-- cбор контактов из рассылок -->
+
+
+<script type="text/javascript"><!--$(function ($) {$.detect_visitor(1, {order: 0});});--></script>
+
+<!-- imtrend.ru - разработка сайта -->
+
+</body>
+</html>

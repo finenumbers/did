@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ColumnFilters, NumberItem } from "@/lib/types/api";
 import { ActiveFiltersBar } from "@/components/numbers/ActiveFiltersBar";
-import { CertaintyCell } from "@/components/numbers/CertaintyCell";
+import { HighlightText } from "@/components/numbers/HighlightText";
 import { ColumnFilterDropdown } from "@/components/numbers/ColumnFilterDropdown";
 import { InfiniteScrollSentinel } from "@/components/table/InfiniteScrollSentinel";
 import { formatCount, formatPoints, formatPrice } from "@/lib/format";
@@ -15,12 +15,13 @@ type Col = {
   key: string;
   header: string;
   value: (row: NumberItem) => string | number | boolean | null | undefined;
-  verification?: (row: NumberItem) => string | undefined;
   mode: "facet" | "plain";
 };
 
-function fv(row: NumberItem, field: string): string | undefined {
-  return row.field_verification?.[field];
+function cellText(value: string | number | boolean | null | undefined): string {
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "boolean") return value ? "да" : "нет";
+  return String(value);
 }
 
 /** Full unified catalog columns (same set on free and purchased pages). */
@@ -35,14 +36,12 @@ const CATALOG_COLUMNS: Col[] = [
     key: "abc_code",
     header: "ABC",
     value: (r) => r.abc_code,
-    verification: (r) => fv(r, "abc_code"),
     mode: "facet",
   },
   {
     key: "number_local",
     header: "Номер",
     value: (r) => r.number_local,
-    verification: (r) => fv(r, "number_local"),
     mode: "facet",
   },
   {
@@ -55,189 +54,162 @@ const CATALOG_COLUMNS: Col[] = [
     key: "status_raw",
     header: "Статус",
     value: (r) => r.status_raw,
-    verification: (r) => fv(r, "status_raw"),
     mode: "facet",
   },
   {
     key: "region_name",
     header: "Регион",
     value: (r) => r.region_name,
-    verification: (r) => fv(r, "region_name"),
     mode: "facet",
   },
   {
     key: "city_name",
     header: "Город",
     value: (r) => r.city_name,
-    verification: (r) => fv(r, "city_name"),
     mode: "facet",
   },
   {
     key: "buy_price",
     header: "Покупка",
     value: (r) => formatPrice(r.buy_price),
-    verification: (r) => fv(r, "buy_price"),
     mode: "facet",
   },
   {
     key: "period_price",
     header: "Абонплата",
     value: (r) => formatPrice(r.period_price),
-    verification: (r) => fv(r, "period_price"),
     mode: "facet",
   },
   {
     key: "mask",
     header: "Маска",
     value: (r) => r.mask,
-    verification: (r) => fv(r, "mask"),
     mode: "facet",
   },
   {
     key: "display_mask",
     header: "Display mask",
     value: (r) => r.display_mask,
-    verification: (r) => fv(r, "display_mask"),
     mode: "facet",
   },
   {
     key: "book_date",
     header: "Book date",
     value: (r) => r.book_date,
-    verification: (r) => fv(r, "book_date"),
     mode: "facet",
   },
   {
     key: "number_type",
     header: "Тип",
     value: (r) => r.number_type,
-    verification: (r) => fv(r, "number_type"),
     mode: "facet",
   },
   {
     key: "points",
     header: "Баллы",
     value: (r) => formatPoints(r.points),
-    verification: (r) => fv(r, "points"),
     mode: "facet",
   },
   {
     key: "date_from",
     header: "date_from",
     value: (r) => r.date_from,
-    verification: (r) => fv(r, "date_from"),
     mode: "facet",
   },
   {
     key: "last_operation_date",
     header: "last_operation_date",
     value: (r) => r.last_operation_date,
-    verification: (r) => fv(r, "last_operation_date"),
     mode: "facet",
   },
   {
     key: "operator",
     header: "Оператор",
     value: (r) => r.operator,
-    verification: (r) => fv(r, "operator"),
     mode: "facet",
   },
   {
     key: "operator_id",
     header: "operator_id",
     value: (r) => r.operator_id,
-    verification: (r) => fv(r, "operator_id"),
     mode: "facet",
   },
   {
     key: "manager_id",
     header: "manager_id",
     value: (r) => r.manager_id,
-    verification: (r) => fv(r, "manager_id"),
     mode: "facet",
   },
   {
     key: "notes",
     header: "notes",
     value: (r) => r.notes,
-    verification: (r) => fv(r, "notes"),
     mode: "facet",
   },
   {
     key: "abcdef",
     header: "abcdef",
     value: (r) => r.abcdef,
-    verification: (r) => fv(r, "abcdef"),
     mode: "facet",
   },
   {
     key: "order_id",
     header: "order_id",
     value: (r) => r.order_id,
-    verification: (r) => fv(r, "order_id"),
     mode: "facet",
   },
   {
     key: "doc_status",
     header: "doc_status",
     value: (r) => r.doc_status,
-    verification: (r) => fv(r, "doc_status"),
     mode: "facet",
   },
   {
     key: "doc_required",
     header: "doc_required",
     value: (r) => r.doc_required,
-    verification: (r) => fv(r, "doc_required"),
     mode: "facet",
   },
   {
     key: "order_doc_required",
     header: "order_doc_required",
     value: (r) => r.order_doc_required,
-    verification: (r) => fv(r, "order_doc_required"),
     mode: "facet",
   },
   {
     key: "sign",
     header: "sign",
     value: (r) => r.sign,
-    verification: (r) => fv(r, "sign"),
     mode: "facet",
   },
   {
     key: "tariff",
     header: "Тариф",
     value: (r) => r.tariff,
-    verification: (r) => fv(r, "tariff"),
     mode: "facet",
   },
   {
     key: "class",
     header: "Класс",
     value: (r) => r.class,
-    verification: (r) => fv(r, "class"),
     mode: "facet",
   },
   {
     key: "partner",
     header: "Партнёр",
     value: (r) => r.partner,
-    verification: (r) => fv(r, "partner"),
     mode: "facet",
   },
   {
     key: "project",
     header: "Проект",
     value: (r) => r.project,
-    verification: (r) => fv(r, "project"),
     mode: "facet",
   },
   {
     key: "equipment",
     header: "Оборудование",
     value: (r) => r.equipment,
-    verification: (r) => fv(r, "equipment"),
     mode: "facet",
   },
   {
@@ -467,17 +439,10 @@ export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
               <tr key={row.id}>
                 {CATALOG_COLUMNS.map((col) => (
                   <td key={col.key}>
-                    {col.verification ? (
-                      <CertaintyCell
-                        value={col.value(row)}
-                        verification={col.verification(row)}
-                        highlight={
-                          col.key === "number_local" ? numberLocalQ : undefined
-                        }
-                      />
-                    ) : (
-                      <span>{col.value(row) ?? "—"}</span>
-                    )}
+                    <HighlightText
+                      text={cellText(col.value(row))}
+                      query={col.key === "number_local" ? numberLocalQ : undefined}
+                    />
                   </td>
                 ))}
               </tr>

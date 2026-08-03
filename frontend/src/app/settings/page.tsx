@@ -10,7 +10,7 @@ import type {
   SyncSchedule,
 } from "@/lib/types/api";
 
-type ProviderCode = "sipout" | "runexis" | "finenumbers";
+type ProviderCode = "sipout" | "runexis" | "uis" | "finenumbers";
 
 type Draft = {
   baseUrl: string;
@@ -20,6 +20,9 @@ type Draft = {
   numberingLogin: string;
   numberingPassword: string;
   numberingBaseUrl: string;
+  accessToken: string;
+  login: string;
+  userId: string;
   settings: ProviderSettings | null;
   message: string | null;
   error: string | null;
@@ -35,6 +38,9 @@ const EMPTY_DRAFT: Draft = {
   numberingLogin: "",
   numberingPassword: "",
   numberingBaseUrl: "",
+  accessToken: "",
+  login: "",
+  userId: "",
   settings: null,
   message: null,
   error: null,
@@ -45,6 +51,7 @@ const EMPTY_DRAFT: Draft = {
 const PROVIDERS: { code: ProviderCode; title: string }[] = [
   { code: "sipout", title: "SipOut" },
   { code: "runexis", title: "Runexis" },
+  { code: "uis", title: "UIS" },
   { code: "finenumbers", title: "Finenumbers" },
 ];
 
@@ -56,6 +63,8 @@ function draftFromSettings(code: ProviderCode, s: ProviderSettings): Draft {
     email: typeof auth.email === "string" ? auth.email : "",
     numberingLogin: typeof auth.numbering_login === "string" ? auth.numbering_login : "",
     numberingBaseUrl: typeof auth.numbering_base_url === "string" ? auth.numbering_base_url : "",
+    login: typeof auth.login === "string" ? auth.login : "",
+    userId: auth.user_id != null && auth.user_id !== "" ? String(auth.user_id) : "",
     settings: s,
   };
 }
@@ -65,6 +74,7 @@ export default function SettingsPage() {
   const [drafts, setDrafts] = useState<Record<ProviderCode, Draft>>({
     sipout: { ...EMPTY_DRAFT },
     runexis: { ...EMPTY_DRAFT },
+    uis: { ...EMPTY_DRAFT },
     finenumbers: { ...EMPTY_DRAFT },
   });
   const [pageError, setPageError] = useState<string | null>(null);
@@ -108,6 +118,7 @@ export default function SettingsPage() {
     const next: Record<ProviderCode, Draft> = {
       sipout: { ...EMPTY_DRAFT },
       runexis: { ...EMPTY_DRAFT },
+      uis: { ...EMPTY_DRAFT },
       finenumbers: { ...EMPTY_DRAFT },
     };
     for (const { code } of PROVIDERS) {
@@ -140,6 +151,13 @@ export default function SettingsPage() {
     let auth_settings: Record<string, string> | undefined;
     if (code === "sipout" || code === "finenumbers") {
       auth_settings = d.apiKey ? { key: d.apiKey } : undefined;
+    } else if (code === "uis") {
+      const next: Record<string, string> = {};
+      if (d.accessToken) next.access_token = d.accessToken;
+      if (d.login) next.login = d.login;
+      if (d.password) next.password = d.password;
+      if (d.userId) next.user_id = d.userId;
+      auth_settings = Object.keys(next).length ? next : undefined;
     } else {
       const next: Record<string, string> = {};
       if (d.email) next.email = d.email;
@@ -412,7 +430,13 @@ export default function SettingsPage() {
               <div className="filters" style={{ flexDirection: "column", alignItems: "stretch" }}>
                 <label>
                   Base URL{" "}
-                  {code === "runexis" ? "(DIDAPI)" : code === "finenumbers" ? "(PSTN)" : ""}
+                  {code === "runexis"
+                    ? "(DIDAPI)"
+                    : code === "finenumbers"
+                      ? "(PSTN)"
+                      : code === "uis"
+                        ? "(Data API)"
+                        : ""}
                   <input
                     value={d.baseUrl}
                     onChange={(e) => setDraft(code, { baseUrl: e.target.value })}
@@ -422,7 +446,9 @@ export default function SettingsPage() {
                         ? "https://didapi.runexis.ru"
                         : code === "finenumbers"
                           ? "https://pstn.finenumbers.com"
-                          : undefined
+                          : code === "uis"
+                            ? "https://dataapi.uiscom.ru/v2.0"
+                            : undefined
                     }
                   />
                 </label>
@@ -444,6 +470,66 @@ export default function SettingsPage() {
                       style={{ width: "100%" }}
                     />
                   </label>
+                ) : code === "uis" ? (
+                  <>
+                    <label>
+                      Access token
+                      <input
+                        type="password"
+                        placeholder={
+                          d.settings?.auth_settings_masked?.access_token
+                            ? `текущее: ${String(d.settings.auth_settings_masked.access_token)}`
+                            : "постоянный/временный ключ из ЛК UIS"
+                        }
+                        value={d.accessToken}
+                        onChange={(e) => setDraft(code, { accessToken: e.target.value })}
+                        style={{ width: "100%" }}
+                      />
+                    </label>
+                    <h3 style={{ margin: "0.5rem 0 0", fontSize: "0.95rem" }}>
+                      Fallback — login.user
+                    </h3>
+                    <label>
+                      Login
+                      <input
+                        value={d.login}
+                        onChange={(e) => setDraft(code, { login: e.target.value })}
+                        placeholder="логин UIS (если нет access_token)"
+                        style={{ width: "100%" }}
+                      />
+                    </label>
+                    <label>
+                      Password
+                      <input
+                        type="password"
+                        autoComplete="new-password"
+                        placeholder={
+                          d.settings?.auth_settings_masked?.password
+                            ? `текущее: ${String(d.settings.auth_settings_masked.password)}`
+                            : "пароль UIS"
+                        }
+                        value={d.password}
+                        onChange={(e) => setDraft(code, { password: e.target.value })}
+                        style={{ width: "100%" }}
+                      />
+                    </label>
+                    <label>
+                      user_id (опционально, агент)
+                      <input
+                        value={d.userId}
+                        onChange={(e) => setDraft(code, { userId: e.target.value })}
+                        placeholder="числовой user_id клиента"
+                        style={{ width: "100%" }}
+                      />
+                    </label>
+                    <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
+                      Read-only: get.available_virtual_numbers / get.virtual_numbers. IP whitelist в
+                      ЛК UIS обязателен.
+                      {d.settings?.auth_settings_masked?.access_token
+                        ? " Access token сохранён."
+                        : " Access token ещё не задан."}
+                    </div>
+                  </>
                 ) : (
                   <>
                     <h3 style={{ margin: "0.5rem 0 0", fontSize: "0.95rem" }}>

@@ -104,7 +104,6 @@ def _facets(
     summary="List free numbers",
     description=(
         "Paginated free inventory from numbers_catalog_normalized. "
-        "field_verification marks documentation_verified / example_confirmed / unresolved values. "
         "Use filters JSON for multi-select column filters; number_local_q for local number search."
     ),
 )

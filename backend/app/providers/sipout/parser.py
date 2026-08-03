@@ -5,7 +5,6 @@ from __future__ import annotations
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from app.models.enums import FieldVerification
 from app.providers.dto.common import RawHttpResult
 from app.providers.dto.geo import ParsedCity, ParsedRegion
 from app.providers.dto.numbers import ParsedNumberItem
@@ -60,11 +59,7 @@ def parse_geo(raw: RawHttpResult) -> tuple[list[ParsedRegion], list[ParsedCity]]
                 name=_as_text(item.get("name")),
                 eng_name=_as_text(item.get("eng_name")),
                 capital_city=_as_text(item.get("capital_city")),
-                gmt=_as_text(item.get("gmt")),
-                field_verification={
-                    "region_external_id": FieldVerification.example_confirmed,
-                    "name": FieldVerification.example_confirmed,
-                },
+                gmt=_as_text(item.get("gmt"))
             )
         )
     cities: list[ParsedCity] = []
@@ -77,12 +72,7 @@ def parse_geo(raw: RawHttpResult) -> tuple[list[ParsedRegion], list[ParsedCity]]
                 city_external_id=_as_text(item.get("id")),
                 name=_as_text(item.get("name")),
                 eng_name=_as_text(item.get("eng_name")),
-                region_external_id=_as_text(item.get("region_id")),
-                field_verification={
-                    "city_external_id": FieldVerification.example_confirmed,
-                    "name": FieldVerification.example_confirmed,
-                    "region_external_id": FieldVerification.example_confirmed,
-                },
+                region_external_id=_as_text(item.get("region_id"))
             )
         )
     return regions, cities
@@ -149,34 +139,7 @@ def parse_number_list(raw: RawHttpResult) -> list[ParsedNumberItem]:
                 doc_status=doc_status,
                 doc_required=doc_required,
                 order_doc_required=order_doc_required,
-                sign=sign,
-                field_verification={
-                    "provider_number_key": FieldVerification.example_confirmed,
-                    "msisdn": FieldVerification.example_confirmed,
-                    "city_external_id": FieldVerification.example_confirmed,
-                    "period_price": FieldVerification.example_confirmed
-                    if item.get("price") is not None
-                    else FieldVerification.missing,
-                    "buy_price": FieldVerification.missing,
-                    "status_raw": FieldVerification.example_confirmed
-                    if item.get("status") is not None
-                    else FieldVerification.missing,
-                    "order_id": FieldVerification.example_confirmed
-                    if order_id is not None
-                    else FieldVerification.missing,
-                    "doc_status": FieldVerification.example_confirmed
-                    if doc_status is not None
-                    else FieldVerification.missing,
-                    "doc_required": FieldVerification.example_confirmed
-                    if doc_required is not None
-                    else FieldVerification.missing,
-                    "order_doc_required": FieldVerification.example_confirmed
-                    if order_doc_required is not None
-                    else FieldVerification.missing,
-                    "sign": FieldVerification.example_confirmed
-                    if sign is not None
-                    else FieldVerification.missing,
-                },
+                sign=sign
             )
         )
     return out

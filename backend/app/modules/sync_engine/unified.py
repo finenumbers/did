@@ -34,7 +34,12 @@ logger = logging.getLogger(__name__)
 
 STALE_RUNNING_MINUTES = 180
 STALE_PENDING_MINUTES = 30
-PROVIDER_ORDER = (ProviderCode.sipout, ProviderCode.runexis, ProviderCode.finenumbers)
+PROVIDER_ORDER = (
+    ProviderCode.sipout,
+    ProviderCode.runexis,
+    ProviderCode.uis,
+    ProviderCode.finenumbers,
+)
 ACTIVE_STATUSES = (SyncJobStatus.pending, SyncJobStatus.running)
 
 

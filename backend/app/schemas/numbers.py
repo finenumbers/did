@@ -47,7 +47,6 @@ class NumberItem(BaseModel):
     last_seen_at: datetime
     is_currently_present: bool
     mapping_confidence: str
-    field_verification: dict[str, str] = Field(default_factory=dict)
 
 
 class FacetItem(BaseModel):

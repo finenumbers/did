@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-from app.models.enums import FieldVerification, InventoryKind, MappingConfidence
+from app.models.enums import InventoryKind, MappingConfidence
 
 
 @dataclass
@@ -46,7 +46,6 @@ class ParsedNumberItem:
     partner: str | None = None
     project: str | None = None
     equipment: str | None = None
-    field_verification: dict[str, FieldVerification] = field(default_factory=dict)
 
 
 @dataclass
@@ -61,7 +60,6 @@ class NormalizedNumber:
     buy_price: Decimal | None
     period_price: Decimal | None
     status_raw: str | None
-    field_verification: dict[str, str]
     mapping_confidence: MappingConfidence
     normalized_payload: dict[str, Any]
     raw_payload: dict[str, Any]

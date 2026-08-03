@@ -28,6 +28,7 @@ from app.models.sipout_raw import (
     SipoutPurchasedNumberRaw,
     SipoutRegionRaw,
 )
+from app.models.uis_raw import UisFreeNumberRaw, UisPurchasedNumberRaw
 from app.modules.sync_engine.hashing import payload_hash
 from app.modules.sync_engine.staging import (
     cutover_from_staging,
@@ -101,6 +102,13 @@ def wipe_provider_numbers(
             RunexisFreeNumberRaw
             if inventory_kind == InventoryKind.free
             else RunexisPurchasedNumberRaw
+        )
+        wiped_raw = db.execute(delete(raw_cls)).rowcount or 0
+    elif provider_code == ProviderCode.uis:
+        raw_cls = (
+            UisFreeNumberRaw
+            if inventory_kind == InventoryKind.free
+            else UisPurchasedNumberRaw
         )
         wiped_raw = db.execute(delete(raw_cls)).rowcount or 0
     elif provider_code == ProviderCode.finenumbers:
@@ -300,7 +308,7 @@ def _catalog_row(
         "raw_source_table": table_name,
         "raw_source_id": raw_id,
         "last_sync_job_id": job_id,
-        "field_verification": num.field_verification or {},
+        "field_verification": {},
         "mapping_confidence": conf_val,
         "first_seen_at": loaded,
         "last_seen_at": loaded,
@@ -596,6 +604,141 @@ def persist_runexis_numbers(
     }
 
 
+def persist_uis_numbers(
+    db: Session,
+    *,
+    provider_id: uuid.UUID,
+    job_id: uuid.UUID,
+    inventory_kind: InventoryKind,
+    numbers: list[NormalizedNumber],
+    on_progress: Callable[[str, int | None, int | None], Any] | None = None,
+) -> dict[str, int]:
+    """Stage into UNLOGGED tables, then atomic wipe+cutover."""
+    deduped: dict[str, NormalizedNumber] = {}
+    for num in numbers:
+        if num.provider_number_key:
+            deduped[num.provider_number_key] = num
+    numbers = list(deduped.values())
+
+    loaded = _now()
+    table_name = (
+        "uis_free_numbers_raw"
+        if inventory_kind == InventoryKind.free
+        else "uis_purchased_numbers_raw"
+    )
+    stg_raw_name = f"{table_name}_stg"
+    stg_cat_name = "numbers_catalog_normalized_stg"
+
+    stg_raw = ensure_temp_staging(db, live_table=table_name, stg_table=stg_raw_name)
+    stg_cat = ensure_temp_staging(
+        db, live_table="numbers_catalog_normalized", stg_table=stg_cat_name
+    )
+
+    raw_rows: list[dict[str, Any]] = []
+    cat_rows: list[dict[str, Any]] = []
+    for num in numbers:
+        raw_id = uuid.uuid4()
+        ph = payload_hash(num.raw_payload)
+        if inventory_kind == InventoryKind.free:
+            raw_rows.append(
+                {
+                    "id": raw_id,
+                    "sync_job_id": job_id,
+                    "source_loaded_at": loaded,
+                    "raw_payload": num.raw_payload,
+                    "payload_hash": ph,
+                    "external_key": num.provider_number_key,
+                    "phone": num.msisdn or num.provider_number_key,
+                    "category": num.number_type,
+                    "location_name": num.region_name,
+                    "location_mnemonic": num.region_external_id,
+                    "created_at": loaded,
+                }
+            )
+        else:
+            ext = num.raw_payload.get("id")
+            raw_rows.append(
+                {
+                    "id": raw_id,
+                    "sync_job_id": job_id,
+                    "source_loaded_at": loaded,
+                    "raw_payload": num.raw_payload,
+                    "payload_hash": ph,
+                    "external_key": num.provider_number_key,
+                    "phone": num.msisdn,
+                    "external_id": str(ext) if ext is not None else None,
+                    "status": num.status_raw,
+                    "category": num.number_type,
+                    "name": (
+                        str(num.raw_payload.get("name"))
+                        if num.raw_payload.get("name") is not None
+                        else None
+                    ),
+                    "comment": (
+                        str(num.raw_payload.get("comment"))
+                        if num.raw_payload.get("comment") is not None
+                        else None
+                    ),
+                    "created_at": loaded,
+                }
+            )
+        cat_rows.append(
+            _catalog_row(
+                num,
+                provider_id=provider_id,
+                job_id=job_id,
+                inventory_kind=inventory_kind,
+                table_name=table_name,
+                raw_id=raw_id,
+                loaded=loaded,
+            )
+        )
+
+    upserted = insert_staging_batches(
+        db, stg_raw, raw_rows, on_progress=on_progress, progress_label="UIS staging raw"
+    )
+    insert_staging_batches(
+        db, stg_cat, cat_rows, on_progress=on_progress, progress_label="UIS staging catalog"
+    )
+
+    wipe_holder: dict[str, int] = {}
+
+    def _wipe() -> None:
+        wipe_holder.update(
+            wipe_provider_numbers(
+                db,
+                provider_id=provider_id,
+                provider_code=ProviderCode.uis,
+                inventory_kind=inventory_kind,
+            )
+        )
+
+    cutover_from_staging(
+        db,
+        wipe_fn=_wipe,
+        live_raw_table=table_name,
+        stg_raw=stg_raw,
+        live_catalog_table="numbers_catalog_normalized",
+        stg_catalog=stg_cat,
+    )
+    if on_progress:
+        try:
+            on_progress("cutover done", upserted, len(numbers))
+        except Exception:
+            logger.exception("persist on_progress failed")
+
+    return {
+        "upserted": upserted,
+        "marked_absent": 0,
+        "price_history": 0,
+        "status_history": 0,
+        "deduped_input": len(deduped),
+        "bulk_insert": 1,
+        "staged_cutover": 1,
+        **wipe_holder,
+    }
+
+
 def persist_finenumbers_numbers(
     db: Session,
     *,
@@ -676,7 +819,7 @@ def _decimal_or_none(value: Any) -> Decimal | None:
 def build_city_lookup(db: Session, provider_code: str) -> dict[str, tuple[str | None, str | None, str | None]]:
     """city_id -> (city_name, region_external_id, region_name)."""
     lookup: dict[str, tuple[str | None, str | None, str | None]] = {}
-    if provider_code == "finenumbers":
+    if provider_code in {"finenumbers", "uis"}:
         return lookup
     if provider_code == "sipout":
         cities = db.scalars(select(SipoutCityRaw)).all()

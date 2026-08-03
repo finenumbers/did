@@ -4,11 +4,13 @@ from app.providers.errors import ProviderError
 from app.providers.finenumbers import FinenumbersProvider
 from app.providers.runexis import RunexisProvider
 from app.providers.sipout import SipOutProvider
+from app.providers.uis import UisProvider
 
 PROVIDER_REGISTRY: dict[ProviderCode, type[AbstractProvider]] = {
     ProviderCode.runexis: RunexisProvider,
     ProviderCode.sipout: SipOutProvider,
     ProviderCode.finenumbers: FinenumbersProvider,
+    ProviderCode.uis: UisProvider,
 }
 
 

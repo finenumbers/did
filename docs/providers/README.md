@@ -8,6 +8,7 @@ External provider APIs are documented from uploaded vendor materials:
 - **Runexis DIDAPI:** [`runexis/raw/Runexis.html`](runexis/raw/Runexis.html) (HTML)
 - **Runexis Numbering API:** see [`runexis/SOURCE.md`](runexis/SOURCE.md) and `runexis-numbering-api-contract.md` (DOCX-derived)
 - **Finenumbers / PSTN:** [`finenumbers-contract.md`](finenumbers-contract.md), [`finenumbers-implementation-notes.md`](finenumbers-implementation-notes.md) (Contour A inventory vs Contour B operator cache); code constants in `backend/app/providers/finenumbers/contract.py`
+- **UIS Data API:** see [`uis/SOURCE.md`](uis/SOURCE.md), [`uis-contract.md`](uis-contract.md), [`uis-field-mapping.md`](uis-field-mapping.md); raw HTML under [`uis/raw/`](uis/raw/); code in `backend/app/providers/uis/contract.py`
 
 Derived artifacts (`*-contract.md`, `*-field-mapping.md`, `*-implementation-notes.md`) must not invent methods, fields, or semantics beyond those sources.
 

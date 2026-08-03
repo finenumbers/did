@@ -1,5 +1,9 @@
 from app.models.base import Base
-from app.models.catalog import NumberPriceHistory, NumbersCatalogNormalized, NumberStatusHistory
+from app.models.catalog import (
+    NumberPriceHistory,
+    NumbersCatalogNormalized,
+    NumberStatusHistory,
+)
 from app.models.providers import Provider, ProviderConnection, SystemSetting
 from app.models.pstn_cache import PstnInnCacheOperator, PstnInnRangeCache
 from app.models.runexis_raw import (
@@ -15,27 +19,30 @@ from app.models.sipout_raw import (
     SipoutRegionRaw,
 )
 from app.models.sync import SyncJob, SyncJobLog, SyncRun, SyncRunLog
+from app.models.uis_raw import UisFreeNumberRaw, UisPurchasedNumberRaw
 
 __all__ = [
     "Base",
+    "NumberPriceHistory",
+    "NumberStatusHistory",
+    "NumbersCatalogNormalized",
     "Provider",
     "ProviderConnection",
-    "SystemSetting",
     "PstnInnCacheOperator",
     "PstnInnRangeCache",
+    "RunexisCityRaw",
+    "RunexisFreeNumberRaw",
+    "RunexisPurchasedNumberRaw",
+    "RunexisRegionRaw",
+    "SipoutCityRaw",
+    "SipoutFreeNumberRaw",
+    "SipoutPurchasedNumberRaw",
+    "SipoutRegionRaw",
     "SyncJob",
     "SyncJobLog",
     "SyncRun",
     "SyncRunLog",
-    "RunexisRegionRaw",
-    "RunexisCityRaw",
-    "RunexisFreeNumberRaw",
-    "RunexisPurchasedNumberRaw",
-    "SipoutRegionRaw",
-    "SipoutCityRaw",
-    "SipoutFreeNumberRaw",
-    "SipoutPurchasedNumberRaw",
-    "NumbersCatalogNormalized",
-    "NumberPriceHistory",
-    "NumberStatusHistory",
+    "SystemSetting",
+    "UisFreeNumberRaw",
+    "UisPurchasedNumberRaw",
 ]

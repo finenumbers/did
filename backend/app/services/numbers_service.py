@@ -430,7 +430,6 @@ class NumbersService:
             last_seen_at=row.last_seen_at,
             is_currently_present=row.is_currently_present,
             mapping_confidence=row.mapping_confidence.value,
-            field_verification=row.field_verification or {},
         )
 
     def order_by_clauses(self, sort_by: str | None, sort_dir: str) -> list[Any]:

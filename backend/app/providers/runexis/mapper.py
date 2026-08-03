@@ -19,14 +19,7 @@ def map_number(
 ) -> NormalizedNumber | None:
     if not item.provider_number_key:
         return None
-    verification = {k: v.value for k, v in item.field_verification.items()}
     city_name = item.city_name
-    if city_name:
-        verification.setdefault("city_name", "example_confirmed")
-    if region_name:
-        verification["region_name"] = "derived"
-    verification.pop("has_sms", None)
-    verification.pop("price_currency", None)
     purchased = inventory_kind == InventoryKind.purchased
     raw = item.raw_payload or {}
     abc_code, number_local = split_from_parts(
@@ -34,10 +27,6 @@ def map_number(
         code=raw.get("code") or raw.get("city_code"),
         number=raw.get("number") or raw.get("phone_number"),
     )
-    if abc_code:
-        verification["abc_code"] = "derived"
-    if number_local:
-        verification["number_local"] = "derived"
     return NormalizedNumber(
         inventory_kind=inventory_kind,
         provider_number_key=item.provider_number_key,
@@ -51,7 +40,6 @@ def map_number(
         buy_price=item.buy_price,
         period_price=item.period_price,
         status_raw=item.status_raw,
-        field_verification=verification,
         mapping_confidence=MappingConfidence.low,
         normalized_payload={
             "code": item.raw_payload.get("code"),

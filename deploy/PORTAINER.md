@@ -84,3 +84,7 @@ After a new image is published to GHCR (`:latest` is updated on every push to `m
 3. Or: **Stop** → **Start** the stack so images are pulled again
 
 Do **not** pin version tags for routine redeploys — keep `DID_IMAGE_TAG=latest`.
+
+## 7. UIS Data API egress IP
+
+UIS requires the server egress IP in the personal account API allowlist before sync/test work. Add the Docker host public IP (or `0.0.0.0/0` for lab) under UIS ЛК → API security. Credentials (`access_token` or login/password) are entered in Settings → UIS after deploy.

@@ -5,6 +5,7 @@ class ProviderCode(str, enum.Enum):
     runexis = "runexis"
     sipout = "sipout"
     finenumbers = "finenumbers"
+    uis = "uis"
 
 
 class InventoryKind(str, enum.Enum):
@@ -45,14 +46,6 @@ class ConnectionTestStatus(str, enum.Enum):
     never_tested = "never_tested"
     ok = "ok"
     failed = "failed"
-
-
-class FieldVerification(str, enum.Enum):
-    documentation_verified = "documentation_verified"
-    example_confirmed = "example_confirmed"
-    derived = "derived"
-    unresolved = "unresolved"
-    missing = "missing"
 
 
 class MappingConfidence(str, enum.Enum):

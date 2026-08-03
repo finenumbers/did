@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
-
-from app.models.enums import FieldVerification
 
 
 @dataclass
@@ -14,7 +12,6 @@ class ParsedRegion:
     eng_name: str | None = None
     capital_city: str | None = None
     gmt: str | None = None
-    field_verification: dict[str, FieldVerification] = field(default_factory=dict)
 
 
 @dataclass
@@ -25,4 +22,3 @@ class ParsedCity:
     eng_name: str | None = None
     region_external_id: str | None = None
     region_name: str | None = None
-    field_verification: dict[str, FieldVerification] = field(default_factory=dict)

@@ -15,7 +15,6 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.models.catalog import NumbersCatalogNormalized
-from app.models.enums import FieldVerification
 from app.modules.pstn_inn_cache.service import load_enabled_ranges_for_enrich
 from app.providers.dto.common import ConnectionConfig
 from app.providers.errors import ProviderError
@@ -151,7 +150,6 @@ async def _enrich_catalog_operators_inner(
         NumbersCatalogNormalized.id,
         NumbersCatalogNormalized.msisdn,
         NumbersCatalogNormalized.operator,
-        NumbersCatalogNormalized.field_verification,
     ).where(
         NumbersCatalogNormalized.is_currently_present.is_(True),
         NumbersCatalogNormalized.msisdn.is_not(None),
@@ -167,33 +165,28 @@ async def _enrich_catalog_operators_inner(
     logger.warning("PSTN enrich: rows to process=%s only_missing=%s", len(rows), only_missing)
     _progress(on_progress, f"Сопоставление с кешем ({len(rows)} номеров)", 0, len(rows))
 
-    verified = FieldVerification.documentation_verified.value
     pending_updates: list[tuple] = []
     cache_hits = 0
     lookups = 0
     errors = 0
 
-    # (id, msisdn, phone, current_operator, fv)
+    # (id, msisdn, phone, current_operator)
     pending: list[tuple] = []
     invalid_msisdns: list[str] = []
 
-    for catalog_id, msisdn, current_operator, field_verification in rows:
+    for catalog_id, msisdn, current_operator in rows:
         msisdn_s = msisdn or ""
         operator = cache.resolve(msisdn_s)
         if operator:
             cache_hits += 1
-            fv = dict(field_verification or {})
-            if not (current_operator == operator and fv.get("operator") == verified):
-                fv["operator"] = verified
-                pending_updates.append((catalog_id, operator, fv))
+            if current_operator != operator:
+                pending_updates.append((catalog_id, operator))
             continue
         phone = phone_for_lookup(msisdn_s)
         if not phone:
             invalid_msisdns.append(msisdn_s)
             continue
-        pending.append(
-            (catalog_id, msisdn_s, phone, current_operator, dict(field_verification or {}))
-        )
+        pending.append((catalog_id, msisdn_s, phone, current_operator))
 
     sem = asyncio.Semaphore(concurrency)
     # phone -> operator string, or None when API returned found=false / empty operator
@@ -229,7 +222,7 @@ async def _enrich_catalog_operators_inner(
         phone_seen: set[str] = set()
 
         for item in pending:
-            catalog_id, msisdn_s, phone, current_operator, fv = item
+            catalog_id, msisdn_s, phone, current_operator = item
             operator = cache.resolve(msisdn_s)
             if not operator:
                 op_direct = lookup_result.get(phone)
@@ -237,10 +230,8 @@ async def _enrich_catalog_operators_inner(
                     operator = op_direct
             if operator:
                 cache_hits += 1
-                if not (current_operator == operator and fv.get("operator") == verified):
-                    fv = dict(fv)
-                    fv["operator"] = verified
-                    pending_updates.append((catalog_id, operator, fv))
+                if current_operator != operator:
+                    pending_updates.append((catalog_id, operator))
                 continue
 
             still.append(item)
@@ -271,24 +262,23 @@ async def _enrich_catalog_operators_inner(
     # Final apply
     uncovered_msisdns: list[str] = list(invalid_msisdns)
     for item in pending:
-        catalog_id, msisdn_s, phone, current_operator, fv = item
+        catalog_id, msisdn_s, phone, current_operator = item
         operator = cache.resolve(msisdn_s) or lookup_result.get(phone)
         if operator:
             cache_hits += 1
-            fv = dict(fv)
-            fv["operator"] = verified
-            pending_updates.append((catalog_id, operator, fv))
+            if current_operator != operator:
+                pending_updates.append((catalog_id, operator))
         else:
             uncovered_msisdns.append(msisdn_s)
 
     updated = 0
     for i in range(0, len(pending_updates), batch_size):
         chunk = pending_updates[i : i + batch_size]
-        for catalog_id, operator, fv in chunk:
+        for catalog_id, operator in chunk:
             db.execute(
                 update(NumbersCatalogNormalized)
                 .where(NumbersCatalogNormalized.id == catalog_id)
-                .values(operator=operator, field_verification=fv)
+                .values(operator=operator)
             )
             updated += 1
         db.commit()
