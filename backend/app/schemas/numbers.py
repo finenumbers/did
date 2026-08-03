@@ -14,6 +14,7 @@ class NumberItem(BaseModel):
     provider_number_key: str
     msisdn: str | None = None
     abc_code: str | None = None
+    number_category: str | None = None
     number_local: str | None = None
     status_raw: str | None = None
     region_name: str | None = None

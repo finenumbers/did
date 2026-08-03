@@ -22,6 +22,7 @@ from app.services.numbers_service import NumbersService
 EXPORT_COLUMNS: list[tuple[str, str]] = [
     ("provider_code", "Провайдер"),
     ("abc_code", "ABC"),
+    ("number_category", "Категория"),
     ("number_local", "Номер"),
     ("status_raw", "Статус"),
     ("region_name", "Регион"),
@@ -57,6 +58,7 @@ EXPORT_COLUMNS: list[tuple[str, str]] = [
 COLUMN_WIDTHS: dict[str, float] = {
     "provider_code": 12,
     "abc_code": 8,
+    "number_category": 16,
     "number_local": 12,
     "status_raw": 12,
     "region_name": 28,

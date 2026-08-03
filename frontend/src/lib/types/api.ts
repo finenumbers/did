@@ -20,6 +20,7 @@ export interface NumberItem {
   provider_number_key: string;
   msisdn: string | null;
   abc_code: string | null;
+  number_category: string | null;
   number_local: string | null;
   status_raw: string | null;
   region_name: string | null;

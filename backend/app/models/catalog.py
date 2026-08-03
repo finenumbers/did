@@ -35,6 +35,7 @@ class NumbersCatalogNormalized(Base, TimestampMixin):
     provider_number_key: Mapped[str] = mapped_column(Text, nullable=False)
     msisdn: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
     abc_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    number_category: Mapped[str | None] = mapped_column(Text, nullable=True)
     number_local: Mapped[str | None] = mapped_column(Text, nullable=True)
     region_external_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     city_external_id: Mapped[str | None] = mapped_column(Text, nullable=True)

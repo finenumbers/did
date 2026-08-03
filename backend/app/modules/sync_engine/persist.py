@@ -118,8 +118,11 @@ def wipe_provider_numbers(
 
 
 def _catalog_extra_fields(num: NormalizedNumber) -> dict[str, Any]:
+    from app.modules.catalog.number_category import classify_number_category
+
     return {
         "abc_code": num.abc_code,
+        "number_category": classify_number_category(num.abc_code, num.msisdn),
         "number_local": num.number_local,
         "mask": num.mask,
         "display_mask": num.display_mask,

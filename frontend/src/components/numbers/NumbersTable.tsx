@@ -39,6 +39,12 @@ const CATALOG_COLUMNS: Col[] = [
     mode: "facet",
   },
   {
+    key: "number_category",
+    header: "Категория",
+    value: (r) => r.number_category,
+    mode: "facet",
+  },
+  {
     key: "number_local",
     header: "Номер",
     value: (r) => r.number_local,
