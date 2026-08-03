@@ -22,10 +22,12 @@ AUTH_NUMBERING_BASE_URL = "numbering_base_url"
 # VERIFIED filter field name; EXAMPLE-CONFIRMED alternate key usage_statuses in same DOCX
 NUMBERING_FREE_FILTER_PRIMARY = {"access_state": ["free"]}
 NUMBERING_FREE_FILTER_FALLBACK = {"usage_statuses": ["free"]}
-# Live: ~40s/page regardless of size; 20k ≈ 17 pages for ~342k free
+# Live: ~40s/page regardless of size; 20k ≈ 22 pages for ~437k free
 NUMBERING_PAGE_LIMIT = 20_000
 # Parallel search_numbers pages (all-or-nothing; lower if API rate-limits)
 NUMBERING_FETCH_CONCURRENCY = 4
+# If parallel waves stop short of search_numbers_count, resume with this limit
+NUMBERING_PAGE_LIMIT_RECOVERY = 5_000
 NUMBERING_SOURCE_ENDPOINT = "numbering-api:search_numbers"
 # Numbering search is slow; defaults in TimeoutConfig are too short
 NUMBERING_CONNECT_TIMEOUT = 30.0
