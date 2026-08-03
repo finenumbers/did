@@ -262,6 +262,25 @@ def is_free_management_item(item: dict[str, Any] | ParsedNumberItem) -> bool:
     return (mnemonic or "").lower() == contract.STATUS_MNEMONIC_FREE
 
 
+def is_numbering_free_status(status: Any) -> bool:
+    """
+    True only for Numbering access_state free / 0.
+
+    Sold (3), installed/отрулен (4), reserved, booked, etc. must not enter
+    the free catalog — those are not «Свободные номера».
+    """
+    if status is None:
+        return True
+    if isinstance(status, (list, tuple)):
+        if not status:
+            return True
+        return all(is_numbering_free_status(x) for x in status)
+    text = str(status).strip().lower()
+    if not text:
+        return True
+    return text in contract.NUMBERING_FREE_STATUS_VALUES
+
+
 def _first_present(item: dict[str, Any], *keys: str) -> Any:
     for key in keys:
         if key in item and item.get(key) is not None:

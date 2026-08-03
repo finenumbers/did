@@ -213,20 +213,37 @@ class RunexisProvider(AbstractProvider):
             except Exception:
                 pass
         parsed = parser.parse_numbering_search_items(raw_items)
+        free_parsed = []
+        dropped_non_free = 0
+        for item in parsed:
+            if parser.is_numbering_free_status(item.status_raw):
+                # Normalize numeric/empty free markers for stable UI facets.
+                item.status_raw = contract.STATUS_MNEMONIC_FREE
+                free_parsed.append(item)
+            else:
+                dropped_non_free += 1
         city_lookup: dict[str, tuple] = kwargs.get("city_lookup") or {}
-        mapped = self._map_items(parsed, inventory_kind=InventoryKind.free, city_lookup=city_lookup)
+        mapped = self._map_items(
+            free_parsed, inventory_kind=InventoryKind.free, city_lookup=city_lookup
+        )
         warnings = [
             "Free catalog via Numbering API search_numbers (separate numbering_* credentials)",
             f"filter_used={meta.get('filter')}",
             f"count_hint={meta.get('count_hint') or meta.get('expected_count')}",
             f"raw_fetched={meta.get('fetched')}",
+            f"free_kept={len(free_parsed)}",
         ]
+        if dropped_non_free:
+            warnings.append(
+                f"dropped_non_free_status={dropped_non_free} "
+                "(only access_state free/0 enter Свободные; purchased is DIDAPI)"
+            )
         if meta.get("primary_filter_error"):
             warnings.append(
                 f"primary filter failed, used fallback: {meta.get('primary_filter_error')}"
             )
         return SyncResult(
-            fetched=len(parsed),
+            fetched=len(free_parsed),
             parsed=len(mapped),
             items=mapped,
             raw_envelopes=envelopes,
