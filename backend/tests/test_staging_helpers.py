@@ -1,4 +1,4 @@
-"""TEMP staging helpers — clone live columns; insert without reflecting TEMP."""
+"""Staging helpers — durable staging tables + column clone from live."""
 
 from sqlalchemy import Column, Integer, MetaData, String, Table, create_engine, text
 from sqlalchemy.orm import Session
@@ -30,7 +30,8 @@ def test_staging_table_from_live_clones_column_names():
     assert {c.name for c in stg.columns} == {"id", "did", "external_key"}
 
 
-def test_ensure_temp_staging_insert_without_temp_autoload():
+def test_ensure_staging_survives_commit_and_insert():
+    """Staging must remain visible after commit (no TEMP / pool-session issues)."""
     engine = create_engine("sqlite:///:memory:")
     with engine.begin() as conn:
         conn.execute(
@@ -48,6 +49,9 @@ def test_ensure_temp_staging_insert_without_temp_autoload():
             stg_table="sipout_free_numbers_raw_stg",
         )
         assert {c.name for c in stg.columns} == {"id", "did", "external_key"}
+        # New Session on same engine — durable table must still exist (unlike TEMP).
+        db.close()
+        db = Session(engine)
         n = insert_staging_batches(
             db,
             stg,

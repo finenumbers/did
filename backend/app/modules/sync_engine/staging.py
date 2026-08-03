@@ -1,4 +1,10 @@
-"""Session-local TEMP staging + atomic cutover into live tables."""
+"""Persistent UNLOGGED staging + atomic cutover into live tables.
+
+TEMP tables are unsafe with SQLAlchemy connection pooling: CREATE TEMP on one
+checkout can disappear before INSERT after commit/reconnect (UndefinedTable).
+Staging tables live in the normal schema; unified sync holds an advisory lock
+so only one writer uses them at a time.
+"""
 
 from __future__ import annotations
 
@@ -12,30 +18,37 @@ logger = logging.getLogger(__name__)
 
 
 def staging_table_from_live(live: Table, stg_table: str) -> Table:
-    """
-    Build an in-memory Table for INSERT into a TEMP staging relation.
-
-    Do not autoload TEMP tables: Postgres keeps them in a session-private
-    pg_temp_* schema and SQLAlchemy reflection often raises NoSuchTableError
-    with only the bare table name as the message.
-    """
+    """In-memory Table for INSERT into a staging relation (column list from live)."""
     cols = [Column(c.name, c.type, nullable=c.nullable) for c in live.columns]
     return Table(stg_table, MetaData(), *cols)
 
 
 def ensure_temp_staging(db: Session, *, live_table: str, stg_table: str) -> Table:
     """
-    Create (if needed) a TEMP table with the same columns as live, no constraints.
-    ON COMMIT PRESERVE ROWS so staging batches can commit without dropping data.
+    Ensure a durable staging table with the same columns as live (no constraints),
+    then clear it for this run.
+
+    Name kept as ensure_temp_staging for call-site compatibility; storage is
+    UNLOGGED (Postgres) / plain table (SQLite), not TEMP.
     """
-    db.execute(
-        text(
-            f"CREATE TEMP TABLE IF NOT EXISTS {stg_table} AS "
-            f"SELECT * FROM {live_table} WHERE false"
+    bind = db.get_bind()
+    dialect = bind.dialect.name
+    if dialect == "postgresql":
+        db.execute(
+            text(
+                f"CREATE UNLOGGED TABLE IF NOT EXISTS {stg_table} AS "
+                f"SELECT * FROM {live_table} WHERE false"
+            )
         )
-    )
-    # DELETE (not TRUNCATE): empty TEMP is cheap; works on Postgres and SQLite tests.
-    db.execute(text(f"DELETE FROM {stg_table}"))
+        db.execute(text(f"TRUNCATE {stg_table}"))
+    else:
+        db.execute(
+            text(
+                f"CREATE TABLE IF NOT EXISTS {stg_table} AS "
+                f"SELECT * FROM {live_table} WHERE false"
+            )
+        )
+        db.execute(text(f"DELETE FROM {stg_table}"))
     db.commit()
     live = Table(live_table, MetaData(), autoload_with=db.connection())
     return staging_table_from_live(live, stg_table)
