@@ -114,6 +114,8 @@ City / DEF codes are **3 digits**.
 
 Same search object as `search_numbers`, without `from`/`limit`. Returns count in `result`. Same visibility rules.
 
+**Operational note:** live `search_numbers_count` behaves as an **API-total / progress upper bound**, not the size of the free-only list. Sync must not fail when free `search_numbers` pages end with `fetched < count`.
+
 ---
 
 ## Supporting read methods (dictionaries) — VERIFIED

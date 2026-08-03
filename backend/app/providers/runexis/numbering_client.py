@@ -308,16 +308,21 @@ class RunexisNumberingClient:
         on_progress: ProgressCb | None = None,
         limit: int | None = None,
         concurrency: int | None = None,
-        expected: int | None = None,
+        count_hint: int | None = None,
     ) -> tuple[list[Any], list[RawHttpResult], int]:
-        from app.modules.sync_engine.safety import fetch_complete_enough
+        """
+        Paginate search_numbers until a verified short/empty page.
 
-        if expected is None:
-            expected = await self.search_numbers_count(filters)
+        ``search_numbers_count`` is only a progress upper bound (API total inventory),
+        not the free-list size — never fail because fetched < count.
+        """
+        if count_hint is None:
+            count_hint = await self.search_numbers_count(filters)
         logger.warning(
-            "Runexis Numbering search_numbers_count filter=%s expected=%s",
+            "Runexis Numbering search_numbers_count filter=%s count_hint=%s "
+            "(progress only; not free-list size)",
             filters,
-            expected,
+            count_hint,
         )
         limit = int(limit if limit is not None else contract.NUMBERING_PAGE_LIMIT)
         concurrency = max(
@@ -334,10 +339,10 @@ class RunexisNumberingClient:
         last_env = raw0
         logger.warning(
             "Runexis Numbering search_numbers page=1 offset=0 got=%s "
-            "total_fetched=%s expected=%s limit=%s concurrency=%s ms=%s",
+            "total_fetched=%s count_hint=%s limit=%s concurrency=%s ms=%s",
             len(chunk0),
             len(chunk0),
-            expected,
+            count_hint,
             limit,
             concurrency,
             ms0,
@@ -351,35 +356,18 @@ class RunexisNumberingClient:
             on_progress,
             "Numbering: страница 1",
             len(chunk0),
-            expected if expected > 0 else None,
+            count_hint if count_hint > 0 else None,
         )
 
-        if not chunk0:
-            return [], [last_env], expected
+        if not chunk0 or len(chunk0) < limit:
+            return chunk0, [last_env], count_hint
 
-        next_offset = len(chunk0) if len(chunk0) < limit else limit
+        next_offset = limit
         page_num = 1
-        # When parallel waves stop early vs count, drop trailing short pages and
-        # resume sequentially once (API often truncates under concurrency).
+        # Parallel waves can truncate early; verify once with sequential re-fetch.
         sequential_resume_used = concurrency <= 1
 
         while next_offset <= 5_000_000:
-            if len(chunk0) < limit and page_num == 1 and next_offset == len(chunk0):
-                # First page already short — only continue if count says more remain.
-                ok, _ = fetch_complete_enough(expected=expected, fetched=len(chunk0))
-                if ok or sequential_resume_used:
-                    break
-                sequential_resume_used = True
-                concurrency = 1
-                logger.warning(
-                    "Runexis Numbering short first page (%s < %s) but count=%s; "
-                    "continuing sequentially from offset=%s",
-                    len(chunk0),
-                    limit,
-                    expected,
-                    next_offset,
-                )
-
             sem = asyncio.Semaphore(concurrency)
 
             async def _one(off: int) -> tuple[int, list[Any], RawHttpResult, int]:
@@ -408,19 +396,19 @@ class RunexisNumberingClient:
                 total_fetched = sum(len(c) for c in pages.values())
                 logger.warning(
                     "Runexis Numbering search_numbers page=%s offset=%s got=%s "
-                    "total_fetched=%s expected=%s ms=%s",
+                    "total_fetched=%s count_hint=%s ms=%s",
                     page_num,
                     off,
                     len(chunk),
                     total_fetched,
-                    expected,
+                    count_hint,
                     elapsed_ms,
                 )
                 await _emit_progress(
                     on_progress,
                     f"Numbering: страница {page_num}",
                     total_fetched,
-                    expected if expected > 0 else None,
+                    count_hint if count_hint > 0 else None,
                 )
 
             ordered = sorted(pages.keys())
@@ -438,22 +426,22 @@ class RunexisNumberingClient:
                     first_short = off
                     seen_end = True
 
-            if hole_off is not None and concurrency > 1 and not sequential_resume_used:
-                # Parallel race: data after a short page — discard from first short and
-                # resume one-by-one from that offset.
-                logger.warning(
-                    "Runexis Numbering pagination hole at offset=%s under concurrency=%s; "
-                    "resuming sequentially from offset=%s",
-                    hole_off,
-                    concurrency,
-                    first_short,
-                )
-                assert first_short is not None
-                for off in [o for o in list(pages.keys()) if o >= first_short]:
+            def _resume_sequential_from(start: int) -> None:
+                nonlocal next_offset, concurrency, sequential_resume_used
+                for off in [o for o in list(pages.keys()) if o >= start]:
                     del pages[off]
-                next_offset = first_short
+                next_offset = start
                 concurrency = 1
                 sequential_resume_used = True
+
+            if hole_off is not None and not sequential_resume_used and first_short is not None:
+                logger.warning(
+                    "Runexis Numbering pagination hole at offset=%s under concurrency; "
+                    "resuming sequentially from offset=%s",
+                    hole_off,
+                    first_short,
+                )
+                _resume_sequential_from(first_short)
                 continue
 
             if hole_off is not None:
@@ -463,30 +451,22 @@ class RunexisNumberingClient:
                         f"at offset={hole_off} (got data after earlier short page)"
                     ),
                     code="PROVIDER_INCOMPLETE_FETCH",
-                    details={
-                        "offset": hole_off,
-                        "expected": expected,
-                    },
+                    details={"offset": hole_off, "count_hint": count_hint},
                 )
 
             if seen_end:
-                total_fetched = sum(len(c) for c in pages.values())
-                ok, _ = fetch_complete_enough(expected=expected, fetched=total_fetched)
-                if ok or sequential_resume_used or first_short is None:
-                    break
-                logger.warning(
-                    "Runexis Numbering parallel fetch stopped at offset=%s with "
-                    "fetched=%s expected=%s; resuming sequentially",
-                    first_short,
-                    total_fetched,
-                    expected,
-                )
-                for off in [o for o in list(pages.keys()) if o >= first_short]:
-                    del pages[off]
-                next_offset = first_short
-                concurrency = 1
-                sequential_resume_used = True
-                continue
+                if not sequential_resume_used and first_short is not None:
+                    total_fetched = sum(len(c) for c in pages.values())
+                    logger.warning(
+                        "Runexis Numbering parallel fetch stopped at offset=%s "
+                        "(fetched=%s count_hint=%s); verifying sequentially",
+                        first_short,
+                        total_fetched,
+                        count_hint,
+                    )
+                    _resume_sequential_from(first_short)
+                    continue
+                break
 
             next_offset += concurrency * limit
 
@@ -498,71 +478,7 @@ class RunexisNumberingClient:
             items.extend(chunk)
             if len(chunk) < limit:
                 break
-        return items, [last_env], expected
-
-    async def _fetch_remaining(
-        self,
-        filters: dict[str, Any],
-        *,
-        start_offset: int,
-        expected: int,
-        limit: int,
-        on_progress: ProgressCb | None = None,
-    ) -> tuple[list[Any], list[RawHttpResult]]:
-        """
-        Continue listing from start_offset with sequential pages.
-
-        Uneven/short pages do not stop the walk while fetched < expected; only an
-        empty page ends the scan (Runexis sometimes truncates large pages early).
-        """
-        from app.modules.sync_engine.safety import fetch_complete_enough
-
-        items: list[Any] = []
-        envelopes: list[RawHttpResult] = []
-        off = start_offset
-        page_num = 0
-        while off <= 5_000_000:
-            _off, chunk, raw, elapsed_ms = await self._fetch_page(
-                filters, offset=off, limit=limit
-            )
-            page_num += 1
-            envelopes.append(raw)
-            if not chunk:
-                logger.warning(
-                    "Runexis Numbering remaining scan empty at offset=%s "
-                    "extra=%s total=%s expected=%s",
-                    off,
-                    len(items),
-                    start_offset + len(items),
-                    expected,
-                )
-                break
-            items.extend(chunk)
-            total = start_offset + len(items)
-            logger.warning(
-                "Runexis Numbering remaining page=%s offset=%s got=%s "
-                "total_fetched=%s expected=%s ms=%s",
-                page_num,
-                off,
-                len(chunk),
-                total,
-                expected,
-                elapsed_ms,
-            )
-            await _emit_progress(
-                on_progress,
-                f"Numbering: догрузка {page_num}",
-                total,
-                expected if expected > 0 else None,
-            )
-            off += len(chunk)
-            ok, _ = fetch_complete_enough(expected=expected, fetched=total)
-            if ok:
-                break
-            if len(chunk) < limit:
-                # Short page but still below count — keep walking from new offset.
-                continue
-        return items, envelopes
+        return items, [last_env], count_hint
 
     async def list_all_free_numbers(
         self,
@@ -570,8 +486,10 @@ class RunexisNumberingClient:
         on_progress: ProgressCb | None = None,
     ) -> tuple[list[Any], list[RawHttpResult], dict[str, Any]]:
         """
-        Paginate free inventory via search_numbers (parallel pages, all-or-nothing).
+        Paginate free inventory via search_numbers (parallel pages).
+
         Always opens a fresh session for bulk sync (stale sessions can return tiny pages).
+        search_numbers_count is treated as a progress hint only.
         """
         await self.connect()
 
@@ -582,84 +500,46 @@ class RunexisNumberingClient:
             "filter": used_filter,
             "fresh_session": True,
             "concurrency": contract.NUMBERING_FETCH_CONCURRENCY,
+            "count_is_progress_hint": True,
         }
-        expected = 0
+        count_hint = 0
 
         try:
             try:
-                items, envelopes, expected = await self._page_all(
+                items, envelopes, count_hint = await self._page_all(
                     used_filter, on_progress=on_progress
                 )
             except (ProviderAuthError, ProviderTransportError) as primary_exc:
                 used_filter = dict(contract.NUMBERING_FREE_FILTER_FALLBACK)
                 meta["filter"] = used_filter
                 meta["primary_filter_error"] = str(primary_exc)
-                items, envelopes, expected = await self._page_all(
+                items, envelopes, count_hint = await self._page_all(
                     used_filter, on_progress=on_progress
                 )
 
-            meta["expected_count"] = expected
+            meta["expected_count"] = count_hint
+            meta["count_hint"] = count_hint
             meta["fetched"] = len(items)
 
-            from app.modules.sync_engine.safety import fetch_complete_enough
-
-            ok, reason = fetch_complete_enough(expected=expected, fetched=len(items))
-            if not ok and items:
-                # Continue from current offset with smaller pages instead of
-                # re-downloading hundreds of thousands of rows from offset 0.
-                recovery_limit = int(contract.NUMBERING_PAGE_LIMIT_RECOVERY)
-                logger.warning(
-                    "Runexis Numbering incomplete after primary fetch "
-                    "(fetched=%s expected=%s); continuing from offset=%s limit=%s",
-                    len(items),
-                    expected,
-                    len(items),
-                    recovery_limit,
-                )
-                await _emit_progress(
-                    on_progress,
-                    f"Numbering: догрузка (стр. по {recovery_limit})",
-                    len(items),
-                    expected if expected > 0 else None,
-                )
-                extra, extra_envs = await self._fetch_remaining(
-                    used_filter,
-                    start_offset=len(items),
-                    expected=expected,
-                    limit=recovery_limit,
-                    on_progress=on_progress,
-                )
-                meta["recovery_limit"] = recovery_limit
-                meta["recovery_extra"] = len(extra)
-                if extra:
-                    items.extend(extra)
-                    envelopes.extend(extra_envs)
-                    meta["fetched"] = len(items)
-                ok, reason = fetch_complete_enough(expected=expected, fetched=len(items))
-            if not ok:
+            if not items:
                 raise ProviderError(
-                    reason or "Incomplete Runexis Numbering fetch",
+                    "Empty Runexis Numbering free fetch",
                     code="PROVIDER_INCOMPLETE_FETCH",
-                    details={
-                        "expected": expected,
-                        "fetched": len(items),
-                        "filter": used_filter,
-                        "recovery_fetched": meta.get("recovery_fetched"),
-                    },
+                    details={"count_hint": count_hint, "filter": used_filter},
                 )
-            if expected > 0 and len(items) < expected:
+            if count_hint > 0 and len(items) < count_hint:
                 logger.warning(
-                    "Runexis Numbering minor count/list gap: count=%s fetched=%s filter=%s",
-                    expected,
+                    "Runexis Numbering free list fetched=%s < count_hint=%s "
+                    "(count is API total / progress, not free-only size); accepting",
                     len(items),
-                    used_filter,
+                    count_hint,
                 )
 
             await _emit_progress(
                 on_progress,
                 f"Numbering: загружено {len(items)}",
                 len(items),
-                expected if expected > 0 else len(items),
+                len(items),
             )
             return items, envelopes, meta
         finally:

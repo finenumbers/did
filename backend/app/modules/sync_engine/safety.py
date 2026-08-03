@@ -39,7 +39,12 @@ def reload_allowed(*, previous: int, incoming: int, kind: str) -> tuple[bool, st
 
 
 def fetch_complete_enough(*, expected: int, fetched: int) -> tuple[bool, str | None]:
-    """Provider count vs list completeness (Runexis Numbering)."""
+    """
+    Generic count-vs-list gate.
+
+    Do **not** use for Runexis Numbering: search_numbers_count is an API-total /
+    progress hint, not the free-list size (free fetch may be substantially smaller).
+    """
     if expected <= 0:
         return True, None
     if fetched <= 0:

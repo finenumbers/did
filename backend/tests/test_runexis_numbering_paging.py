@@ -1,4 +1,4 @@
-"""Runexis Numbering pagination recovery (no live API)."""
+"""Runexis Numbering pagination (no live API)."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def _raw() -> RawHttpResult:
 class ScriptedNumberingClient(RunexisNumberingClient):
     """Serves scripted pages: offset -> queue of chunk responses."""
 
-    def __init__(self, scripts: dict[int, list[list[dict]]], *, expected: int):
+    def __init__(self, scripts: dict[int, list[list[dict]]], *, count_hint: int):
         super().__init__(
             ConnectionConfig(
                 base_url="https://example.test",
@@ -33,11 +33,11 @@ class ScriptedNumberingClient(RunexisNumberingClient):
             )
         )
         self._scripts = {k: list(v) for k, v in scripts.items()}
-        self._expected = expected
+        self._count_hint = count_hint
         self.fetch_log: list[tuple[int, int]] = []
 
     async def search_numbers_count(self, filters: dict) -> int:  # type: ignore[override]
-        return self._expected
+        return self._count_hint
 
     async def _fetch_page(  # type: ignore[override]
         self,
@@ -49,58 +49,45 @@ class ScriptedNumberingClient(RunexisNumberingClient):
         self.fetch_log.append((offset, limit))
         queue = self._scripts.setdefault(offset, [[]])
         chunk = queue.pop(0) if queue else []
-        # Default: synthesize a full page from a contiguous catalog when not scripted
-        if chunk is None:
-            chunk = []
         return offset, chunk, _raw(), 1
 
 
-def test_page_all_resumes_sequentially_when_parallel_stops_short():
+def test_page_all_resumes_sequentially_when_parallel_stops_early():
     """
-    Parallel wave ends early (short page + empties) while count is higher.
-    Client must discard the short tail and re-fetch from that offset sequentially.
+    Parallel wave ends early (short page + empties). Client verifies once
+    sequentially from that offset — even when count_hint is much larger.
     """
     data = [{"n": i} for i in range(100)]
     scripts = {
         0: [data[0:20]],
         20: [data[20:40]],
         40: [data[40:60]],
-        # First visit (parallel): false end; second visit (sequential): full page
         60: [data[60:65], data[60:80]],
         80: [[], data[80:100]],
         100: [[]],
     }
-    client = ScriptedNumberingClient(scripts, expected=100)
-    items, _envs, expected = asyncio.run(
-        client._page_all({}, limit=20, concurrency=4, expected=100)
+    client = ScriptedNumberingClient(scripts, count_hint=500)
+    items, _envs, hint = asyncio.run(
+        client._page_all({}, limit=20, concurrency=4, count_hint=500)
     )
-    assert expected == 100
+    assert hint == 500
     assert len(items) == 100
     assert [row["n"] for row in items] == list(range(100))
-    # Sequential resume must re-hit offset 60
     assert client.fetch_log.count((60, 20)) >= 2
 
 
-def test_fetch_remaining_walks_past_short_pages():
-    data = [{"n": i} for i in range(50)]
+def test_page_all_accepts_free_list_below_count_hint():
+    """Natural end of free list must succeed when count_hint is API total."""
+    data = [{"n": i} for i in range(45)]
     scripts = {
-        30: [data[30:35], data[35:40]],  # first short then continue from 35
-        35: [data[35:40]],
+        0: [data[0:20]],
+        20: [data[20:40]],
         40: [data[40:45]],
-        45: [data[45:50]],
-        50: [[]],
+        60: [[]],
     }
-    # Simpler: remaining scan uses off += len(chunk)
-    scripts = {
-        30: [data[30:35]],  # short
-        35: [data[35:40]],
-        40: [data[40:45]],
-        45: [data[45:50]],
-        50: [[]],
-    }
-    client = ScriptedNumberingClient(scripts, expected=50)
-    extra, _ = asyncio.run(
-        client._fetch_remaining({}, start_offset=30, expected=50, limit=5)
+    client = ScriptedNumberingClient(scripts, count_hint=200)
+    items, _envs, hint = asyncio.run(
+        client._page_all({}, limit=20, concurrency=1, count_hint=200)
     )
-    assert len(extra) == 20
-    assert [row["n"] for row in extra] == list(range(30, 50))
+    assert hint == 200
+    assert len(items) == 45

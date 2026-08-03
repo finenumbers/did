@@ -218,7 +218,7 @@ class RunexisProvider(AbstractProvider):
         warnings = [
             "Free catalog via Numbering API search_numbers (separate numbering_* credentials)",
             f"filter_used={meta.get('filter')}",
-            f"expected_count={meta.get('expected_count')}",
+            f"count_hint={meta.get('count_hint') or meta.get('expected_count')}",
             f"raw_fetched={meta.get('fetched')}",
         ]
         if meta.get("primary_filter_error"):
