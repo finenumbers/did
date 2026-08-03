@@ -30,6 +30,11 @@ from app.providers.registry import get_provider
 from app.services.providers_service import persist_auth_settings
 
 
+def _exc_summary(exc: BaseException, *, limit: int = 2000) -> str:
+    """Include exception type so bare NoSuchTableError names are actionable in the UI."""
+    return f"{type(exc).__name__}: {exc}"[:limit]
+
+
 class SyncService:
     def __init__(self, db: Session):
         self.db = db
@@ -102,9 +107,11 @@ class SyncService:
             job = self.db.get(SyncJob, job_id)
             assert job is not None
             job.status = SyncJobStatus.failed
-            job.error_summary = str(exc)[:2000]
+            job.error_summary = _exc_summary(exc)
             job.finished_at = datetime.now(timezone.utc)
-            log_job(self.db, job.id, SyncLogLevel.error, f"Sync failed: {exc}")
+            log_job(
+                self.db, job.id, SyncLogLevel.error, f"Sync failed: {_exc_summary(exc)}"
+            )
             self.db.commit()
             return job
         finally:
@@ -194,10 +201,13 @@ class SyncService:
                     f"regions={len(regions or [])}, cities={len(cities or [])}",
                 )
             except Exception as exc:
-                log_job(self.db, job.id, SyncLogLevel.error, f"Dictionaries failed: {exc}")
+                summary = _exc_summary(exc)
+                log_job(
+                    self.db, job.id, SyncLogLevel.error, f"Dictionaries failed: {summary}"
+                )
                 self.db.commit()
-                stats["_fatal_error"] = str(exc)
-                await _hook("dictionaries", "fail", str(exc)[:300])
+                stats["_fatal_error"] = summary
+                await _hook("dictionaries", "fail", summary[:300])
                 stats["limitations"] = limitations
                 return stats
 

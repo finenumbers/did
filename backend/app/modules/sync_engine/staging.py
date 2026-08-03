@@ -5,10 +5,22 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from sqlalchemy import MetaData, Table, insert, text
+from sqlalchemy import Column, MetaData, Table, insert, text
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
+
+
+def staging_table_from_live(live: Table, stg_table: str) -> Table:
+    """
+    Build an in-memory Table for INSERT into a TEMP staging relation.
+
+    Do not autoload TEMP tables: Postgres keeps them in a session-private
+    pg_temp_* schema and SQLAlchemy reflection often raises NoSuchTableError
+    with only the bare table name as the message.
+    """
+    cols = [Column(c.name, c.type, nullable=c.nullable) for c in live.columns]
+    return Table(stg_table, MetaData(), *cols)
 
 
 def ensure_temp_staging(db: Session, *, live_table: str, stg_table: str) -> Table:
@@ -22,10 +34,11 @@ def ensure_temp_staging(db: Session, *, live_table: str, stg_table: str) -> Tabl
             f"SELECT * FROM {live_table} WHERE false"
         )
     )
-    db.execute(text(f"TRUNCATE {stg_table}"))
+    # DELETE (not TRUNCATE): empty TEMP is cheap; works on Postgres and SQLite tests.
+    db.execute(text(f"DELETE FROM {stg_table}"))
     db.commit()
-    meta = MetaData()
-    return Table(stg_table, meta, autoload_with=db.connection())
+    live = Table(live_table, MetaData(), autoload_with=db.connection())
+    return staging_table_from_live(live, stg_table)
 
 
 def insert_staging_batches(
