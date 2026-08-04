@@ -930,6 +930,11 @@ def persist_finenumbers_numbers(
         live_catalog_table="numbers_catalog_normalized",
         stg_catalog=stg_cat,
     )
+    if on_progress:
+        try:
+            on_progress("cutover done", upserted, len(deduped))
+        except Exception:
+            logger.exception("persist on_progress failed")
     return {
         "upserted": upserted,
         "deduped_input": len(deduped),

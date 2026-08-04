@@ -141,6 +141,9 @@ class RunexisProvider(AbstractProvider):
 
     async def sync_regions(self, connection: ConnectionConfig, **kwargs: Any) -> SyncResult:
         # VERIFIED: GET api/v1/regions
+        from app.providers.progress_emit import emit_progress
+
+        await emit_progress(kwargs.get("on_progress"), "Runexis: regions…")
         client = self._didapi_client(connection)
         raw = await client.get_regions()
         regions = parser.parse_regions(raw)
@@ -153,6 +156,9 @@ class RunexisProvider(AbstractProvider):
 
     async def sync_cities(self, connection: ConnectionConfig, **kwargs: Any) -> SyncResult:
         # VERIFIED: GET api/v1/regions/cities
+        from app.providers.progress_emit import emit_progress
+
+        await emit_progress(kwargs.get("on_progress"), "Runexis: cities…")
         client = self._didapi_client(connection)
         raw = await client.get_cities()
         cities = parser.parse_cities(raw)
@@ -200,6 +206,8 @@ class RunexisProvider(AbstractProvider):
                 "Runexis free sync requires numbering_login and numbering_password "
                 "(Numbering API — separate credentials)."
             )
+        from app.providers.progress_emit import emit_progress
+
         on_progress = kwargs.get("on_progress")
         try:
             nclient = self._numbering_client(connection)
@@ -208,13 +216,9 @@ class RunexisProvider(AbstractProvider):
             )
         except (ProviderAuthError, ProviderTransportError, ProviderError):
             raise
-        if on_progress is not None:
-            try:
-                maybe = on_progress("Разбор и маппинг номеров", len(raw_items), len(raw_items))
-                if hasattr(maybe, "__await__"):
-                    await maybe
-            except Exception:
-                pass
+        await emit_progress(
+            on_progress, "Runexis: разбор и маппинг…", len(raw_items), len(raw_items)
+        )
         parsed = parser.parse_numbering_search_items(raw_items)
         free_parsed = []
         dropped_non_free = 0
@@ -256,8 +260,16 @@ class RunexisProvider(AbstractProvider):
 
     async def sync_purchased_numbers(self, connection: ConnectionConfig, **kwargs: Any) -> SyncResult:
         # VERIFIED: GET api/v1/numbers/management — partner numbers excluding free
+        from app.providers.progress_emit import emit_progress
+
+        on_progress = kwargs.get("on_progress")
         client = self._didapi_client(connection)
-        _raw_items, envelopes = await client.list_all_numbers_management()
+        _raw_items, envelopes = await client.list_all_numbers_management(
+            on_progress=on_progress
+        )
+        await emit_progress(
+            on_progress, "Runexis: разбор и маппинг…", len(_raw_items), len(_raw_items)
+        )
         parsed = [
             p
             for env in envelopes

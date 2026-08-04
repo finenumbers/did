@@ -201,13 +201,19 @@ class RunexisClient:
         return await self._request("GET", contract.GET_NUMBERS_MANAGEMENT, params=params)
 
     async def list_all_numbers_management(
-        self, *, extra_params: dict[str, Any] | None = None
+        self,
+        *,
+        extra_params: dict[str, Any] | None = None,
+        on_progress: Any | None = None,
     ) -> tuple[list[dict[str, Any]], list[RawHttpResult]]:
         """Paginate management list using EXAMPLE-CONFIRMED meta.total/page/limit."""
+        from app.providers.progress_emit import emit_progress
+
         page = 1
         limit = contract.MANAGEMENT_PAGE_LIMIT
         items: list[dict[str, Any]] = []
         envelopes: list[RawHttpResult] = []
+        await emit_progress(on_progress, "Runexis: management…")
         while True:
             params: dict[str, Any] = {"page": page, "limit": limit}
             if extra_params:
@@ -223,6 +229,12 @@ class RunexisClient:
             items.extend([x for x in chunk if isinstance(x, dict)])
             meta = body.get("meta") if isinstance(body.get("meta"), dict) else {}
             total = meta.get("total")
+            await emit_progress(
+                on_progress,
+                f"Runexis: management page {page}",
+                len(items),
+                int(total) if total is not None else None,
+            )
             if not chunk:
                 break
             if total is not None and len(items) >= int(total):

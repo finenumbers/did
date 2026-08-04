@@ -130,12 +130,14 @@ class UisClient:
 
         Fail closed if API reports more rows than we can fetch within MAX_OFFSET.
         """
+        from app.providers.progress_emit import emit_progress
         from app.providers.uis.parser import parse_list_page
 
         items: list[dict[str, Any]] = []
         envelopes: list[RawHttpResult] = []
         offset = 0
         total: int | None = None
+        await emit_progress(on_progress, f"UIS: {method}…")
         while offset <= contract.MAX_OFFSET:
             raw = await self.get_page(method, offset=offset, limit=self.page_limit)
             envelopes.append(raw)
@@ -143,15 +145,12 @@ class UisClient:
             if total is None and page_total is not None:
                 total = page_total
             items.extend(page_items)
-            if on_progress:
-                try:
-                    on_progress(
-                        f"UIS {method} offset={offset}",
-                        len(items),
-                        total,
-                    )
-                except Exception:
-                    logger.exception("UIS on_progress failed")
+            await emit_progress(
+                on_progress,
+                f"UIS: {method} offset={offset}",
+                len(items),
+                total,
+            )
             if not page_items:
                 break
             offset += len(page_items)

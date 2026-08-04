@@ -144,11 +144,15 @@ class FinenumbersClient:
         *,
         inn: str = contract.OPERATOR_INN,
         page_size: int = contract.DEFAULT_PAGE_SIZE,
+        on_progress: Any | None = None,
     ) -> tuple[list[dict[str, Any]], list[RawHttpResult]]:
         """Paginate by-inn until hasMore is false. Returns (range rows, envelopes)."""
+        from app.providers.progress_emit import emit_progress
+
         ranges: list[dict[str, Any]] = []
         envelopes: list[RawHttpResult] = []
         page = 1
+        await emit_progress(on_progress, "Finenumbers: by-inn…")
         while True:
             raw = await self.lookup_by_inn(inn=inn, page=page, page_size=page_size)
             envelopes.append(raw)
@@ -161,6 +165,12 @@ class FinenumbersClient:
             if isinstance(chunk, list):
                 ranges.extend([r for r in chunk if isinstance(r, dict)])
             meta = body.get("meta") or {}
+            await emit_progress(
+                on_progress,
+                f"Finenumbers: by-inn page {page}",
+                len(ranges),
+                None,
+            )
             if not meta.get("hasMore"):
                 break
             page = int(meta.get("page") or page) + 1

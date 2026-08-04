@@ -84,11 +84,16 @@ class UisProvider(AbstractProvider):
         return await self.sync_regions(connection, **kwargs)
 
     async def sync_free_numbers(self, connection: ConnectionConfig, **kwargs: Any) -> SyncResult:
+        from app.providers.progress_emit import emit_progress
+
         client = self._client(connection)
         on_progress = kwargs.get("on_progress")
         items, envelopes = await client.iter_all(
             contract.METHOD_AVAILABLE_VIRTUAL_NUMBERS,
             on_progress=on_progress,
+        )
+        await emit_progress(
+            on_progress, "UIS: разбор и маппинг…", 0, len(items) or None
         )
         mapped = []
         unmapped_raw: list[dict] = []
@@ -110,11 +115,16 @@ class UisProvider(AbstractProvider):
     async def sync_purchased_numbers(
         self, connection: ConnectionConfig, **kwargs: Any
     ) -> SyncResult:
+        from app.providers.progress_emit import emit_progress
+
         client = self._client(connection)
         on_progress = kwargs.get("on_progress")
         items, envelopes = await client.iter_all(
             contract.METHOD_VIRTUAL_NUMBERS,
             on_progress=on_progress,
+        )
+        await emit_progress(
+            on_progress, "UIS: разбор и маппинг…", 0, len(items) or None
         )
         mapped = []
         unmapped_raw: list[dict] = []

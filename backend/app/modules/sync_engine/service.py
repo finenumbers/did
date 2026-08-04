@@ -263,11 +263,21 @@ class SyncService:
                 await _hook("dictionaries", "skip", "capability not supported")
             else:
                 await _hook("dictionaries", "begin")
+
+                async def _dict_progress(
+                    detail: str, current: int | None = None, total: int | None = None
+                ) -> None:
+                    await _hook(
+                        "dictionaries", "progress", detail, current=current, total=total
+                    )
+
                 try:
                     regions: list = []
                     cities: list = []
                     if provider.code == ProviderCode.sipout:
-                        geo = await adapter.sync_cities(connection)
+                        geo = await adapter.sync_cities(
+                            connection, on_progress=_dict_progress
+                        )
                         regions = (
                             (geo.items or {}).get("regions")
                             if isinstance(geo.items, dict)
@@ -279,8 +289,12 @@ class SyncService:
                             else []
                         )
                     else:
-                        reg = await adapter.sync_regions(connection)
-                        cit = await adapter.sync_cities(connection)
+                        reg = await adapter.sync_regions(
+                            connection, on_progress=_dict_progress
+                        )
+                        cit = await adapter.sync_cities(
+                            connection, on_progress=_dict_progress
+                        )
                         regions = (
                             (reg.items or {}).get("regions")
                             if isinstance(reg.items, dict)
@@ -291,6 +305,7 @@ class SyncService:
                             if isinstance(cit.items, dict)
                             else []
                         )
+                    await _dict_progress("Запись справочников…")
                     rc = persist_regions(
                         self.db,
                         provider_code=provider.code.value,
@@ -482,7 +497,19 @@ class SyncService:
         )
         if mode == SyncMode.full and purchased_supported:
             await _hook("purchased", "begin")
-            result = await adapter.sync_purchased_numbers(connection, city_lookup=city_lookup)
+
+            async def _purchased_progress(
+                detail: str, current: int | None = None, total: int | None = None
+            ) -> None:
+                await _hook(
+                    "purchased", "progress", detail, current=current, total=total
+                )
+
+            result = await adapter.sync_purchased_numbers(
+                connection,
+                city_lookup=city_lookup,
+                on_progress=_purchased_progress,
+            )
             for lim in result.limitations:
                 limitations.append(
                     {
@@ -535,6 +562,7 @@ class SyncService:
                     provider_code=provider.code.value,
                     phase="purchased",
                 )
+                await _purchased_progress("Буфер → каталог…", 0, unique_incoming)
                 log_job(
                     self.db,
                     job.id,

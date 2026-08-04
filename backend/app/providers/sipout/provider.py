@@ -64,8 +64,12 @@ class SipOutProvider(AbstractProvider):
                 raw=raw,
             )
 
-    async def _fetch_geo(self, connection: ConnectionConfig) -> SyncResult:
+    async def _fetch_geo(self, connection: ConnectionConfig, **kwargs: Any) -> SyncResult:
         # VERIFIED: method=did&action=get_cities — fills regions and cities
+        from app.providers.progress_emit import emit_progress
+
+        on_progress = kwargs.get("on_progress")
+        await emit_progress(on_progress, "SipOut: get_cities…")
         client = self._client(connection)
         raw = await client.get_cities()
         regions, cities = parser.parse_geo(raw)
@@ -77,16 +81,21 @@ class SipOutProvider(AbstractProvider):
         )
 
     async def sync_regions(self, connection: ConnectionConfig, **kwargs: Any) -> SyncResult:
-        return await self._fetch_geo(connection)
+        return await self._fetch_geo(connection, **kwargs)
 
     async def sync_cities(self, connection: ConnectionConfig, **kwargs: Any) -> SyncResult:
-        return await self._fetch_geo(connection)
+        return await self._fetch_geo(connection, **kwargs)
 
     async def sync_free_numbers(self, connection: ConnectionConfig, **kwargs: Any) -> SyncResult:
         # VERIFIED: free_list; locked: single call, no city crawl
+        from app.providers.progress_emit import emit_progress
+
+        on_progress = kwargs.get("on_progress")
+        await emit_progress(on_progress, "SipOut: free_list…")
         client = self._client(connection)
         mask = kwargs.get("mask")
         raw = await client.free_list(mask=mask)
+        await emit_progress(on_progress, "SipOut: разбор и маппинг…")
         parsed = parser.parse_number_list(raw)
         city_lookup: dict[str, tuple] = kwargs.get("city_lookup") or {}
         mapped = []
@@ -120,8 +129,13 @@ class SipOutProvider(AbstractProvider):
 
     async def sync_purchased_numbers(self, connection: ConnectionConfig, **kwargs: Any) -> SyncResult:
         # VERIFIED: connected_list → purchased (product decision)
+        from app.providers.progress_emit import emit_progress
+
+        on_progress = kwargs.get("on_progress")
+        await emit_progress(on_progress, "SipOut: connected_list…")
         client = self._client(connection)
         raw = await client.connected_list()
+        await emit_progress(on_progress, "SipOut: разбор и маппинг…")
         parsed = parser.parse_number_list(raw)
         city_lookup: dict[str, tuple] = kwargs.get("city_lookup") or {}
         mapped = []

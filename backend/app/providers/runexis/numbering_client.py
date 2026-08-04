@@ -7,23 +7,20 @@ READ-ONLY: connect + search_numbers (+ count). Never reserv/book/sell/…
 from __future__ import annotations
 
 import asyncio
-import inspect
 import json
 import logging
 import time
-from collections.abc import Callable
 from typing import Any
 
 import httpx
 
 from app.providers.dto.common import ConnectionConfig, RawHttpResult
 from app.providers.errors import ProviderAuthError, ProviderError, ProviderParseError, ProviderTransportError
+from app.providers.progress_emit import ProgressCb, emit_progress
 from app.providers.retry import RetryPolicy, TimeoutConfig
 from app.providers.runexis import contract
 
 logger = logging.getLogger(__name__)
-
-ProgressCb = Callable[[str, int | None, int | None], Any]
 
 
 def _looks_like_number_item(value: dict[str, Any]) -> bool:
@@ -73,22 +70,6 @@ def _parse_count(result: Any) -> int:
     if isinstance(result, str) and result.strip().isdigit():
         return int(result.strip())
     raise ProviderParseError(f"Unexpected search_numbers_count result: {result!r}")
-
-
-async def _emit_progress(
-    on_progress: ProgressCb | None,
-    detail: str,
-    current: int | None = None,
-    total: int | None = None,
-) -> None:
-    if on_progress is None:
-        return
-    try:
-        result = on_progress(detail, current, total)
-        if inspect.isawaitable(result):
-            await result  # type: ignore[misc]
-    except Exception:
-        logger.exception("Runexis Numbering progress callback failed")
 
 
 class RunexisNumberingClient:
@@ -317,7 +298,7 @@ class RunexisNumberingClient:
         not the free-list size — never fail because fetched < count.
         """
         if count_hint is None:
-            await _emit_progress(on_progress, "Numbering: запрос count…")
+            await emit_progress(on_progress, "Numbering: запрос count…")
             count_hint = await self.search_numbers_count(filters)
         logger.warning(
             "Runexis Numbering search_numbers_count filter=%s count_hint=%s "
@@ -326,7 +307,7 @@ class RunexisNumberingClient:
             count_hint,
         )
         total_hint = count_hint if count_hint > 0 else None
-        await _emit_progress(
+        await emit_progress(
             on_progress,
             "Numbering: загрузка страницы 1…",
             0,
@@ -360,7 +341,7 @@ class RunexisNumberingClient:
                 "Runexis Numbering first item keys=%s",
                 list(chunk0[0].keys())[:25],
             )
-        await _emit_progress(
+        await emit_progress(
             on_progress,
             "Numbering: страница 1",
             len(chunk0),
@@ -412,7 +393,7 @@ class RunexisNumberingClient:
                     count_hint,
                     elapsed_ms,
                 )
-                await _emit_progress(
+                await emit_progress(
                     on_progress,
                     f"Numbering: страница {page_num}",
                     total_fetched,
@@ -499,9 +480,9 @@ class RunexisNumberingClient:
         Always opens a fresh session for bulk sync (stale sessions can return tiny pages).
         search_numbers_count is treated as a progress hint only.
         """
-        await _emit_progress(on_progress, "Numbering: подключение…")
+        await emit_progress(on_progress, "Numbering: подключение…")
         await self.connect()
-        await _emit_progress(on_progress, "Numbering: сессия")
+        await emit_progress(on_progress, "Numbering: сессия")
 
         envelopes: list[RawHttpResult] = []
         items: list[Any] = []
@@ -545,7 +526,7 @@ class RunexisNumberingClient:
                     count_hint,
                 )
 
-            await _emit_progress(
+            await emit_progress(
                 on_progress,
                 f"Numbering: загружено {len(items)}",
                 len(items),

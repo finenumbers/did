@@ -8,11 +8,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from bisect import bisect_right
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import bindparam, func, or_, select, text
+from sqlalchemy.dialects.postgresql import ARRAY, UUID as PGUUID
 from sqlalchemy.orm import Session
+from sqlalchemy.types import Text
 
 from app.models.catalog import NumbersCatalogNormalized
 from app.modules.pstn_inn_cache.service import load_enabled_ranges_for_enrich
@@ -24,6 +27,7 @@ from app.providers.finenumbers.mapper import parse_msisdn_parts, phone_for_looku
 logger = logging.getLogger(__name__)
 
 ProgressCb = Callable[[str, int | None, int | None], None]
+_PROGRESS_EVERY = 50_000
 
 
 @dataclass(frozen=True)
@@ -32,23 +36,33 @@ class OperatorRange:
     start: int
     end: int
     operator: str
+    order: int = 0
 
     def covers(self, abc: str, local: int) -> bool:
         return self.abc == abc and self.start <= local <= self.end
 
 
 class OperatorRangeCache:
+    """ABC-bucketed ranges; resolve uses bisect + first-insert-order among covering."""
+
     def __init__(self) -> None:
         self._by_abc: dict[str, list[OperatorRange]] = {}
+        self._starts: dict[str, list[int]] = {}
+        self._order = 0
+        self._finalized = False
 
     def add(self, abc: str, start: int, end: int, operator: str) -> None:
         if not abc or not operator or end < start:
             return
+        self._finalized = False
         bucket = self._by_abc.setdefault(abc, [])
         for existing in bucket:
             if existing.start == start and existing.end == end:
                 return
-        bucket.append(OperatorRange(abc=abc, start=start, end=end, operator=operator))
+        self._order += 1
+        bucket.append(
+            OperatorRange(abc=abc, start=start, end=end, operator=operator, order=self._order)
+        )
 
     def add_from_api_row(self, row: dict) -> str | None:
         abc = str(row.get("abc") or "").strip()
@@ -62,12 +76,46 @@ class OperatorRangeCache:
             self.add(abc, start, end, operator)
         return operator or None
 
+    def finalize(self) -> None:
+        self._starts = {}
+        for abc, bucket in self._by_abc.items():
+            bucket.sort(key=lambda r: (r.start, r.end, r.order))
+            self._starts[abc] = [r.start for r in bucket]
+        self._finalized = True
+
+    def resolve_parts(self, abc: str, local: int) -> str | None:
+        if not self._finalized:
+            self.finalize()
+        bucket = self._by_abc.get(abc) or []
+        if not bucket:
+            return None
+        starts = self._starts.get(abc) or []
+        i = bisect_right(starts, local) - 1
+        best_op: str | None = None
+        best_order: int | None = None
+        while i >= 0:
+            r = bucket[i]
+            if r.start <= local <= r.end:
+                if best_order is None or r.order < best_order:
+                    best_op = r.operator
+                    best_order = r.order
+            i -= 1
+        return best_op
+
     def resolve(self, msisdn: str) -> str | None:
         parts = parse_msisdn_parts(msisdn)
         if not parts:
             return None
         abc, local = parts
-        for r in self._by_abc.get(abc, []):
+        return self.resolve_parts(abc, local)
+
+    def resolve_linear_first_match(self, msisdn: str) -> str | None:
+        """Reference semantics (insertion order) for tests."""
+        parts = parse_msisdn_parts(msisdn)
+        if not parts:
+            return None
+        abc, local = parts
+        for r in sorted(self._by_abc.get(abc) or [], key=lambda x: x.order):
             if r.covers(abc, local):
                 return r.operator
         return None
@@ -78,7 +126,7 @@ async def enrich_catalog_operators(
     *,
     connection: ConnectionConfig,
     seed_ranges: list[dict] | None = None,
-    batch_size: int = 1000,
+    batch_size: int = 10_000,
     concurrency: int = 40,
     require_full_coverage: bool = True,
     max_rounds: int = 8,
@@ -124,6 +172,30 @@ def _progress(
             logger.exception("enrich progress callback failed")
 
 
+def _bulk_update_operators(
+    db: Session,
+    pairs: list[tuple],
+) -> int:
+    """UPDATE operator for (id, operator) pairs via unnest; returns row count attempted."""
+    if not pairs:
+        return 0
+    ids = [p[0] for p in pairs]
+    ops = [p[1] for p in pairs]
+    stmt = text(
+        """
+        UPDATE numbers_catalog_normalized AS c
+        SET operator = v.operator
+        FROM unnest(:ids, :ops) AS v(id, operator)
+        WHERE c.id = v.id
+        """
+    ).bindparams(
+        bindparam("ids", type_=ARRAY(PGUUID(as_uuid=True))),
+        bindparam("ops", type_=ARRAY(Text())),
+    )
+    db.execute(stmt, {"ids": ids, "ops": ops})
+    return len(pairs)
+
+
 async def _enrich_catalog_operators_inner(
     db: Session,
     *,
@@ -145,11 +217,14 @@ async def _enrich_catalog_operators_inner(
     if seed_ranges:
         for row in seed_ranges:
             cache.add_from_api_row(row)
+    cache.finalize()
 
     stmt = select(
         NumbersCatalogNormalized.id,
         NumbersCatalogNormalized.msisdn,
         NumbersCatalogNormalized.operator,
+        NumbersCatalogNormalized.abc_code,
+        NumbersCatalogNormalized.number_local,
     ).where(
         NumbersCatalogNormalized.is_currently_present.is_(True),
         NumbersCatalogNormalized.msisdn.is_not(None),
@@ -162,8 +237,9 @@ async def _enrich_catalog_operators_inner(
             )
         )
     rows = db.execute(stmt).all()
-    logger.warning("PSTN enrich: rows to process=%s only_missing=%s", len(rows), only_missing)
-    _progress(on_progress, f"Сопоставление с кешем ({len(rows)} номеров)", 0, len(rows))
+    total_rows = len(rows)
+    logger.warning("PSTN enrich: rows to process=%s only_missing=%s", total_rows, only_missing)
+    _progress(on_progress, f"Сопоставление с кешем ({total_rows} номеров)", 0, total_rows)
 
     pending_updates: list[tuple] = []
     cache_hits = 0
@@ -174,19 +250,41 @@ async def _enrich_catalog_operators_inner(
     pending: list[tuple] = []
     invalid_msisdns: list[str] = []
 
-    for catalog_id, msisdn, current_operator in rows:
+    for idx, (catalog_id, msisdn, current_operator, abc_code, number_local) in enumerate(rows):
         msisdn_s = msisdn or ""
-        operator = cache.resolve(msisdn_s)
+        operator: str | None = None
+        if abc_code and number_local is not None:
+            try:
+                operator = cache.resolve_parts(str(abc_code).strip(), int(number_local))
+            except (TypeError, ValueError):
+                operator = None
+        if operator is None:
+            operator = cache.resolve(msisdn_s)
         if operator:
             cache_hits += 1
             if current_operator != operator:
                 pending_updates.append((catalog_id, operator))
-            continue
-        phone = phone_for_lookup(msisdn_s)
-        if not phone:
-            invalid_msisdns.append(msisdn_s)
-            continue
-        pending.append((catalog_id, msisdn_s, phone, current_operator))
+        else:
+            phone = phone_for_lookup(msisdn_s)
+            if not phone:
+                invalid_msisdns.append(msisdn_s)
+            else:
+                pending.append((catalog_id, msisdn_s, phone, current_operator))
+        if (idx + 1) % _PROGRESS_EVERY == 0:
+            _progress(
+                on_progress,
+                f"Сопоставление с кешем ({idx + 1}/{total_rows})",
+                idx + 1,
+                total_rows,
+            )
+
+    if total_rows:
+        _progress(
+            on_progress,
+            f"Сопоставление с кешем ({total_rows}/{total_rows})",
+            total_rows,
+            total_rows,
+        )
 
     sem = asyncio.Semaphore(concurrency)
     # phone -> operator string, or None when API returned found=false / empty operator
@@ -200,19 +298,18 @@ async def _enrich_catalog_operators_inner(
                 lookups += 1
                 if raw.status_code >= 400:
                     errors += 1
-                    # leave unset — retry in a later round
                     return
                 body = raw.body_json if isinstance(raw.body_json, dict) else {}
                 data = body.get("data") if body.get("found") else None
                 if isinstance(data, dict):
                     op = cache.add_from_api_row(data)
-                    lookup_result[phone] = op  # may be None if operator empty
+                    cache.finalize()
+                    lookup_result[phone] = op
                 else:
                     lookup_result[phone] = None
             except Exception:
                 errors += 1
                 logger.exception("Finenumbers lookup failed for %s", phone)
-                # leave unset so a later round can retry
 
     rounds = 0
     while pending and rounds < max_rounds:
@@ -235,7 +332,6 @@ async def _enrich_catalog_operators_inner(
                 continue
 
             still.append(item)
-            # Retry phones that never got a definitive API answer; skip confirmed None
             if phone not in phone_seen and phone not in lookup_result:
                 phone_seen.add(phone)
                 phones_needed.append(phone)
@@ -259,7 +355,6 @@ async def _enrich_catalog_operators_inner(
         )
         await asyncio.gather(*(lookup_phone_row(p) for p in phones_needed))
 
-    # Final apply
     uncovered_msisdns: list[str] = list(invalid_msisdns)
     for item in pending:
         catalog_id, msisdn_s, phone, current_operator = item
@@ -272,18 +367,39 @@ async def _enrich_catalog_operators_inner(
             uncovered_msisdns.append(msisdn_s)
 
     updated = 0
+    write_total = len(pending_updates)
+    _progress(on_progress, f"Запись операторов ({write_total})", 0, write_total or None)
     for i in range(0, len(pending_updates), batch_size):
         chunk = pending_updates[i : i + batch_size]
-        for catalog_id, operator in chunk:
-            db.execute(
-                update(NumbersCatalogNormalized)
-                .where(NumbersCatalogNormalized.id == catalog_id)
-                .values(operator=operator)
-            )
-            updated += 1
+        try:
+            updated += _bulk_update_operators(db, chunk)
+        except Exception:
+            logger.exception("Bulk operator update failed; falling back to row updates")
+            for catalog_id, operator in chunk:
+                db.execute(
+                    text(
+                        "UPDATE numbers_catalog_normalized "
+                        "SET operator = :op WHERE id = :id"
+                    ),
+                    {"op": operator, "id": catalog_id},
+                )
+                updated += 1
         db.commit()
+        if write_total and (i + len(chunk)) % _PROGRESS_EVERY < batch_size:
+            _progress(
+                on_progress,
+                f"Запись операторов ({min(i + len(chunk), write_total)}/{write_total})",
+                min(i + len(chunk), write_total),
+                write_total,
+            )
+    if write_total:
+        _progress(
+            on_progress,
+            f"Запись операторов ({write_total}/{write_total})",
+            write_total,
+            write_total,
+        )
 
-    # Global coverage check (all present rows), not only this batch
     global_missing = int(
         db.scalar(
             select(func.count())
@@ -301,7 +417,7 @@ async def _enrich_catalog_operators_inner(
     )
 
     stats = {
-        "rows_scanned": len(rows),
+        "rows_scanned": total_rows,
         "updated": updated,
         "lookups": lookups,
         "cache_hits": cache_hits,
@@ -319,26 +435,23 @@ async def _enrich_catalog_operators_inner(
                 select(NumbersCatalogNormalized.msisdn)
                 .where(
                     NumbersCatalogNormalized.is_currently_present.is_(True),
+                    NumbersCatalogNormalized.msisdn.is_not(None),
                     or_(
                         NumbersCatalogNormalized.operator.is_(None),
                         NumbersCatalogNormalized.operator == "",
                     ),
                 )
                 .limit(10)
-            ).scalars().all()
-            sample = [str(x) for x in sample_rows]
+            ).all()
+            sample = [r[0] for r in sample_rows]
         raise ProviderError(
             (
-                f"PSTN coverage incomplete: {stats['missing']} numbers without "
-                f"real PSTN operator (sample={sample})"
+                f"Operator enrichment incomplete: missing={stats['missing']} "
+                f"invalid_msisdn={stats['invalid_msisdn']} errors={errors} "
+                f"sample={sample}"
             ),
-            code="PSTN_COVERAGE_INCOMPLETE",
-            details={
-                "uncovered": stats["missing"],
-                "invalid_msisdn": len(invalid_msisdns),
-                "sample_msisdn": sample,
-                "stats": stats,
-            },
+            code="OPERATOR_ENRICHMENT_INCOMPLETE",
+            details=stats,
         )
 
     return stats

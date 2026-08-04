@@ -80,10 +80,21 @@ class FinenumbersProvider(AbstractProvider):
 
     async def sync_free_numbers(self, connection: ConnectionConfig, **kwargs: Any) -> SyncResult:
         from app.providers.errors import ProviderError
+        from app.providers.progress_emit import emit_progress
 
+        on_progress = kwargs.get("on_progress")
         client = self._client(connection)
-        ranges, envelopes = await client.iter_all_ranges_by_inn()
+        ranges, envelopes = await client.iter_all_ranges_by_inn(on_progress=on_progress)
+        await emit_progress(
+            on_progress, f"Finenumbers: раскрытие диапазонов… ({len(ranges)})"
+        )
         numbers = mapper.expand_ranges(ranges)
+        await emit_progress(
+            on_progress,
+            f"Finenumbers: раскрыто {len(numbers)}",
+            len(numbers),
+            len(numbers),
+        )
         if len(numbers) > contract.MAX_EXPAND_NUMBERS:
             raise ProviderError(
                 (

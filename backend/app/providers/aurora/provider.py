@@ -110,13 +110,13 @@ class AuroraProvider(AbstractProvider):
         return await self.sync_regions(connection, **kwargs)
 
     async def sync_free_numbers(self, connection: ConnectionConfig, **kwargs: Any) -> SyncResult:
+        from app.providers.progress_emit import emit_progress
+
         client = self._client(connection)
         on_progress = kwargs.get("on_progress")
-        if on_progress:
-            on_progress("Скачивание CSV…", 0, None)
+        await emit_progress(on_progress, "Aurora: скачивание CSV…", 0, None)
         raw = await client.fetch_csv()
-        if on_progress:
-            on_progress("Разбор CSV…", 0, None)
+        await emit_progress(on_progress, "Aurora: разбор CSV…", 0, None)
         try:
             parsed_items, unmapped_raw, meta = parser.parse_free_csv(
                 raw, raw_bytes=client.raw_bytes(raw)
@@ -130,12 +130,12 @@ class AuroraProvider(AbstractProvider):
                 mapped.append(mapped_item)
             else:
                 unmapped_raw.append(item.raw_payload)
-        if on_progress:
-            on_progress(
-                f"Разобрано {len(mapped)} (encoding={meta.get('encoding')})",
-                len(mapped),
-                meta.get("row_count"),
-            )
+        await emit_progress(
+            on_progress,
+            f"Aurora: разобрано {len(mapped)} (encoding={meta.get('encoding')})",
+            len(mapped),
+            meta.get("row_count"),
+        )
         # Keep a compact envelope meta only (avoid holding full multi-MB latin-1 body)
         envelope = RawHttpResult(
             status_code=raw.status_code,
