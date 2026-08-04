@@ -89,7 +89,7 @@ class ProvidersService:
             )
         elif code == ProviderCode.uis.value:
             notice = (
-                "UIS Data API: access_token (API key from ЛК); optional user_id for agent. "
+                "UIS Data API: access_token (API key from ЛК). "
                 "IP whitelist required in UIS ЛК. See uis-contract.md. Read-only get.* only."
             )
         elif code == ProviderCode.aurora.value:

@@ -21,7 +21,6 @@ type Draft = {
   numberingPassword: string;
   numberingBaseUrl: string;
   accessToken: string;
-  userId: string;
   settings: ProviderSettings | null;
   message: string | null;
   error: string | null;
@@ -38,7 +37,6 @@ const EMPTY_DRAFT: Draft = {
   numberingPassword: "",
   numberingBaseUrl: "",
   accessToken: "",
-  userId: "",
   settings: null,
   message: null,
   error: null,
@@ -62,7 +60,6 @@ function draftFromSettings(code: ProviderCode, s: ProviderSettings): Draft {
     email: typeof auth.email === "string" ? auth.email : "",
     numberingLogin: typeof auth.numbering_login === "string" ? auth.numbering_login : "",
     numberingBaseUrl: typeof auth.numbering_base_url === "string" ? auth.numbering_base_url : "",
-    userId: auth.user_id != null && auth.user_id !== "" ? String(auth.user_id) : "",
     settings: s,
   };
 }
@@ -152,10 +149,7 @@ export default function SettingsPage() {
     if (code === "sipout" || code === "finenumbers") {
       auth_settings = d.apiKey ? { key: d.apiKey } : undefined;
     } else if (code === "uis") {
-      const next: Record<string, string> = {};
-      if (d.accessToken) next.access_token = d.accessToken;
-      if (d.userId) next.user_id = d.userId;
-      auth_settings = Object.keys(next).length ? next : undefined;
+      auth_settings = d.accessToken ? { access_token: d.accessToken } : undefined;
     } else if (code === "aurora") {
       auth_settings = undefined;
     } else {
@@ -492,15 +486,6 @@ export default function SettingsPage() {
                         }
                         value={d.accessToken}
                         onChange={(e) => setDraft(code, { accessToken: e.target.value })}
-                        style={{ width: "100%" }}
-                      />
-                    </label>
-                    <label>
-                      user_id (опционально, агент)
-                      <input
-                        value={d.userId}
-                        onChange={(e) => setDraft(code, { userId: e.target.value })}
-                        placeholder="числовой user_id клиента"
                         style={{ width: "100%" }}
                       />
                     </label>
