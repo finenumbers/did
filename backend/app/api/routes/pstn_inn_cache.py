@@ -70,7 +70,7 @@ def refresh_cache(db: Session = Depends(get_db)) -> PstnInnCacheStatusOut:
 @router.get(
     "/settings/sync-schedule",
     response_model=SyncScheduleOut,
-    summary="Daily sync schedule (Europe/Moscow 21:00)",
+    summary="Daily sync schedule (Europe/Moscow 00:00)",
 )
 def get_sync_schedule(db: Session = Depends(get_db)) -> SyncScheduleOut:
     return SyncScheduleOut(**cache_svc.get_sync_schedule(db))

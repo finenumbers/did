@@ -19,6 +19,7 @@ from app.models.sync import SyncJob, SyncRun
 from app.modules.sync_engine.dropped_export import (
     begin_dropped_export,
     end_dropped_export,
+    get_collector,
     write_dropped_xlsx,
 )
 from app.modules.sync_engine.modes import SyncMode
@@ -43,6 +44,7 @@ PROVIDER_ORDER = (
     ProviderCode.sipout,
     ProviderCode.runexis,
     ProviderCode.uis,
+    ProviderCode.aurora,
     ProviderCode.finenumbers,
 )
 ACTIVE_STATUSES = (SyncJobStatus.pending, SyncJobStatus.running)
@@ -86,7 +88,40 @@ def mark_stale_runs(db: Session) -> int:
     return len(rows)
 
 
+def reclaim_orphaned_running_runs(db: Session) -> int:
+    """If a run is `running` but the sync advisory lock is free, the worker died — reclaim."""
+    from app.modules.sync_engine.locks import SYNC_LOCK_KEY, advisory_unlock, try_advisory_lock
+
+    running = list(
+        db.scalars(
+            select(SyncRun).where(SyncRun.status == SyncJobStatus.running)
+        ).all()
+    )
+    if not running:
+        return 0
+    if not try_advisory_lock(db, SYNC_LOCK_KEY):
+        # Live sync holds the lock — leave running rows alone
+        return 0
+    reclaimed = 0
+    try:
+        for run in running:
+            run.status = SyncJobStatus.failed
+            run.error_summary = "Marked orphan: running but sync lock was free"
+            run.finished_at = _now()
+            log_run(db, run.id, SyncLogLevel.error, run.error_summary)
+            reclaimed += 1
+        if reclaimed:
+            db.commit()
+    finally:
+        try:
+            advisory_unlock(db, SYNC_LOCK_KEY)
+        except Exception:
+            logger.exception("Failed to release lock after orphan reclaim")
+    return reclaimed
+
+
 def get_active_run(db: Session) -> SyncRun | None:
+    reclaim_orphaned_running_runs(db)
     mark_stale_runs(db)
     return db.scalars(
         select(SyncRun)
@@ -133,6 +168,8 @@ def create_run(db: Session, *, triggered_by: str = "api") -> SyncRun:
 
 async def execute_unified_run(run_id: uuid.UUID) -> None:
     from app.modules.sync_engine.locks import SYNC_LOCK_KEY, advisory_unlock, try_advisory_lock
+    from app.modules.sync_engine.scheduler import _set_last_fired_date
+    from zoneinfo import ZoneInfo
 
     db = SessionLocal()
     locked = False
@@ -147,6 +184,21 @@ async def execute_unified_run(run_id: uuid.UUID) -> None:
             return
         locked = True
         db.commit()
+        run = db.get(SyncRun, run_id)
+        if run is not None and (run.triggered_by or "") == "schedule":
+            day_key = datetime.now(ZoneInfo("Europe/Moscow")).date().isoformat()
+            try:
+                _set_last_fired_date(db, day_key)
+            except Exception:
+                logger.exception(
+                    "Failed to mark schedule last_fired for run_id=%s; aborting run",
+                    run_id,
+                )
+                run.status = SyncJobStatus.failed
+                run.error_summary = "Failed to mark schedule last_fired"
+                run.finished_at = _now()
+                db.commit()
+                return
         await _execute_unified_run(db, run_id)
     except Exception:
         logger.exception("Unified sync crashed run_id=%s", run_id)
@@ -199,6 +251,7 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
 
     begin_dropped_export()
     dropped_meta: dict[str, Any] = {"available": False}
+    dropped_written = False
     try:
         log_run(db, run.id, SyncLogLevel.info, "Unified sync started")
 
@@ -212,6 +265,7 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
             tracker.fail("prepare", f"Нет провайдеров в БД: {', '.join(missing)}")
             try:
                 dropped_meta = write_dropped_xlsx()
+                dropped_written = True
             except Exception:
                 logger.exception("Failed to write sync dropped XLSX")
             _finish_run(db, run, SyncJobStatus.failed, f"Missing providers: {missing}")
@@ -252,6 +306,7 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
         tracker.begin("finalize", "Завершение")
         try:
             dropped_meta = write_dropped_xlsx()
+            dropped_written = True
         except Exception:
             logger.exception("Failed to write sync dropped XLSX")
             dropped_meta = {"available": False, "error": "write_failed"}
@@ -296,6 +351,13 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
             summary,
         )
     finally:
+        if not dropped_written:
+            try:
+                collector = get_collector()
+                if collector and collector.rows:
+                    write_dropped_xlsx()
+            except Exception:
+                logger.exception("Best-effort dropped XLSX write on sync exit failed")
         end_dropped_export()
 
 
@@ -328,7 +390,7 @@ async def _sync_provider(
         if stage:
             tracker.skip(stage, "capability not supported")
 
-    if code == ProviderCode.finenumbers:
+    if code in (ProviderCode.finenumbers, ProviderCode.aurora):
         mode = SyncMode.free_only
         job_type = SyncJobType.free_only
     else:
@@ -410,7 +472,7 @@ async def _sync_provider(
         )
         return False
 
-    if code != ProviderCode.finenumbers:
+    if code not in (ProviderCode.finenumbers, ProviderCode.aurora):
         for phase in ("dictionaries", "free", "purchased"):
             sid = stage_for_provider_phase(code.value, phase)
             if not sid:

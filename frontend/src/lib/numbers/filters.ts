@@ -1,7 +1,7 @@
 import { formatCount } from "@/lib/format";
 import type { ColumnFilters } from "@/lib/types/api";
 
-export const EMPTY_FILTER_TOKEN = "__empty__";
+const EMPTY_FILTER_TOKEN = "__empty__";
 
 export function encodeFilters(filters: ColumnFilters): string | null {
   const cleaned: ColumnFilters = {};
@@ -20,6 +20,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   sipout: "SipOut",
   runexis: "Runexis",
   uis: "UIS",
+  aurora: "Aurora Telecom",
   finenumbers: "Finenumbers",
 };
 

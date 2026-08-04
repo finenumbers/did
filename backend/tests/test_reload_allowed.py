@@ -1,6 +1,26 @@
 """Wipe-guard unit tests (no DB)."""
 
-from app.modules.sync_engine.safety import fetch_complete_enough, reload_allowed
+from app.models.enums import InventoryKind, MappingConfidence
+from app.modules.sync_engine.safety import count_unique_provider_keys, reload_allowed
+from app.providers.dto.numbers import NormalizedNumber
+
+
+def _num(key: str) -> NormalizedNumber:
+    return NormalizedNumber(
+        inventory_kind=InventoryKind.free,
+        provider_number_key=key,
+        msisdn=key,
+        city_external_id=None,
+        region_external_id=None,
+        city_name=None,
+        region_name=None,
+        buy_price=None,
+        period_price=None,
+        status_raw=None,
+        mapping_confidence=MappingConfidence.medium,
+        normalized_payload={},
+        raw_payload={},
+    )
 
 
 def test_empty_incoming_with_existing_refuses():
@@ -35,8 +55,15 @@ def test_small_purchased_half_rule():
     assert ok2 is True
 
 
-def test_fetch_complete_enough():
-    assert fetch_complete_enough(expected=0, fetched=10)[0] is True
-    assert fetch_complete_enough(expected=1000, fetched=0)[0] is False
-    assert fetch_complete_enough(expected=10_000, fetched=5_000)[0] is False
-    assert fetch_complete_enough(expected=10_000, fetched=9_600)[0] is True
+def test_unique_key_count_last_wins_set():
+    nums = [_num("79001111111"), _num("79002222222"), _num("79001111111")]
+    assert count_unique_provider_keys(nums) == 2
+
+
+def test_guard_uses_unique_not_raw_length():
+    # 10000 raw rows but only 5000 unique keys must refuse vs previous=10000
+    previous = 10_000
+    unique = 5_000
+    ok, reason = reload_allowed(previous=previous, incoming=unique, kind="free")
+    assert ok is False
+    assert "min_allowed" in (reason or "")

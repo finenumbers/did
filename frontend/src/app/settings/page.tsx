@@ -10,7 +10,7 @@ import type {
   SyncSchedule,
 } from "@/lib/types/api";
 
-type ProviderCode = "sipout" | "runexis" | "uis" | "finenumbers";
+type ProviderCode = "sipout" | "runexis" | "uis" | "aurora" | "finenumbers";
 
 type Draft = {
   baseUrl: string;
@@ -50,6 +50,7 @@ const PROVIDERS: { code: ProviderCode; title: string }[] = [
   { code: "sipout", title: "SipOut" },
   { code: "runexis", title: "Runexis" },
   { code: "uis", title: "UIS" },
+  { code: "aurora", title: "Aurora Telecom" },
   { code: "finenumbers", title: "Finenumbers" },
 ];
 
@@ -72,6 +73,7 @@ export default function SettingsPage() {
     sipout: { ...EMPTY_DRAFT },
     runexis: { ...EMPTY_DRAFT },
     uis: { ...EMPTY_DRAFT },
+    aurora: { ...EMPTY_DRAFT },
     finenumbers: { ...EMPTY_DRAFT },
   });
   const [pageError, setPageError] = useState<string | null>(null);
@@ -116,6 +118,7 @@ export default function SettingsPage() {
       sipout: { ...EMPTY_DRAFT },
       runexis: { ...EMPTY_DRAFT },
       uis: { ...EMPTY_DRAFT },
+      aurora: { ...EMPTY_DRAFT },
       finenumbers: { ...EMPTY_DRAFT },
     };
     for (const { code } of PROVIDERS) {
@@ -153,6 +156,8 @@ export default function SettingsPage() {
       if (d.accessToken) next.access_token = d.accessToken;
       if (d.userId) next.user_id = d.userId;
       auth_settings = Object.keys(next).length ? next : undefined;
+    } else if (code === "aurora") {
+      auth_settings = undefined;
     } else {
       const next: Record<string, string> = {};
       if (d.email) next.email = d.email;
@@ -406,7 +411,7 @@ export default function SettingsPage() {
               disabled={!schedule || scheduleSaving}
               onChange={(e) => void saveSchedule(e.target.checked)}
             />
-            Ежедневно в 21:00 (Europe/Moscow), только если кеш операторов готов
+            Ежедневно в 00:00 (Europe/Moscow), только если кеш операторов готов
           </label>
         </div>
 
@@ -431,7 +436,9 @@ export default function SettingsPage() {
                       ? "(PSTN)"
                       : code === "uis"
                         ? "(Data API)"
-                        : ""}
+                        : code === "aurora"
+                          ? "(CSV free)"
+                          : ""}
                   <input
                     value={d.baseUrl}
                     onChange={(e) => setDraft(code, { baseUrl: e.target.value })}
@@ -443,12 +450,19 @@ export default function SettingsPage() {
                           ? "https://pstn.finenumbers.com"
                           : code === "uis"
                             ? "https://dataapi.uiscom.ru/v2.0"
-                            : undefined
+                            : code === "aurora"
+                              ? "http://bill.auroratelecom.ru:8080/bgbilling/numbers/all_free.csv"
+                              : undefined
                     }
                   />
                 </label>
 
-                {code === "sipout" || code === "finenumbers" ? (
+                {code === "aurora" ? (
+                  <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
+                    Публичный CSV свободных номеров (HTTP). Auth не требуется. Купленные и
+                    справочники не поддерживаются.
+                  </div>
+                ) : code === "sipout" || code === "finenumbers" ? (
                   <label>
                     {code === "finenumbers" ? "API Bearer key" : "API key"}
                     <input

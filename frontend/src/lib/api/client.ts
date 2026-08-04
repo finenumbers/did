@@ -73,10 +73,38 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   return data as T;
 }
 
+/** Authenticated binary download (Authorization header — no token in URL). */
+export async function apiDownload(path: string): Promise<Blob> {
+  const headers: Record<string, string> = {};
+  const token = getAccessToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  const res = await fetch(`${API_URL}${path}`, {
+    headers,
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const parsed = errorMessageFromBody(data, res.statusText || "Download failed");
+    if (res.status === 401 && typeof window !== "undefined") {
+      clearSession();
+      if (!window.location.pathname.startsWith("/login")) {
+        window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+      }
+    }
+    throw new ApiError(parsed.message, parsed.code, parsed.details);
+  }
+  return res.blob();
+}
+
+/**
+ * URL with ?access_token= — only for iframe downloads that cannot set headers.
+ * Prefer apiDownload for normal app fetches.
+ */
 export function apiUrl(path: string): string {
   const token = getAccessToken();
   if (!token) return `${API_URL}${path}`;
   const sep = path.includes("?") ? "&" : "?";
-  // For iframe exports that cannot set Authorization headers
   return `${API_URL}${path}${sep}access_token=${encodeURIComponent(token)}`;
 }

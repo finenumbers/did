@@ -29,7 +29,7 @@ class RunexisCityRaw(RawSyncMixin, Base):
 
 
 class RunexisFreeNumberRaw(RawSyncMixin, Base):
-    """Free inventory from GET api/v1/numbers/management where status.mnemonic=free."""
+    """Free inventory from Numbering API JSON-RPC search_numbers (status free/0)."""
 
     __tablename__ = "runexis_free_numbers_raw"
 

@@ -541,13 +541,14 @@ def get_sync_schedule(db: Session) -> dict[str, Any]:
     row = _get_or_create_setting(
         db,
         "sync_schedule",
-        {"enabled": False, "timezone": "Europe/Moscow", "hour": 21, "minute": 0},
+        {"enabled": False, "timezone": "Europe/Moscow", "hour": 0, "minute": 0},
     )
     value = dict(row.value or {})
     value.setdefault("enabled", False)
     value.setdefault("timezone", "Europe/Moscow")
-    value.setdefault("hour", 21)
-    value.setdefault("minute", 0)
+    # Fixed product schedule: daily 00:00 Europe/Moscow (not user-configurable)
+    value["hour"] = 0
+    value["minute"] = 0
     return value
 
 
@@ -555,13 +556,13 @@ def set_sync_schedule(db: Session, *, enabled: bool) -> dict[str, Any]:
     row = _get_or_create_setting(
         db,
         "sync_schedule",
-        {"enabled": False, "timezone": "Europe/Moscow", "hour": 21, "minute": 0},
+        {"enabled": False, "timezone": "Europe/Moscow", "hour": 0, "minute": 0},
     )
     value = dict(row.value or {})
     value["enabled"] = bool(enabled)
     value.setdefault("timezone", "Europe/Moscow")
-    value.setdefault("hour", 21)
-    value.setdefault("minute", 0)
+    value["hour"] = 0
+    value["minute"] = 0
     row.value = value
     flag_modified(row, "value")
     db.commit()

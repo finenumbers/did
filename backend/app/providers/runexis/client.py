@@ -10,7 +10,7 @@ import httpx
 
 from app.providers.dto.common import ConnectionConfig, RawHttpResult
 from app.providers.errors import ProviderAuthError, ProviderTransportError
-from app.providers.retry import RetryPolicy, TimeoutConfig
+from app.providers.retry import RetryPolicy, TimeoutConfig, request_with_retries
 from app.providers.runexis import contract, parser
 
 
@@ -82,32 +82,32 @@ class RunexisClient:
             connect=self.timeout.connect_timeout,
             read=self.timeout.read_timeout,
         )
-        last_exc: Exception | None = None
-        for attempt in range(self.retry.max_attempts):
-            try:
-                start = time.perf_counter()
-                async with httpx.AsyncClient(timeout=timeout) as client:
-                    response = await client.request(
-                        method, url, headers=headers, params=params, json=json_body
-                    )
-                elapsed = (time.perf_counter() - start) * 1000
-                try:
-                    body_json = response.json()
-                except Exception:
-                    body_json = None
-                return RawHttpResult(
-                    status_code=response.status_code,
-                    body_text=response.text,
-                    body_json=body_json,
-                    headers=dict(response.headers),
-                    elapsed_ms=elapsed,
-                    request_url=str(response.request.url),
+
+        async def _once() -> httpx.Response:
+            async with httpx.AsyncClient(timeout=timeout, trust_env=False) as client:
+                return await client.request(
+                    method, url, headers=headers, params=params, json=json_body
                 )
-            except httpx.HTTPError as exc:
-                last_exc = exc
-                if attempt + 1 >= self.retry.max_attempts:
-                    break
-        raise ProviderTransportError(f"Runexis transport failed: {last_exc}")
+
+        start = time.perf_counter()
+        response = await request_with_retries(
+            retry=self.retry,
+            label=f"Runexis {method} {path}",
+            do_request=_once,
+        )
+        elapsed = (time.perf_counter() - start) * 1000
+        try:
+            body_json = response.json()
+        except Exception:
+            body_json = None
+        return RawHttpResult(
+            status_code=response.status_code,
+            body_text=response.text,
+            body_json=body_json,
+            headers=dict(response.headers),
+            elapsed_ms=elapsed,
+            request_url=str(response.request.url),
+        )
 
     async def login(self) -> dict[str, str]:
         # VERIFIED: POST api/v1/login body email + password
@@ -195,10 +195,6 @@ class RunexisClient:
     async def get_cities(self) -> RawHttpResult:
         # VERIFIED: GET api/v1/regions/cities
         return await self._request("GET", contract.GET_CITIES)
-
-    async def get_numbers(self, params: dict[str, Any] | None = None) -> RawHttpResult:
-        # VERIFIED: GET api/v1/numbers — NOT wired to free/purchased sync
-        return await self._request("GET", contract.GET_NUMBERS, params=params)
 
     async def get_numbers_management(self, params: dict[str, Any] | None = None) -> RawHttpResult:
         # VERIFIED: GET api/v1/numbers/management — partner inventory list

@@ -33,22 +33,22 @@ def ensure_temp_staging(db: Session, *, live_table: str, stg_table: str) -> Tabl
     """
     bind = db.get_bind()
     dialect = bind.dialect.name
+    # Always recreate from current live schema to avoid column drift vs SELECT *
+    db.execute(text(f"DROP TABLE IF EXISTS {stg_table}"))
     if dialect == "postgresql":
         db.execute(
             text(
-                f"CREATE UNLOGGED TABLE IF NOT EXISTS {stg_table} AS "
+                f"CREATE UNLOGGED TABLE {stg_table} AS "
                 f"SELECT * FROM {live_table} WHERE false"
             )
         )
-        db.execute(text(f"TRUNCATE {stg_table}"))
     else:
         db.execute(
             text(
-                f"CREATE TABLE IF NOT EXISTS {stg_table} AS "
+                f"CREATE TABLE {stg_table} AS "
                 f"SELECT * FROM {live_table} WHERE false"
             )
         )
-        db.execute(text(f"DELETE FROM {stg_table}"))
     db.commit()
     live = Table(live_table, MetaData(), autoload_with=db.connection())
     return staging_table_from_live(live, stg_table)

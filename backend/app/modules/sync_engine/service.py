@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import time
 import uuid
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
+from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.db import SessionLocal
 from app.models.enums import InventoryKind, ProviderCode, SyncJobStatus, SyncLogLevel
 from app.models.providers import Provider
 from app.models.sync import SyncJob
@@ -17,6 +20,7 @@ from app.modules.sync_engine.modes import SyncMode
 from app.modules.sync_engine.persist import (
     build_city_lookup,
     count_present_numbers,
+    persist_aurora_numbers,
     persist_cities,
     persist_finenumbers_numbers,
     persist_regions,
@@ -24,7 +28,8 @@ from app.modules.sync_engine.persist import (
     persist_sipout_numbers,
     persist_uis_numbers,
 )
-from app.modules.sync_engine.safety import reload_allowed
+from app.modules.sync_engine.progress import SyncProgressTracker, stage_for_provider_phase
+from app.modules.sync_engine.safety import count_unique_provider_keys, reload_allowed
 from app.providers.dto.common import ConnectionConfig
 from app.providers.dto.numbers import NormalizedNumber
 from app.providers.errors import ProviderError
@@ -75,6 +80,54 @@ def _number_reload_stats(
         "unmapped_dropped": unmapped,
         "duplicates_dropped": duplicates,
     }
+
+
+def _throttled_persist_progress(
+    db: Session,
+    *,
+    job_id: uuid.UUID,
+    provider_code: str,
+    phase: str,
+) -> Callable[[str, int | None, int | None], Any]:
+    """Side-session job log + UI progress — never touch the persist Session."""
+    last = [0.0]
+    run_id_raw = None
+    job = db.get(SyncJob, job_id)
+    if job and isinstance(job.stats, dict):
+        run_id_raw = job.stats.get("sync_run_id")
+    stage_id = stage_for_provider_phase(provider_code, phase)
+
+    def _cb(detail: str, current: int | None = None, total: int | None = None) -> None:
+        text = f"{detail} ({current}/{total})" if total is not None else str(detail)
+        now = time.monotonic()
+        force = "cutover" in text.lower() or "done" in text.lower()
+        update_ui = bool(stage_id and run_id_raw) and (
+            force or (now - last[0]) >= 1.0
+        )
+        if update_ui:
+            last[0] = now
+        side_db = SessionLocal()
+        try:
+            log_job(side_db, job_id, SyncLogLevel.info, text)
+            side_db.commit()
+            if update_ui:
+                SyncProgressTracker(side_db, UUID(str(run_id_raw))).progress(
+                    stage_id,
+                    detail=detail or "",
+                    substage=detail or "",
+                    current=current,
+                    total=total,
+                    unit="numbers",
+                )
+        except Exception:
+            try:
+                side_db.rollback()
+            except Exception:
+                pass
+        finally:
+            side_db.close()
+
+    return _cb
 
 
 class SyncService:
@@ -309,14 +362,16 @@ class SyncService:
                     provider_id=provider.id,
                     inventory_kind=InventoryKind.free,
                 )
+                unique_incoming = count_unique_provider_keys(numbers)
                 ok, reason = reload_allowed(
-                    previous=previous, incoming=len(numbers), kind="free"
+                    previous=previous, incoming=unique_incoming, kind="free"
                 )
                 if not ok:
                     stats["categories"]["free_numbers"] = {
                         "refused_wipe": True,
                         "previous": previous,
-                        "incoming": len(numbers),
+                        "incoming": unique_incoming,
+                        "incoming_raw": len(numbers),
                         "fetched": result.fetched,
                         "reason": reason,
                     }
@@ -333,14 +388,21 @@ class SyncService:
                     unmapped_raw=list(result.unmapped_raw or []),
                     numbers=numbers,
                 )
-                await _free_progress("Буфер → каталог…", 0, len(numbers))
+                persist_progress = _throttled_persist_progress(
+                    self.db,
+                    job_id=job.id,
+                    provider_code=provider.code.value,
+                    phase="free",
+                )
+                await _free_progress("Буфер → каталог…", 0, unique_incoming)
                 log_job(
                     self.db,
                     job.id,
                     SyncLogLevel.info,
                     (
                         f"Staging cutover provider={provider.code.value} kind=free "
-                        f"reload {len(numbers)} (previous={previous})"
+                        f"reload unique={unique_incoming} raw={len(numbers)} "
+                        f"(previous={previous})"
                     ),
                 )
                 if provider.code == ProviderCode.sipout:
@@ -350,12 +412,7 @@ class SyncService:
                         job_id=job.id,
                         inventory_kind=InventoryKind.free,
                         numbers=numbers,
-                        on_progress=lambda d, c=None, t=None: log_job(
-                            self.db,
-                            job.id,
-                            SyncLogLevel.info,
-                            f"{d} ({c}/{t})" if t is not None else d,
-                        ),
+                        on_progress=persist_progress,
                     )
                 elif provider.code == ProviderCode.runexis:
                     persist_stats = persist_runexis_numbers(
@@ -364,12 +421,7 @@ class SyncService:
                         job_id=job.id,
                         inventory_kind=InventoryKind.free,
                         numbers=numbers,
-                        on_progress=lambda d, c=None, t=None: log_job(
-                            self.db,
-                            job.id,
-                            SyncLogLevel.info,
-                            f"{d} ({c}/{t})" if t is not None else d,
-                        ),
+                        on_progress=persist_progress,
                     )
                 elif provider.code == ProviderCode.uis:
                     persist_stats = persist_uis_numbers(
@@ -378,12 +430,16 @@ class SyncService:
                         job_id=job.id,
                         inventory_kind=InventoryKind.free,
                         numbers=numbers,
-                        on_progress=lambda d, c=None, t=None: log_job(
-                            self.db,
-                            job.id,
-                            SyncLogLevel.info,
-                            f"{d} ({c}/{t})" if t is not None else d,
-                        ),
+                        on_progress=persist_progress,
+                    )
+                elif provider.code == ProviderCode.aurora:
+                    persist_stats = persist_aurora_numbers(
+                        self.db,
+                        provider_id=provider.id,
+                        job_id=job.id,
+                        inventory_kind=InventoryKind.free,
+                        numbers=numbers,
+                        on_progress=persist_progress,
                     )
                 elif provider.code == ProviderCode.finenumbers:
                     persist_stats = persist_finenumbers_numbers(
@@ -392,12 +448,7 @@ class SyncService:
                         job_id=job.id,
                         inventory_kind=InventoryKind.free,
                         numbers=numbers,
-                        on_progress=lambda d, c=None, t=None: log_job(
-                            self.db,
-                            job.id,
-                            SyncLogLevel.info,
-                            f"{d} ({c}/{t})" if t is not None else d,
-                        ),
+                        on_progress=persist_progress,
                     )
                 else:
                     persist_stats = {}
@@ -412,7 +463,7 @@ class SyncService:
                 await _free_progress(
                     f"Записано {persist_stats.get('upserted', 0)}",
                     persist_stats.get("upserted"),
-                    len(numbers),
+                    unique_incoming,
                 )
                 free_detail = _number_reload_detail(
                     fetched=fetched,
@@ -452,14 +503,16 @@ class SyncService:
                     provider_id=provider.id,
                     inventory_kind=InventoryKind.purchased,
                 )
+                unique_incoming = count_unique_provider_keys(numbers)
                 ok, reason = reload_allowed(
-                    previous=previous, incoming=len(numbers), kind="purchased"
+                    previous=previous, incoming=unique_incoming, kind="purchased"
                 )
                 if not ok:
                     stats["categories"]["purchased_numbers"] = {
                         "refused_wipe": True,
                         "previous": previous,
-                        "incoming": len(numbers),
+                        "incoming": unique_incoming,
+                        "incoming_raw": len(numbers),
                         "fetched": result.fetched,
                         "reason": reason,
                     }
@@ -476,13 +529,20 @@ class SyncService:
                     unmapped_raw=list(result.unmapped_raw or []),
                     numbers=numbers,
                 )
+                persist_progress = _throttled_persist_progress(
+                    self.db,
+                    job_id=job.id,
+                    provider_code=provider.code.value,
+                    phase="purchased",
+                )
                 log_job(
                     self.db,
                     job.id,
                     SyncLogLevel.info,
                     (
                         f"Staging cutover provider={provider.code.value} kind=purchased "
-                        f"reload {len(numbers)} (previous={previous})"
+                        f"reload unique={unique_incoming} raw={len(numbers)} "
+                        f"(previous={previous})"
                     ),
                 )
                 if provider.code == ProviderCode.sipout:
@@ -492,6 +552,7 @@ class SyncService:
                         job_id=job.id,
                         inventory_kind=InventoryKind.purchased,
                         numbers=numbers,
+                        on_progress=persist_progress,
                     )
                 elif provider.code == ProviderCode.runexis:
                     persist_stats = persist_runexis_numbers(
@@ -500,6 +561,7 @@ class SyncService:
                         job_id=job.id,
                         inventory_kind=InventoryKind.purchased,
                         numbers=numbers,
+                        on_progress=persist_progress,
                     )
                 elif provider.code == ProviderCode.uis:
                     persist_stats = persist_uis_numbers(
@@ -508,6 +570,7 @@ class SyncService:
                         job_id=job.id,
                         inventory_kind=InventoryKind.purchased,
                         numbers=numbers,
+                        on_progress=persist_progress,
                     )
                 else:
                     persist_stats = {}

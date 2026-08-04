@@ -1,6 +1,6 @@
 # DID — telecom numbering analytics
 
-Internal admin console for loading and analyzing phone number inventory from independent providers (**SipOut**, **Runexis**, **Finenumbers**), with PSTN-based operator enrichment.
+Internal admin console for loading and analyzing phone number inventory from independent providers (**SipOut**, **Runexis**, **UIS**, **Aurora Telecom**, **Finenumbers**), with PSTN-based operator enrichment.
 
 ## Stack
 
@@ -13,7 +13,7 @@ Internal admin console for loading and analyzing phone number inventory from ind
 - Unified sync of free/purchased numbers (wipe-and-reload per `(provider, inventory_kind)` with safety guards)
 - Normalized catalog UI (filters, infinite scroll, XLSX export)
 - Local PSTN INN ranges cache used **only** to fill the **Оператор** column
-- Daily schedule option at 21:00 Europe/Moscow (requires ready min cache)
+- Daily schedule option at 00:00 Europe/Moscow (requires ready min cache)
 
 This is **not** a CDR / RADIUS / softswitch platform.
 
@@ -21,6 +21,8 @@ This is **not** a CDR / RADIUS / softswitch platform.
 
 - SipOut HTML: [`docs/providers/sipout/raw/SipOut.html`](docs/providers/sipout/raw/SipOut.html)
 - Runexis DIDAPI HTML + Numbering API DOCX: see [`docs/providers/runexis/SOURCE.md`](docs/providers/runexis/SOURCE.md)
+- UIS: [`docs/providers/uis/SOURCE.md`](docs/providers/uis/SOURCE.md)
+- Aurora Telecom CSV: [`docs/providers/aurora/SOURCE.md`](docs/providers/aurora/SOURCE.md)
 - Finenumbers/PSTN: [`docs/providers/finenumbers-contract.md`](docs/providers/finenumbers-contract.md)
 
 **Locked product decisions:** provider APIs are read-only; wipe is per inventory slice (not full catalog purge); sync requires manually loaded min PSTN INN cache (СИПАУТНЭТ, ИНТЕРНОД, Фронтир Нетворк).

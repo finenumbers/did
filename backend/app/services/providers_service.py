@@ -92,6 +92,11 @@ class ProvidersService:
                 "UIS Data API: access_token (API key from ЛК); optional user_id for agent. "
                 "IP whitelist required in UIS ЛК. See uis-contract.md. Read-only get.* only."
             )
+        elif code == ProviderCode.aurora.value:
+            notice = (
+                "Aurora Telecom: public free CSV over HTTP (no auth). "
+                "base_url is the full CSV URL. See aurora-contract.md. Free inventory only."
+            )
         else:
             notice = (
                 "Provider integration is based on uploaded documentation contracts "

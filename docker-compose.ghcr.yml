@@ -30,6 +30,9 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
       ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-changeme-session-secret}
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
+      SYNC_DROPPED_XLSX_PATH: /data/sync/sync_dropped_latest.xlsx
+    volumes:
+      - did_sync_data:/data/sync
     ports:
       - "8000:8000"
     depends_on:
@@ -41,9 +44,9 @@ services:
     platform: linux/amd64
     pull_policy: always
     environment:
+      # Do not set ADMIN_API_TOKEN here — proxy must not inject a machine token.
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/backend}
       BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:8000}
-      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
     ports:
       - "3000:3000"
     depends_on:
@@ -51,3 +54,4 @@ services:
 
 volumes:
   did_pgdata:
+  did_sync_data:

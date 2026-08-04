@@ -1,23 +1,29 @@
-"""Scheduler must not burn the day when cache is not ready."""
+"""Scheduler must not burn the day when cache is not ready; last_fired after lock."""
 
+from __future__ import annotations
+
+import asyncio
 from datetime import datetime
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 
+from app.models.enums import SyncJobStatus
 from app.modules.sync_engine import scheduler
+from app.modules.sync_engine import unified
 
 
 def test_tick_does_not_set_last_fired_when_cache_not_ready():
     db = MagicMock()
-    fake_now = datetime(2026, 8, 3, 21, 0, tzinfo=ZoneInfo("Europe/Moscow"))
+    fake_now = datetime(2026, 8, 3, 0, 5, tzinfo=ZoneInfo("Europe/Moscow"))
 
     with (
         patch.object(scheduler, "SessionLocal", return_value=db),
         patch.object(
             scheduler,
             "get_sync_schedule",
-            return_value={"enabled": True, "hour": 21, "minute": 0},
+            return_value={"enabled": True, "hour": 0, "minute": 0},
         ),
         patch.object(scheduler, "get_active_run", return_value=None),
         patch.object(scheduler, "is_min_cache_ready", return_value=False),
@@ -30,9 +36,10 @@ def test_tick_does_not_set_last_fired_when_cache_not_ready():
         set_fired.assert_not_called()
 
 
-def test_tick_sets_last_fired_after_successful_create():
+def test_tick_spawn_does_not_set_last_fired():
+    """Day is burned only after worker acquires advisory lock, not on spawn."""
     db = MagicMock()
-    fake_now = datetime(2026, 8, 3, 21, 0, tzinfo=ZoneInfo("Europe/Moscow"))
+    fake_now = datetime(2026, 8, 3, 0, 5, tzinfo=ZoneInfo("Europe/Moscow"))
     run = SimpleNamespace(id="run-1")
 
     with (
@@ -40,7 +47,7 @@ def test_tick_sets_last_fired_after_successful_create():
         patch.object(
             scheduler,
             "get_sync_schedule",
-            return_value={"enabled": True, "hour": 21, "minute": 0},
+            return_value={"enabled": True, "hour": 0, "minute": 0},
         ),
         patch.object(scheduler, "get_active_run", return_value=None),
         patch.object(scheduler, "is_min_cache_ready", return_value=True),
@@ -53,4 +60,130 @@ def test_tick_sets_last_fired_after_successful_create():
         dt.now.return_value = fake_now
         scheduler._tick_once()
         spawn.assert_called_once_with("run-1")
-        set_fired.assert_called_once_with(db, "2026-08-03")
+        set_fired.assert_not_called()
+
+
+def test_tick_before_scheduled_time_does_nothing():
+    db = MagicMock()
+    fake_now = datetime(2026, 8, 3, 0, 30, tzinfo=ZoneInfo("Europe/Moscow"))
+
+    with (
+        patch.object(scheduler, "SessionLocal", return_value=db),
+        patch.object(
+            scheduler,
+            "get_sync_schedule",
+            return_value={"enabled": True, "hour": 1, "minute": 0},
+        ),
+        patch.object(scheduler, "create_run") as create,
+        patch.object(scheduler, "_set_last_fired_date") as set_fired,
+        patch.object(scheduler, "datetime") as dt,
+    ):
+        dt.now.return_value = fake_now
+        scheduler._tick_once()
+        create.assert_not_called()
+        set_fired.assert_not_called()
+
+
+def test_tick_skips_when_already_fired_today():
+    db = MagicMock()
+    fake_now = datetime(2026, 8, 3, 12, 0, tzinfo=ZoneInfo("Europe/Moscow"))
+
+    with (
+        patch.object(scheduler, "SessionLocal", return_value=db),
+        patch.object(
+            scheduler,
+            "get_sync_schedule",
+            return_value={"enabled": True, "hour": 0, "minute": 0},
+        ),
+        patch.object(scheduler, "_get_last_fired_date", return_value="2026-08-03"),
+        patch.object(scheduler, "create_run") as create,
+        patch.object(scheduler, "datetime") as dt,
+    ):
+        dt.now.return_value = fake_now
+        scheduler._tick_once()
+        create.assert_not_called()
+
+
+def test_execute_marks_last_fired_after_lock_for_schedule():
+    run_id = uuid4()
+    db = MagicMock()
+    run = SimpleNamespace(id=run_id, triggered_by="schedule", status=SyncJobStatus.pending)
+    db.get.return_value = run
+    set_fired = MagicMock()
+
+    with (
+        patch.object(unified, "SessionLocal", return_value=db),
+        patch(
+            "app.modules.sync_engine.locks.try_advisory_lock",
+            return_value=True,
+        ),
+        patch("app.modules.sync_engine.locks.advisory_unlock"),
+        patch(
+            "app.modules.sync_engine.scheduler._set_last_fired_date",
+            set_fired,
+        ),
+        patch.object(unified, "_execute_unified_run", new_callable=AsyncMock) as exec_body,
+    ):
+        asyncio.run(unified.execute_unified_run(run_id))
+        set_fired.assert_called_once()
+        assert set_fired.call_args.args[1] == datetime.now(
+            ZoneInfo("Europe/Moscow")
+        ).date().isoformat()
+        exec_body.assert_awaited_once()
+
+
+def test_execute_aborts_when_last_fired_mark_fails():
+    run_id = uuid4()
+    db = MagicMock()
+    run = SimpleNamespace(
+        id=run_id,
+        triggered_by="schedule",
+        status=SyncJobStatus.pending,
+        error_summary=None,
+        finished_at=None,
+    )
+    db.get.return_value = run
+
+    with (
+        patch.object(unified, "SessionLocal", return_value=db),
+        patch("app.modules.sync_engine.locks.try_advisory_lock", return_value=True),
+        patch("app.modules.sync_engine.locks.advisory_unlock"),
+        patch(
+            "app.modules.sync_engine.scheduler._set_last_fired_date",
+            side_effect=RuntimeError("settings write failed"),
+        ),
+        patch.object(unified, "_execute_unified_run", new_callable=AsyncMock) as exec_body,
+    ):
+        asyncio.run(unified.execute_unified_run(run_id))
+        exec_body.assert_not_awaited()
+        assert run.status == SyncJobStatus.failed
+
+
+def test_execute_skips_last_fired_when_lock_fails():
+    run_id = uuid4()
+    db = MagicMock()
+    run = SimpleNamespace(
+        id=run_id,
+        triggered_by="schedule",
+        status=SyncJobStatus.pending,
+        error_summary=None,
+        finished_at=None,
+    )
+    db.get.return_value = run
+    set_fired = MagicMock()
+
+    with (
+        patch.object(unified, "SessionLocal", return_value=db),
+        patch(
+            "app.modules.sync_engine.locks.try_advisory_lock",
+            return_value=False,
+        ),
+        patch(
+            "app.modules.sync_engine.scheduler._set_last_fired_date",
+            set_fired,
+        ),
+        patch.object(unified, "_execute_unified_run", new_callable=AsyncMock) as exec_body,
+    ):
+        asyncio.run(unified.execute_unified_run(run_id))
+        set_fired.assert_not_called()
+        exec_body.assert_not_awaited()

@@ -36,7 +36,7 @@ class PstnInnCacheStatusOut(BaseModel):
 class SyncScheduleOut(BaseModel):
     enabled: bool
     timezone: str = "Europe/Moscow"
-    hour: int = 21
+    hour: int = 0
     minute: int = 0
 
 

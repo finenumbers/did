@@ -2,6 +2,16 @@
 
 from __future__ import annotations
 
+from typing import Iterable
+
+from app.providers.dto.numbers import NormalizedNumber
+
+
+def count_unique_provider_keys(numbers: Iterable[NormalizedNumber]) -> int:
+    """Count distinct provider_number_key values (mirrors persist last-wins set size)."""
+    keys = {n.provider_number_key for n in numbers if n.provider_number_key}
+    return len(keys)
+
 
 def reload_allowed(*, previous: int, incoming: int, kind: str) -> tuple[bool, str | None]:
     """
@@ -11,6 +21,8 @@ def reload_allowed(*, previous: int, incoming: int, kind: str) -> tuple[bool, st
     - Free (large): require >= ~90% of previous (incomplete provider fetches).
     - Purchased / small sets (<100): refuse drops worse than half.
     - previous==0 allows first load / recovery of any positive fetch.
+
+    `incoming` must be the post-dedupe unique key count that will actually be written.
     """
     if incoming <= 0:
         if previous <= 0:
@@ -34,28 +46,5 @@ def reload_allowed(*, previous: int, incoming: int, kind: str) -> tuple[bool, st
                 f"Refusing wipe: {kind} fetch={incoming} << previous={previous} "
                 f"(min_allowed={min_allowed})"
             ),
-        )
-    return True, None
-
-
-def fetch_complete_enough(*, expected: int, fetched: int) -> tuple[bool, str | None]:
-    """
-    Generic count-vs-list gate.
-
-    Do **not** use for Runexis Numbering: search_numbers_count is an API-total /
-    progress hint, not the free-list size (free fetch may be substantially smaller).
-    """
-    if expected <= 0:
-        return True, None
-    if fetched <= 0:
-        return False, f"Empty fetch while provider count={expected}"
-    # Allow tiny rounding gaps; refuse if below 95% or gap > 1000 on large sets
-    min_ok = int(expected * 0.95)
-    if expected >= 1000:
-        min_ok = max(min_ok, expected - 1000)
-    if fetched < min_ok:
-        return (
-            False,
-            f"Incomplete fetch: got {fetched} while count={expected} (min_ok={min_ok})",
         )
     return True, None

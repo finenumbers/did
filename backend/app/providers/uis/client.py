@@ -9,12 +9,12 @@ from typing import Any
 
 import httpx
 
-logger = logging.getLogger(__name__)
-
 from app.providers.dto.common import ConnectionConfig, RawHttpResult
-from app.providers.errors import ProviderAuthError, ProviderTransportError
-from app.providers.retry import RetryPolicy, TimeoutConfig
+from app.providers.errors import ProviderAuthError, ProviderError
+from app.providers.retry import RetryPolicy, TimeoutConfig, request_with_retries
 from app.providers.uis import contract
+
+logger = logging.getLogger(__name__)
 
 
 class UisClient:
@@ -29,7 +29,8 @@ class UisClient:
         self.connection = connection
         self.timeout = timeout or TimeoutConfig()
         self.retry = retry or RetryPolicy()
-        self.base_url = (connection.base_url or contract.EXAMPLE_BASE_URL).rstrip("/")
+        raw_base = (connection.base_url or "").strip() or contract.EXAMPLE_BASE_URL
+        self.base_url = raw_base.rstrip("/")
         self.page_limit = min(page_limit or contract.DEFAULT_LIMIT, contract.MAX_LIMIT)
         auth = connection.auth_settings or {}
         self._token = (auth.get(contract.AUTH_ACCESS_TOKEN) or "").strip() or None
@@ -55,35 +56,35 @@ class UisClient:
             connect=self.timeout.connect_timeout,
             read=self.timeout.read_timeout,
         )
-        last_exc: Exception | None = None
-        for attempt in range(self.retry.max_attempts):
-            try:
-                start = time.perf_counter()
-                async with httpx.AsyncClient(timeout=timeout) as client:
-                    response = await client.post(
-                        self.base_url,
-                        json=envelope,
-                        headers={"Content-Type": "application/json; charset=UTF-8"},
-                    )
-                elapsed = (time.perf_counter() - start) * 1000
-                body_json: Any | None
-                try:
-                    body_json = response.json()
-                except ValueError:
-                    body_json = None
-                return RawHttpResult(
-                    status_code=response.status_code,
-                    body_text=response.text,
-                    body_json=body_json,
-                    headers=dict(response.headers),
-                    elapsed_ms=elapsed,
-                    request_url=str(response.url),
+
+        async def _once() -> httpx.Response:
+            async with httpx.AsyncClient(timeout=timeout, trust_env=False) as client:
+                return await client.post(
+                    self.base_url,
+                    json=envelope,
+                    headers={"Content-Type": "application/json; charset=UTF-8"},
                 )
-            except httpx.HTTPError as exc:
-                last_exc = exc
-                if attempt + 1 >= self.retry.max_attempts:
-                    break
-        raise ProviderTransportError(f"UIS transport failed: {last_exc}")
+
+        start = time.perf_counter()
+        response = await request_with_retries(
+            retry=self.retry,
+            label=f"UIS {method}",
+            do_request=_once,
+        )
+        elapsed = (time.perf_counter() - start) * 1000
+        body_json: Any | None
+        try:
+            body_json = response.json()
+        except ValueError:
+            body_json = None
+        return RawHttpResult(
+            status_code=response.status_code,
+            body_text=response.text,
+            body_json=body_json,
+            headers=dict(response.headers),
+            elapsed_ms=elapsed,
+            request_url=str(response.url),
+        )
 
     def require_access_token(self) -> str:
         if not self._token:
@@ -125,7 +126,10 @@ class UisClient:
         *,
         on_progress: Any | None = None,
     ) -> tuple[list[dict[str, Any]], list[RawHttpResult]]:
-        """Paginate until offset >= total_items or short page."""
+        """Paginate until offset >= total_items or short page.
+
+        Fail closed if API reports more rows than we can fetch within MAX_OFFSET.
+        """
         from app.providers.uis.parser import parse_list_page
 
         items: list[dict[str, Any]] = []
@@ -155,4 +159,19 @@ class UisClient:
                 break
             if len(page_items) < self.page_limit:
                 break
+            if offset > contract.MAX_OFFSET:
+                break
+
+        if total is not None and len(items) < total:
+            raise ProviderError(
+                f"UIS {method} truncated: fetched {len(items)} of {total} "
+                f"(MAX_OFFSET={contract.MAX_OFFSET})",
+                code="UIS_PAGINATION_TRUNCATED",
+                details={
+                    "method": method,
+                    "fetched": len(items),
+                    "total_items": total,
+                    "max_offset": contract.MAX_OFFSET,
+                },
+            )
         return items, envelopes

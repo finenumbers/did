@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ApiError, apiFetch, apiUrl } from "@/lib/api/client";
+import { ApiError, apiDownload, apiFetch } from "@/lib/api/client";
 import type { SyncRun, SyncStage } from "@/lib/types/api";
 
 type DroppedExportMeta = {
@@ -135,17 +135,7 @@ export default function SyncPage() {
     setDownloadingDropped(true);
     setError(null);
     try {
-      const res = await fetch(apiUrl("/api/v1/sync/dropped.xlsx"), { cache: "no-store" });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        const msg =
-          (data as { error?: { message?: string } })?.error?.message ||
-          (data as { detail?: string })?.detail ||
-          res.statusText ||
-          "Ошибка скачивания";
-        throw new Error(msg);
-      }
-      const blob = await res.blob();
+      const blob = await apiDownload("/api/v1/sync/dropped.xlsx");
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = "sync-dropped-latest.xlsx";

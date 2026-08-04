@@ -22,7 +22,7 @@ UI (Next.js)
 
 | Area | Path | Role |
 |---|---|---|
-| Providers | `backend/app/providers/` | Doc-driven adapters (SipOut, Runexis, Finenumbers) |
+| Providers | `backend/app/providers/` | Doc-driven adapters (SipOut, Runexis, UIS, Aurora, Finenumbers) |
 | Sync | `backend/app/modules/sync_engine/` | Unified runs, jobs, wipe+reload, progress, schedule |
 | PSTN INN cache | `backend/app/modules/pstn_inn_cache/` | Contour B: ranges cache for `catalog.operator` only |
 | Settings | `provider_connections` + PSTN cache APIs | Credentials, test connection, cache refresh, schedule |
@@ -45,7 +45,7 @@ UI (Next.js)
 - Primary UI/API path: `POST /api/v1/sync/start` (unified only).
 - Modes: `full` (dictionaries + free + purchased) and `free_only` (Finenumbers).
 - Production reload: stage into TEMP tables, then atomic wipe+cutover per `(provider, inventory_kind)`; refuse incomplete free fetches (~90% / count completeness).
-- Optional `ADMIN_API_TOKEN`: when set, `/api/v1` requires Bearer; UI uses Next `/api/backend` proxy.
+- Optional `ADMIN_API_TOKEN`: when set on **backend**, `/api/v1` requires Bearer (scripts/CI). UI uses Next `/api/backend` proxy with the browser session token only — frontend must not receive/inject the machine token.
 
 ## Adding a provider
 

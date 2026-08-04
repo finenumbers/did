@@ -19,9 +19,11 @@ from app.models.sipout_raw import (
     SipoutRegionRaw,
 )
 from app.models.sync import SyncJob, SyncJobLog, SyncRun, SyncRunLog
+from app.models.aurora_raw import AuroraFreeNumberRaw
 from app.models.uis_raw import UisFreeNumberRaw, UisPurchasedNumberRaw
 
 __all__ = [
+    "AuroraFreeNumberRaw",
     "Base",
     "NumberPriceHistory",
     "NumberStatusHistory",

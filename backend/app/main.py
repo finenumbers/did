@@ -16,6 +16,7 @@ from app.models.providers import Provider, ProviderConnection
 from app.models.sync import SyncRun
 from app.modules.pstn_inn_cache.service import ensure_required_operators
 from app.modules.sync_engine.scheduler import sync_schedule_loop
+from app.providers.aurora import contract as aurora_contract
 from app.providers.finenumbers import contract as finenumbers_contract
 from app.providers.runexis import contract as runexis_contract
 from app.providers.sipout import contract as sipout_contract
@@ -58,6 +59,7 @@ def seed_providers() -> None:
                 {},
             ),
             (ProviderCode.uis, "UIS", uis_contract.EXAMPLE_BASE_URL, {}),
+            (ProviderCode.aurora, "Aurora Telecom", aurora_contract.EXAMPLE_BASE_URL, {}),
         ]
         for code, name, base_url, auth in seeds:
             existing = db.scalar(select(Provider).where(Provider.code == code))

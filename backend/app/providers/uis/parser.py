@@ -8,22 +8,7 @@ from typing import Any
 from app.providers.dto.common import RawHttpResult
 from app.providers.dto.numbers import ParsedNumberItem
 from app.providers.errors import ProviderAuthError, ProviderParseError
-
-
-def normalize_phone(value: Any) -> str | None:
-    """Normalize RU MSISDN to 7XXXXXXXXXX when possible."""
-    if value is None:
-        return None
-    digits = "".join(ch for ch in str(value) if ch.isdigit())
-    if not digits:
-        return None
-    if len(digits) == 11 and digits.startswith("8"):
-        digits = "7" + digits[1:]
-    elif len(digits) == 10:
-        digits = "7" + digits
-    if len(digits) == 11 and digits.startswith("7"):
-        return digits
-    return digits or None
+from app.providers.msisdn_split import normalize_phone
 
 
 def _as_text(value: Any) -> str | None:

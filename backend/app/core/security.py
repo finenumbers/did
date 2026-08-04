@@ -94,10 +94,8 @@ def is_authorized_bearer(authorization: str | None) -> bool:
         return True
     if auth_enabled() and verify_session_token(token):
         return True
-    # If only legacy token configured (no username/password)
-    if not auth_enabled() and legacy:
-        return hmac.compare_digest(token, legacy)
     return False
+
 
 
 def api_protection_enabled() -> bool:

@@ -22,6 +22,7 @@ STAGE_DEFS: list[dict[str, str]] = [
     {"id": "runexis_purchased", "group": "Runexis", "label": "Купленные номера"},
     {"id": "uis_free", "group": "UIS", "label": "Свободные номера"},
     {"id": "uis_purchased", "group": "UIS", "label": "Купленные номера"},
+    {"id": "aurora_free", "group": "Aurora Telecom", "label": "Свободные номера"},
     {"id": "finenumbers_free", "group": "Finenumbers", "label": "Свободные номера"},
     {"id": "operator_enrichment", "group": "Общее", "label": "Обогащение операторов"},
     {"id": "finalize", "group": "Общее", "label": "Завершение"},
@@ -36,6 +37,7 @@ _PHASE_STAGE: dict[tuple[str, str], str] = {
     ("runexis", "purchased"): "runexis_purchased",
     ("uis", "free"): "uis_free",
     ("uis", "purchased"): "uis_purchased",
+    ("aurora", "free"): "aurora_free",
     ("finenumbers", "free"): "finenumbers_free",
 }
 

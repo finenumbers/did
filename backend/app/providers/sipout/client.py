@@ -9,8 +9,8 @@ from urllib.parse import urljoin
 import httpx
 
 from app.providers.dto.common import ConnectionConfig, RawHttpResult
-from app.providers.errors import ProviderAuthError, ProviderTransportError
-from app.providers.retry import RetryPolicy, TimeoutConfig
+from app.providers.errors import ProviderAuthError
+from app.providers.retry import RetryPolicy, TimeoutConfig, request_with_retries
 from app.providers.sipout import contract
 
 
@@ -52,31 +52,31 @@ class SipOutClient:
             connect=self.timeout.connect_timeout,
             read=self.timeout.read_timeout,
         )
-        last_exc: Exception | None = None
-        for attempt in range(self.retry.max_attempts):
-            try:
-                start = time.perf_counter()
-                async with httpx.AsyncClient(timeout=timeout) as client:
-                    response = await client.get(url, params=query)
-                elapsed = (time.perf_counter() - start) * 1000
-                body_json: Any | None
-                try:
-                    body_json = response.json()
-                except Exception:
-                    body_json = None
-                return RawHttpResult(
-                    status_code=response.status_code,
-                    body_text=response.text,
-                    body_json=body_json,
-                    headers=dict(response.headers),
-                    elapsed_ms=elapsed,
-                    request_url=str(response.url),
-                )
-            except httpx.HTTPError as exc:
-                last_exc = exc
-                if attempt + 1 >= self.retry.max_attempts:
-                    break
-        raise ProviderTransportError(f"SipOut transport failed: {last_exc}")
+
+        async def _once() -> httpx.Response:
+            async with httpx.AsyncClient(timeout=timeout, trust_env=False) as client:
+                return await client.get(url, params=query)
+
+        start = time.perf_counter()
+        response = await request_with_retries(
+            retry=self.retry,
+            label=f"SipOut {method}.{action}",
+            do_request=_once,
+        )
+        elapsed = (time.perf_counter() - start) * 1000
+        body_json: Any | None
+        try:
+            body_json = response.json()
+        except Exception:
+            body_json = None
+        return RawHttpResult(
+            status_code=response.status_code,
+            body_text=response.text,
+            body_json=body_json,
+            headers=dict(response.headers),
+            elapsed_ms=elapsed,
+            request_url=str(response.url),
+        )
 
     async def get_balance(self) -> RawHttpResult:
         # VERIFIED: method=balance&action=get

@@ -8,7 +8,7 @@ import pytest
 
 from app.models.enums import InventoryKind
 from app.providers.dto.common import ConnectionConfig, RawHttpResult
-from app.providers.errors import ProviderAuthError, ProviderParseError
+from app.providers.errors import ProviderAuthError, ProviderError, ProviderParseError
 from app.providers.uis import contract, mapper, parser
 from app.providers.uis.client import UisClient
 
@@ -30,6 +30,7 @@ def test_normalize_phone():
     assert parser.normalize_phone("9001234567") == "79001234567"
     assert parser.normalize_phone("+7 (900) 123-45-67") == "79001234567"
     assert parser.normalize_phone(None) is None
+    assert parser.normalize_phone("12345") is None
 
 
 def test_parse_list_page_ok():
@@ -135,6 +136,45 @@ def test_iter_all_pagination(monkeypatch):
     items, envs = asyncio.run(_run())
     assert len(items) == 3
     assert len(envs) == 2
+
+
+def test_iter_all_fails_when_truncated_by_max_offset(monkeypatch):
+    cfg = ConnectionConfig(
+        base_url=contract.EXAMPLE_BASE_URL,
+        auth_settings={"access_token": "t"},
+    )
+    client = UisClient(cfg, page_limit=contract.MAX_LIMIT)
+    # Pretend API has more rows than MAX_OFFSET window allows
+    total = contract.MAX_OFFSET + 50_000
+
+    async def fake_get_page(method, *, offset=0, limit=None):
+        lim = limit or contract.MAX_LIMIT
+        if offset > contract.MAX_OFFSET:
+            data = []
+        else:
+            # Compact fake rows (count only matters)
+            data = [{"phone_number": "79001234567"}] * lim
+        return _raw(
+            {
+                "jsonrpc": "2.0",
+                "id": "1",
+                "result": {"data": data, "metadata": {"total_items": total}},
+            }
+        )
+
+    monkeypatch.setattr(client, "get_page", fake_get_page)
+
+    async def _run():
+        return await client.iter_all(contract.METHOD_AVAILABLE_VIRTUAL_NUMBERS)
+
+    with pytest.raises(ProviderError, match="truncated"):
+        asyncio.run(_run())
+
+
+def test_client_blank_base_url_falls_back():
+    cfg = ConnectionConfig(base_url="   ", auth_settings={"access_token": "t"})
+    client = UisClient(cfg)
+    assert client.base_url == contract.EXAMPLE_BASE_URL.rstrip("/")
 
 
 def test_client_requires_access_token():

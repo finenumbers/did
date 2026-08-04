@@ -28,6 +28,7 @@ from app.models.sipout_raw import (
     SipoutPurchasedNumberRaw,
     SipoutRegionRaw,
 )
+from app.models.aurora_raw import AuroraFreeNumberRaw
 from app.models.uis_raw import UisFreeNumberRaw, UisPurchasedNumberRaw
 from app.modules.sync_engine.hashing import payload_hash
 from app.modules.sync_engine.staging import (
@@ -111,6 +112,10 @@ def wipe_provider_numbers(
             else UisPurchasedNumberRaw
         )
         wiped_raw = db.execute(delete(raw_cls)).rowcount or 0
+    elif provider_code == ProviderCode.aurora:
+        if inventory_kind != InventoryKind.free:
+            raise ValueError("Aurora supports free inventory wipe only")
+        wiped_raw = db.execute(delete(AuroraFreeNumberRaw)).rowcount or 0
     elif provider_code == ProviderCode.finenumbers:
         wiped_raw = 0
     else:
@@ -739,6 +744,132 @@ def persist_uis_numbers(
     }
 
 
+def persist_aurora_numbers(
+    db: Session,
+    *,
+    provider_id: uuid.UUID,
+    job_id: uuid.UUID,
+    inventory_kind: InventoryKind,
+    numbers: list[NormalizedNumber],
+    on_progress: Callable[[str, int | None, int | None], Any] | None = None,
+) -> dict[str, int]:
+    """Stage into UNLOGGED tables, then atomic wipe+cutover (free only)."""
+    if inventory_kind != InventoryKind.free:
+        raise ValueError("Aurora persist supports free inventory only")
+
+    deduped: dict[str, NormalizedNumber] = {}
+    for num in numbers:
+        if num.provider_number_key:
+            deduped[num.provider_number_key] = num
+    numbers = list(deduped.values())
+
+    loaded = _now()
+    table_name = "aurora_free_numbers_raw"
+    stg_raw_name = f"{table_name}_stg"
+    stg_cat_name = "numbers_catalog_normalized_stg"
+
+    stg_raw = ensure_temp_staging(db, live_table=table_name, stg_table=stg_raw_name)
+    stg_cat = ensure_temp_staging(
+        db, live_table="numbers_catalog_normalized", stg_table=stg_cat_name
+    )
+
+    raw_rows: list[dict[str, Any]] = []
+    cat_rows: list[dict[str, Any]] = []
+    for num in numbers:
+        raw_id = uuid.uuid4()
+        ph = payload_hash(num.raw_payload)
+        raw_payload = num.raw_payload or {}
+        raw_rows.append(
+            {
+                "id": raw_id,
+                "sync_job_id": job_id,
+                "source_loaded_at": loaded,
+                "raw_payload": raw_payload,
+                "payload_hash": ph,
+                "external_key": num.provider_number_key,
+                "phone": num.msisdn or num.provider_number_key,
+                "number_type": num.number_type,
+                "period_price_raw": (
+                    str(raw_payload.get("period_price_raw"))
+                    if raw_payload.get("period_price_raw") is not None
+                    else None
+                ),
+                "region_raw": (
+                    str(raw_payload.get("region_raw"))
+                    if raw_payload.get("region_raw") is not None
+                    else None
+                ),
+                "city_name": num.city_name,
+                "region_name": num.region_name,
+                "display_mask": num.display_mask,
+                "created_at": loaded,
+            }
+        )
+        cat_rows.append(
+            _catalog_row(
+                num,
+                provider_id=provider_id,
+                job_id=job_id,
+                inventory_kind=inventory_kind,
+                table_name=table_name,
+                raw_id=raw_id,
+                loaded=loaded,
+            )
+        )
+
+    upserted = insert_staging_batches(
+        db,
+        stg_raw,
+        raw_rows,
+        on_progress=on_progress,
+        progress_label="Aurora staging raw",
+    )
+    insert_staging_batches(
+        db,
+        stg_cat,
+        cat_rows,
+        on_progress=on_progress,
+        progress_label="Aurora staging catalog",
+    )
+
+    wipe_holder: dict[str, int] = {}
+
+    def _wipe() -> None:
+        wipe_holder.update(
+            wipe_provider_numbers(
+                db,
+                provider_id=provider_id,
+                provider_code=ProviderCode.aurora,
+                inventory_kind=inventory_kind,
+            )
+        )
+
+    cutover_from_staging(
+        db,
+        wipe_fn=_wipe,
+        live_raw_table=table_name,
+        stg_raw=stg_raw,
+        live_catalog_table="numbers_catalog_normalized",
+        stg_catalog=stg_cat,
+    )
+    if on_progress:
+        try:
+            on_progress("cutover done", upserted, len(numbers))
+        except Exception:
+            logger.exception("persist on_progress failed")
+
+    return {
+        "upserted": upserted,
+        "marked_absent": 0,
+        "price_history": 0,
+        "status_history": 0,
+        "deduped_input": len(deduped),
+        "bulk_insert": 1,
+        "staged_cutover": 1,
+        **wipe_holder,
+    }
+
+
 def persist_finenumbers_numbers(
     db: Session,
     *,
@@ -819,7 +950,7 @@ def _decimal_or_none(value: Any) -> Decimal | None:
 def build_city_lookup(db: Session, provider_code: str) -> dict[str, tuple[str | None, str | None, str | None]]:
     """city_id -> (city_name, region_external_id, region_name)."""
     lookup: dict[str, tuple[str | None, str | None, str | None]] = {}
-    if provider_code in {"finenumbers", "uis"}:
+    if provider_code in {"finenumbers", "uis", "aurora"}:
         return lookup
     if provider_code == "sipout":
         cities = db.scalars(select(SipoutCityRaw)).all()

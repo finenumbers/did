@@ -64,9 +64,9 @@ services:
     restart: unless-stopped
     environment:
       # Same-origin API via Next server proxy (browser → NPM → frontend → backend)
+      # Do not set ADMIN_API_TOKEN here — proxy must not inject a machine token.
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/backend}
       BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:8000}
-      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
     networks:
       - did_internal
       - proxy

@@ -1,4 +1,5 @@
 from app.models.enums import ProviderCode
+from app.providers.aurora import AuroraProvider
 from app.providers.base import AbstractProvider
 from app.providers.errors import ProviderError
 from app.providers.finenumbers import FinenumbersProvider
@@ -11,6 +12,7 @@ PROVIDER_REGISTRY: dict[ProviderCode, type[AbstractProvider]] = {
     ProviderCode.sipout: SipOutProvider,
     ProviderCode.finenumbers: FinenumbersProvider,
     ProviderCode.uis: UisProvider,
+    ProviderCode.aurora: AuroraProvider,
 }
 
 

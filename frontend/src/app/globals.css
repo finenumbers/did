@@ -393,14 +393,8 @@ mark.search-hit {
   font-size: 0.9rem;
 }
 
-.grid-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
 @media (max-width: 900px) {
   .app-shell { grid-template-columns: 1fr; }
-  .grid-2 { grid-template-columns: 1fr; }
 }
 
 .login-page {

@@ -1,6 +1,25 @@
-"""Split normalized Russian MSISDN into ABC code + local subscriber part."""
+"""Normalize and split Russian MSISDN helpers shared across providers."""
 
 from __future__ import annotations
+
+from typing import Any
+
+
+def normalize_phone(value: Any) -> str | None:
+    """Normalize RU MSISDN to 7XXXXXXXXXX; otherwise None."""
+    if value is None:
+        return None
+    digits = "".join(ch for ch in str(value) if ch.isdigit())
+    if not digits:
+        return None
+    if len(digits) == 11 and digits.startswith("8"):
+        digits = "7" + digits[1:]
+    elif len(digits) == 10:
+        digits = "7" + digits
+    if len(digits) == 11 and digits.startswith("7"):
+        return digits
+    return None
+
 
 
 def split_msisdn(msisdn: str | None) -> tuple[str | None, str | None]:

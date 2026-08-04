@@ -4,12 +4,14 @@
 
 | Table | Purpose |
 |---|---|
-| `providers` | Independent sources registry (sipout, runexis, finenumbers) |
+| `providers` | Independent sources registry (sipout, runexis, uis, aurora, finenumbers) |
 | `provider_connections` | Auth/base URL/test status |
 | `system_settings` | Key/value settings (`sync_schedule`, `pstn_inn_cache_refresh`, …) |
 | `sync_jobs` / `sync_job_logs` | Per-provider job audit (also used inside unified run) |
 | `sync_runs` / `sync_run_logs` | Unified multi-provider sync progress + logs |
 | `runexis_*_raw` / `sipout_*_raw` | Per-provider raw payloads (+ extracts) |
+| `uis_free_numbers_raw` / `uis_purchased_numbers_raw` | UIS Data API free/purchased raw |
+| `aurora_free_numbers_raw` | Aurora Telecom free CSV raw |
 | `numbers_catalog_normalized` | Cross-provider UI catalog + verification metadata |
 | `number_price_history` / `number_status_history` | Reserved; unused under wipe+reload (rows deleted on wipe, sync does not append history) |
 | `pstn_inn_cache_operators` | Contour B: managed INNs for operator cache |

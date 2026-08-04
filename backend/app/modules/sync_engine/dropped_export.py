@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
 from app.core.config import get_settings
 from app.providers.dto.numbers import NormalizedNumber
@@ -80,17 +81,15 @@ def get_collector() -> DroppedCollector | None:
 
 
 def begin_dropped_export() -> DroppedCollector:
-    """Start a new unified-run collector; delete previous XLSX."""
+    """Start a new unified-run collector; keep previous XLSX until a successful write."""
     global _collector
     with _lock:
         _collector = DroppedCollector()
         path = dropped_xlsx_path()
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            if path.exists():
-                path.unlink()
         except OSError:
-            logger.exception("Failed to clear previous dropped export at %s", path)
+            logger.exception("Failed to ensure dropped export directory %s", path.parent)
         return _collector
 
 
@@ -139,11 +138,63 @@ def record_number_drops(
         )
 
 
+def _counts_from_existing_xlsx(path: Path) -> tuple[int, int] | None:
+    """Return (unmapped, duplicates) data rows from existing report, or None if unreadable."""
+    try:
+        wb = load_workbook(path, read_only=True, data_only=True)
+        try:
+            unmapped_n = 0
+            duplicates_n = 0
+            if "unmapped" in wb.sheetnames:
+                # subtract header row when present
+                unmapped_n = max(0, (wb["unmapped"].max_row or 0) - 1)
+            if "duplicates" in wb.sheetnames:
+                duplicates_n = max(0, (wb["duplicates"].max_row or 0) - 1)
+            return unmapped_n, duplicates_n
+        finally:
+            wb.close()
+    except Exception:
+        logger.exception("Failed to read preserved dropped export %s", path)
+        return None
+
+
 def write_dropped_xlsx() -> dict[str, Any]:
-    """Write collector rows to SYNC_DROPPED_XLSX_PATH; always overwrite."""
+    """Write collector rows atomically; preserve previous file when collector is empty."""
     collector = get_collector() or DroppedCollector()
     path = dropped_xlsx_path()
     path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not collector.rows:
+        if not dropped_xlsx_exists():
+            return {
+                "available": False,
+                "path_basename": None,
+                "unmapped": 0,
+                "duplicates": 0,
+                "preserved_previous": False,
+                "generated_at": None,
+            }
+        counts = _counts_from_existing_xlsx(path)
+        if counts is None:
+            return {
+                "available": False,
+                "path_basename": path.name,
+                "unmapped": 0,
+                "duplicates": 0,
+                "preserved_previous": True,
+                "generated_at": None,
+                "error": "preserved_unreadable",
+            }
+        unmapped_n, duplicates_n = counts
+        mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=UTC).isoformat()
+        return {
+            "available": True,
+            "path_basename": path.name,
+            "unmapped": unmapped_n,
+            "duplicates": duplicates_n,
+            "preserved_previous": True,
+            "generated_at": mtime,
+        }
 
     wb = Workbook(write_only=True)
     ws_u = wb.create_sheet("unmapped")
@@ -171,7 +222,9 @@ def write_dropped_xlsx() -> dict[str, Any]:
             ws_d.append(values)
             duplicates_n += 1
 
-    wb.save(path)
+    tmp_path = path.with_name(path.name + ".tmp")
+    wb.save(tmp_path)
+    os.replace(tmp_path, path)
     generated_at = datetime.now(UTC).isoformat()
     meta = {
         "available": True,

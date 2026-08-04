@@ -57,9 +57,11 @@ NEXT_PUBLIC_API_URL=/api/backend
 BACKEND_INTERNAL_URL=http://backend:8000
 ```
 
+**Auth:** keep a **single** `backend` replica for schedule/sync. Optional `ADMIN_API_TOKEN` belongs on the **backend** service only (scripts/CI call `did-backend` directly). Do **not** set it on `frontend` — the Next `/api/backend` proxy never injects a machine token (that would bypass login).
+
 ## 4. Optional: separate API host
 
-Only if you need direct OpenAPI access:
+Only if you need direct OpenAPI access (exposes `/docs` without the UI login gate — prefer internal-only):
 
 | Field | Value |
 |-------|--------|
@@ -88,6 +90,10 @@ Do **not** pin version tags for routine redeploys — keep `DID_IMAGE_TAG=latest
 ## 7. UIS Data API egress IP
 
 UIS requires the server egress IP in the personal account API allowlist before sync/test work. Add the Docker host public IP (or `0.0.0.0/0` for lab) under UIS ЛК → API security. Credentials (`access_token`) are entered in Settings → UIS after deploy.
+
+## 7b. Aurora Telecom CSV egress
+
+Aurora free numbers load via plain **HTTP** to `bill.auroratelecom.ru:8080` (public CSV, no auth). The backend container must be allowed outbound HTTP to that host/port. No credentials in Settings — only optional CSV URL override.
 
 ## 8. Sync dropped XLSX volume
 

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api/client";
 import type { Page } from "@/lib/types/api";
 
-export const INFINITE_PAGE_SIZE = 100;
+const INFINITE_PAGE_SIZE = 100;
 
 type UseInfinitePageOptions = {
   /** Return null to skip fetching (e.g. nothing selected). */

@@ -23,16 +23,14 @@ async function proxy(req: NextRequest, pathParts: string[]): Promise<NextRespons
   const accept = req.headers.get("accept");
   if (accept) headers.set("accept", accept);
 
-  // Prefer browser session token; fallback to machine token for server-side calls
+  // Forward only the browser/session credentials — never inject ADMIN_API_TOKEN
+  // (machine token belongs on backend-only callers; injecting it here is an auth bypass).
   const incoming = req.headers.get("Authorization");
   if (incoming) {
     headers.set("Authorization", incoming);
-  } else {
-    const token = (process.env.ADMIN_API_TOKEN || "").trim();
-    if (token) headers.set("Authorization", `Bearer ${token}`);
   }
 
-  // Allow iframe export via ?access_token=
+  // Legacy download path: ?access_token= → Authorization (strip from upstream URL)
   const qToken = url.searchParams.get("access_token");
   if (qToken && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${qToken}`);

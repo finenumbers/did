@@ -45,7 +45,7 @@ By default API access is denied until the caller IP is added under ЛК security
 
 | Param | Default | Max |
 |---|---|---|
-| `offset` | 0 | 100_000 |
+| `offset` | 0 | 100_000 (product hard-fails sync if `total_items` exceeds what can be fetched in this window — no silent truncate) |
 | `limit` | 1000 | 10_000 |
 
 Metadata includes total count (see Data API «Мета-параметры» / limits).
