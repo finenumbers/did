@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 ProgressCb = Callable[[str, int | None, int | None], None]
 _PROGRESS_EVERY = 50_000
+_WAVE_PROGRESS_EVERY = 200
 
 
 @dataclass(frozen=True)
@@ -245,6 +246,7 @@ async def _enrich_catalog_operators_inner(
     cache_hits = 0
     lookups = 0
     errors = 0
+    skipped_already_have_operator = 0
 
     # (id, msisdn, phone, current_operator)
     pending: list[tuple] = []
@@ -265,6 +267,10 @@ async def _enrich_catalog_operators_inner(
             if current_operator != operator:
                 pending_updates.append((catalog_id, operator))
         else:
+            # Keep existing non-empty operator; PSTN only for empty operator.
+            if current_operator and str(current_operator).strip():
+                skipped_already_have_operator += 1
+                continue
             phone = phone_for_lookup(msisdn_s)
             if not phone:
                 invalid_msisdns.append(msisdn_s)
@@ -285,12 +291,28 @@ async def _enrich_catalog_operators_inner(
             total_rows,
             total_rows,
         )
+    logger.warning(
+        "PSTN enrich: cache_hits=%s pending_api=%s skipped_already_have_operator=%s "
+        "invalid_msisdn=%s",
+        cache_hits,
+        len(pending),
+        skipped_already_have_operator,
+        len(invalid_msisdns),
+    )
 
     sem = asyncio.Semaphore(concurrency)
-    # phone -> operator string, or None when API returned found=false / empty operator
+    # phone -> operator string, or None when attempted (found=false / error / empty)
     lookup_result: dict[str, str | None] = {}
+    progress_lock = asyncio.Lock()
 
-    async def lookup_phone_row(phone: str) -> None:
+    async def lookup_phone_row(
+        phone: str,
+        *,
+        wave_num: int,
+        wave_base: int,
+        wave_total: int,
+        wave_done_box: list[int],
+    ) -> None:
         nonlocal lookups, errors
         async with sem:
             try:
@@ -298,22 +320,35 @@ async def _enrich_catalog_operators_inner(
                 lookups += 1
                 if raw.status_code >= 400:
                     errors += 1
-                    return
-                body = raw.body_json if isinstance(raw.body_json, dict) else {}
-                data = body.get("data") if body.get("found") else None
-                if isinstance(data, dict):
-                    op = cache.add_from_api_row(data)
-                    cache.finalize()
-                    lookup_result[phone] = op
-                else:
+                    # Mark attempted so later waves do not retry the same phone.
                     lookup_result[phone] = None
+                else:
+                    body = raw.body_json if isinstance(raw.body_json, dict) else {}
+                    data = body.get("data") if body.get("found") else None
+                    if isinstance(data, dict):
+                        op = cache.add_from_api_row(data)
+                        cache.finalize()
+                        lookup_result[phone] = op
+                    else:
+                        lookup_result[phone] = None
             except Exception:
                 errors += 1
+                lookup_result[phone] = None
                 logger.exception("Finenumbers lookup failed for %s", phone)
+            finally:
+                async with progress_lock:
+                    wave_done_box[0] += 1
+                    done = wave_done_box[0]
+                    if done % _WAVE_PROGRESS_EVERY == 0 or done == wave_total:
+                        _progress(
+                            on_progress,
+                            f"PSTN lookup, волна {wave_num}: {done}/{wave_total} запросов",
+                            wave_base + done,
+                            wave_base + wave_total,
+                        )
 
     rounds = 0
     while pending and rounds < max_rounds:
-        rounds += 1
         still: list[tuple] = []
         phones_needed: list[str] = []
         phone_seen: set[str] = set()
@@ -340,20 +375,39 @@ async def _enrich_catalog_operators_inner(
         if not phones_needed:
             break
 
+        rounds += 1
         logger.warning(
-            "PSTN enrich round=%s pending=%s phones_needed=%s lookups_so_far=%s",
+            "PSTN enrich round=%s pending=%s phones_needed=%s lookups_so_far=%s "
+            "errors=%s cache_hits=%s skipped_already_have_operator=%s",
             rounds,
             len(pending),
             len(phones_needed),
             lookups,
+            errors,
+            cache_hits,
+            skipped_already_have_operator,
         )
+        wave_base = lookups
+        wave_total = len(phones_needed)
+        wave_done_box = [0]
         _progress(
             on_progress,
-            f"PSTN lookup, волна {rounds}: {len(phones_needed)} запросов",
-            lookups,
-            lookups + len(phones_needed),
+            f"PSTN lookup, волна {rounds}: 0/{wave_total} запросов",
+            wave_base,
+            wave_base + wave_total,
         )
-        await asyncio.gather(*(lookup_phone_row(p) for p in phones_needed))
+        await asyncio.gather(
+            *(
+                lookup_phone_row(
+                    p,
+                    wave_num=rounds,
+                    wave_base=wave_base,
+                    wave_total=wave_total,
+                    wave_done_box=wave_done_box,
+                )
+                for p in phones_needed
+            )
+        )
 
     uncovered_msisdns: list[str] = list(invalid_msisdns)
     for item in pending:
@@ -421,6 +475,7 @@ async def _enrich_catalog_operators_inner(
         "updated": updated,
         "lookups": lookups,
         "cache_hits": cache_hits,
+        "skipped_already_have_operator": skipped_already_have_operator,
         "missing": max(len(uncovered_msisdns), global_missing),
         "invalid_msisdn": len(invalid_msisdns),
         "errors": errors,
