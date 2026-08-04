@@ -317,12 +317,20 @@ class RunexisNumberingClient:
         not the free-list size — never fail because fetched < count.
         """
         if count_hint is None:
+            await _emit_progress(on_progress, "Numbering: запрос count…")
             count_hint = await self.search_numbers_count(filters)
         logger.warning(
             "Runexis Numbering search_numbers_count filter=%s count_hint=%s "
             "(progress only; not free-list size)",
             filters,
             count_hint,
+        )
+        total_hint = count_hint if count_hint > 0 else None
+        await _emit_progress(
+            on_progress,
+            "Numbering: загрузка страницы 1…",
+            0,
+            total_hint,
         )
         limit = int(limit if limit is not None else contract.NUMBERING_PAGE_LIMIT)
         concurrency = max(
@@ -491,7 +499,9 @@ class RunexisNumberingClient:
         Always opens a fresh session for bulk sync (stale sessions can return tiny pages).
         search_numbers_count is treated as a progress hint only.
         """
+        await _emit_progress(on_progress, "Numbering: подключение…")
         await self.connect()
+        await _emit_progress(on_progress, "Numbering: сессия")
 
         envelopes: list[RawHttpResult] = []
         items: list[Any] = []

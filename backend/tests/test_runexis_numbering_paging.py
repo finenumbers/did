@@ -91,3 +91,52 @@ def test_page_all_accepts_free_list_below_count_hint():
     )
     assert hint == 200
     assert len(items) == 45
+
+
+def test_page_all_emits_pending_progress_before_slow_calls():
+    """UI should not stay blank while count / page1 RPC are in flight."""
+    events: list[tuple[str, int | None, int | None]] = []
+
+    def on_progress(detail: str, current=None, total=None):
+        events.append((detail, current, total))
+
+    scripts = {0: [[{"n": 1}] * 5]}
+    client = ScriptedNumberingClient(scripts, count_hint=42)
+    items, _envs, hint = asyncio.run(
+        client._page_all({}, limit=20, concurrency=1, on_progress=on_progress)
+    )
+    assert hint == 42
+    assert len(items) == 5
+    details = [e[0] for e in events]
+    assert "Numbering: запрос count…" in details
+    assert "Numbering: загрузка страницы 1…" in details
+    # Pending page1 shows 0 / total before the first page returns
+    pending = next(e for e in events if e[0] == "Numbering: загрузка страницы 1…")
+    assert pending[1] == 0 and pending[2] == 42
+    assert any(d.startswith("Numbering: страница 1") for d in details)
+
+
+def test_list_all_free_emits_session_progress():
+    events: list[str] = []
+
+    def on_progress(detail: str, current=None, total=None):
+        events.append(detail)
+
+    scripts = {0: [[{"n": 1}, {"n": 2}]]}
+    client = ScriptedNumberingClient(scripts, count_hint=2)
+
+    async def fake_connect():
+        return "session"
+
+    async def fake_aclose():
+        return None
+
+    client.connect = fake_connect  # type: ignore[method-assign]
+    client.aclose = fake_aclose  # type: ignore[method-assign]
+
+    items, _envs, meta = asyncio.run(client.list_all_free_numbers(on_progress=on_progress))
+    assert len(items) == 2
+    assert events[0] == "Numbering: подключение…"
+    assert "Numbering: сессия" in events
+    assert "Numbering: запрос count…" in events
+    assert "Numbering: загрузка страницы 1…" in events

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api/client";
 import { formatCount } from "@/lib/format";
 import type {
-  ProviderOut,
   ProviderSettings,
   PstnInnCacheStatus,
   SyncSchedule,
@@ -65,7 +64,6 @@ function draftFromSettings(code: ProviderCode, s: ProviderSettings): Draft {
 }
 
 export default function SettingsPage() {
-  const [providers, setProviders] = useState<ProviderOut[]>([]);
   const [drafts, setDrafts] = useState<Record<ProviderCode, Draft>>({
     sipout: { ...EMPTY_DRAFT },
     runexis: { ...EMPTY_DRAFT },
@@ -109,8 +107,7 @@ export default function SettingsPage() {
   }, []);
 
   const reloadAll = async () => {
-    const plist = await apiFetch<ProviderOut[]>("/api/v1/providers");
-    setProviders(plist);
+    await apiFetch("/api/v1/providers");
     const next: Record<ProviderCode, Draft> = {
       sipout: { ...EMPTY_DRAFT },
       runexis: { ...EMPTY_DRAFT },
@@ -411,7 +408,6 @@ export default function SettingsPage() {
 
         {PROVIDERS.map(({ code, title }) => {
           const d = drafts[code];
-          const caps = providers.find((p) => p.code === code)?.capabilities;
           const hasToken = Boolean(d.settings?.auth_settings_masked?.token);
           const hasNumberingSession = Boolean(
             d.settings?.auth_settings_masked?.numbering_session_id,
@@ -608,14 +604,6 @@ export default function SettingsPage() {
                     {d.settings.last_test_message}
                   </div>
                 )}
-              </div>
-              <div style={{ marginTop: "0.75rem", fontSize: "0.85rem", color: "var(--muted)" }}>
-                Capabilities:{" "}
-                {caps
-                  ? Object.entries(caps)
-                      .map(([k, v]) => `${k}:${v.supported ? "yes" : "limited"}`)
-                      .join(" · ")
-                  : "—"}
               </div>
             </div>
           );
