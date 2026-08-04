@@ -16,4 +16,4 @@
 
 ## Rule
 
-Saved HTML under `uis/raw/` is the method source of truth for UIS. Derived `uis-contract.md` / `uis-field-mapping.md` must not invent methods or fields. Integration is **read-only** (`get.*` + optional `login.user` only).
+Saved HTML under `uis/raw/` is the method source of truth for UIS. Derived `uis-contract.md` / `uis-field-mapping.md` must not invent methods or fields. Integration is **read-only** (`get.*` with ЛК `access_token` only; `login.user` documented but unused by product).

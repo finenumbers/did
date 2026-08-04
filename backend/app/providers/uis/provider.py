@@ -40,7 +40,7 @@ class UisProvider(AbstractProvider):
             "test_connection": {
                 "supported": True,
                 "source": "documentation_verified",
-                "action": f"{contract.METHOD_LOGIN_USER}|{contract.METHOD_VIRTUAL_NUMBERS}",
+                "action": contract.METHOD_VIRTUAL_NUMBERS,
             },
         }
 
@@ -50,7 +50,7 @@ class UisProvider(AbstractProvider):
     async def test_connection(self, connection: ConnectionConfig) -> DiagnosticsResult:
         client = self._client(connection)
         try:
-            await client.resolve_access_token()
+            client.require_access_token()
             raw = await client.get_page(contract.METHOD_VIRTUAL_NUMBERS, offset=0, limit=1)
             parser.parse_list_page(raw)
             return DiagnosticsResult(

@@ -66,20 +66,6 @@ def test_parse_list_page_rpc_error_auth():
         )
 
 
-def test_parse_login():
-    token, expire = parser.parse_login(
-        _raw(
-            {
-                "jsonrpc": "2.0",
-                "id": "1",
-                "result": {"data": {"access_token": "tok123", "expire_at": "2026-01-01 00:00:00"}},
-            }
-        )
-    )
-    assert token == "tok123"
-    assert expire == "2026-01-01 00:00:00"
-
-
 def test_map_available():
     parsed = parser.parse_available_item(
         {
@@ -151,11 +137,11 @@ def test_iter_all_pagination(monkeypatch):
     assert len(envs) == 2
 
 
-def test_client_requires_auth():
+def test_client_requires_access_token():
     cfg = ConnectionConfig(base_url=contract.EXAMPLE_BASE_URL, auth_settings={})
     client = UisClient(cfg)
-    with pytest.raises(ProviderAuthError):
-        asyncio.run(client.resolve_access_token())
+    with pytest.raises(ProviderAuthError, match="access_token"):
+        client.require_access_token()
 
 
 def test_parse_error_non_list():

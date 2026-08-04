@@ -4,10 +4,10 @@
 
 | Key | Purpose |
 |---|---|
-| `access_token` | Permanent/temporary API key (preferred for sync) |
-| `login` / `password` | Fallback → `login.user` when token empty |
+| `access_token` | Permanent/temporary API key from UIS ЛК (required) |
 | `user_id` | Optional agent customer user id (number as string in settings) |
-| `session_expire_at` | Stored after login.user (operational) |
+
+Product does **not** call `login.user`; session-via-password is unused. Vendor docs still describe that method separately.
 
 ## Operational
 
@@ -20,6 +20,5 @@
 
 ## Test connection
 
-1. Resolve token (stored or login.user).
+1. Require stored `access_token`.
 2. `get.virtual_numbers` with `limit=1`.
-3. Persist refreshed session token into auth_settings when obtained via login.

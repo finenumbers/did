@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
@@ -25,11 +23,9 @@ from app.schemas.providers import (
 _AUTH_PLAIN_KEYS = frozenset(
     {
         "email",
-        "login",
         "user_id",
         "token_expire",
         "refresh_token_expire",
-        "session_expire_at",
         "numbering_login",
         "numbering_partition",
         "numbering_base_url",
@@ -44,9 +40,7 @@ _AUTH_NUMBERING_SESSION_KEYS = frozenset({"numbering_session_id"})
 def _mask_auth(auth: dict) -> dict:
     out = {}
     for k, v in (auth or {}).items():
-        if v is None or v == "":
-            out[k] = v
-        elif k in _AUTH_PLAIN_KEYS:
+        if v is None or v == "" or k in _AUTH_PLAIN_KEYS:
             out[k] = v
         else:
             s = str(v)
@@ -95,9 +89,8 @@ class ProvidersService:
             )
         elif code == ProviderCode.uis.value:
             notice = (
-                "UIS Data API: access_token (preferred) or login/password → login.user; "
-                "optional user_id for agent. IP whitelist required in UIS ЛК. "
-                "See uis-contract.md. Read-only get.* only."
+                "UIS Data API: access_token (API key from ЛК); optional user_id for agent. "
+                "IP whitelist required in UIS ЛК. See uis-contract.md. Read-only get.* only."
             )
         else:
             notice = (

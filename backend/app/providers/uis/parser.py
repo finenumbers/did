@@ -66,19 +66,6 @@ def _require_result(raw: RawHttpResult) -> dict[str, Any]:
     return result
 
 
-def parse_login(raw: RawHttpResult) -> tuple[str, str | None]:
-    result = _require_result(raw)
-    data = result.get("data")
-    if not isinstance(data, dict):
-        raise ProviderParseError("UIS login.user data is not an object")
-    token = _as_text(data.get("access_token"))
-    if not token:
-        raise ProviderAuthError("UIS login.user returned empty access_token")
-    expire = data.get("expire_at")
-    expire_at = _as_text(expire) if expire is not None else None
-    return token, expire_at
-
-
 def parse_list_page(raw: RawHttpResult) -> tuple[list[dict[str, Any]], int | None]:
     result = _require_result(raw)
     data = result.get("data")

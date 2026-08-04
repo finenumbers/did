@@ -90,13 +90,13 @@ Metadata includes total count (see Data API «Мета-параметры» / li
 | `campaigns` | array | Campaign nesting — keep in raw only |
 | `scenarios` | array | Scenario nesting — keep in raw only |
 
-### Auth helper — `login.user` — VERIFIED
+### Auth helper — `login.user` — VERIFIED (not used by DID product)
 
-Used only when permanent `access_token` is not configured.
+Vendor supports session auth via `login.user`. DID Settings/sync use **only** the ЛК API key as `access_token`.
 
 ## Forbidden for DID sync
 
-Any `create.*` / `update.*` / `delete.*` / `set.*` mutating virtual-number or billing methods. Not called from sync, probes, or diagnostics beyond `login.user` + `get.*`.
+Any `create.*` / `update.*` / `delete.*` / `set.*` mutating virtual-number or billing methods. Not called from sync, probes, or diagnostics — only `get.*` with stored `access_token`.
 
 ## Response envelope — EXAMPLE-CONFIRMED
 

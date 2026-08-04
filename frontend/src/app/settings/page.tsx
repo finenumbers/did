@@ -21,7 +21,6 @@ type Draft = {
   numberingPassword: string;
   numberingBaseUrl: string;
   accessToken: string;
-  login: string;
   userId: string;
   settings: ProviderSettings | null;
   message: string | null;
@@ -39,7 +38,6 @@ const EMPTY_DRAFT: Draft = {
   numberingPassword: "",
   numberingBaseUrl: "",
   accessToken: "",
-  login: "",
   userId: "",
   settings: null,
   message: null,
@@ -63,7 +61,6 @@ function draftFromSettings(code: ProviderCode, s: ProviderSettings): Draft {
     email: typeof auth.email === "string" ? auth.email : "",
     numberingLogin: typeof auth.numbering_login === "string" ? auth.numbering_login : "",
     numberingBaseUrl: typeof auth.numbering_base_url === "string" ? auth.numbering_base_url : "",
-    login: typeof auth.login === "string" ? auth.login : "",
     userId: auth.user_id != null && auth.user_id !== "" ? String(auth.user_id) : "",
     settings: s,
   };
@@ -154,8 +151,6 @@ export default function SettingsPage() {
     } else if (code === "uis") {
       const next: Record<string, string> = {};
       if (d.accessToken) next.access_token = d.accessToken;
-      if (d.login) next.login = d.login;
-      if (d.password) next.password = d.password;
       if (d.userId) next.user_id = d.userId;
       auth_settings = Object.keys(next).length ? next : undefined;
     } else {
@@ -479,37 +474,10 @@ export default function SettingsPage() {
                         placeholder={
                           d.settings?.auth_settings_masked?.access_token
                             ? `текущее: ${String(d.settings.auth_settings_masked.access_token)}`
-                            : "постоянный/временный ключ из ЛК UIS"
+                            : "API-ключ из ЛК UIS"
                         }
                         value={d.accessToken}
                         onChange={(e) => setDraft(code, { accessToken: e.target.value })}
-                        style={{ width: "100%" }}
-                      />
-                    </label>
-                    <h3 style={{ margin: "0.5rem 0 0", fontSize: "0.95rem" }}>
-                      Fallback — login.user
-                    </h3>
-                    <label>
-                      Login
-                      <input
-                        value={d.login}
-                        onChange={(e) => setDraft(code, { login: e.target.value })}
-                        placeholder="логин UIS (если нет access_token)"
-                        style={{ width: "100%" }}
-                      />
-                    </label>
-                    <label>
-                      Password
-                      <input
-                        type="password"
-                        autoComplete="new-password"
-                        placeholder={
-                          d.settings?.auth_settings_masked?.password
-                            ? `текущее: ${String(d.settings.auth_settings_masked.password)}`
-                            : "пароль UIS"
-                        }
-                        value={d.password}
-                        onChange={(e) => setDraft(code, { password: e.target.value })}
                         style={{ width: "100%" }}
                       />
                     </label>
@@ -523,8 +491,8 @@ export default function SettingsPage() {
                       />
                     </label>
                     <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
-                      Read-only: get.available_virtual_numbers / get.virtual_numbers. IP whitelist в
-                      ЛК UIS обязателен.
+                      Auth только через API-ключ (access_token). Read-only: get.available_virtual_numbers /
+                      get.virtual_numbers. IP whitelist в ЛК UIS обязателен.
                       {d.settings?.auth_settings_masked?.access_token
                         ? " Access token сохранён."
                         : " Access token ещё не задан."}

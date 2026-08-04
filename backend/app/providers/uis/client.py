@@ -1,4 +1,4 @@
-"""UIS Data API JSON-RPC client. Docs: uis-contract.md — read-only get.* + login.user."""
+"""UIS Data API JSON-RPC client. Docs: uis-contract.md — read-only get.*; auth via access_token."""
 
 from __future__ import annotations
 
@@ -33,8 +33,6 @@ class UisClient:
         self.page_limit = min(page_limit or contract.DEFAULT_LIMIT, contract.MAX_LIMIT)
         auth = connection.auth_settings or {}
         self._token = (auth.get(contract.AUTH_ACCESS_TOKEN) or "").strip() or None
-        self._login = (auth.get(contract.AUTH_LOGIN) or "").strip() or None
-        self._password = auth.get(contract.AUTH_PASSWORD) or None
         user_id = auth.get(contract.AUTH_USER_ID)
         self._user_id: int | None = None
         if user_id is not None and str(user_id).strip() != "":
@@ -87,30 +85,12 @@ class UisClient:
                     break
         raise ProviderTransportError(f"UIS transport failed: {last_exc}")
 
-    async def login_user(self) -> RawHttpResult:
-        if not self._login or not self._password:
+    def require_access_token(self) -> str:
+        if not self._token:
             raise ProviderAuthError(
-                "UIS requires access_token or login+password "
-                "(VERIFIED: login.user / permanent key)"
+                "UIS access_token is required (API key from UIS personal account)"
             )
-        return await self.call(
-            contract.METHOD_LOGIN_USER,
-            {"login": self._login, "password": self._password},
-        )
-
-    async def resolve_access_token(self) -> str:
-        """Prefer stored token; otherwise login.user and persist into auth_settings."""
-        if self._token:
-            return self._token
-        raw = await self.login_user()
-        from app.providers.uis.parser import parse_login
-
-        token, expire_at = parse_login(raw)
-        self._token = token
-        self.connection.auth_settings[contract.AUTH_ACCESS_TOKEN] = token
-        if expire_at is not None:
-            self.connection.auth_settings[contract.AUTH_SESSION_EXPIRE_AT] = expire_at
-        return token
+        return self._token
 
     def _auth_params(self, token: str, extra: dict[str, Any] | None = None) -> dict[str, Any]:
         params: dict[str, Any] = {contract.AUTH_ACCESS_TOKEN: token}
@@ -127,7 +107,7 @@ class UisClient:
         offset: int = 0,
         limit: int | None = None,
     ) -> RawHttpResult:
-        token = await self.resolve_access_token()
+        token = self.require_access_token()
         return await self.call(
             method,
             self._auth_params(
