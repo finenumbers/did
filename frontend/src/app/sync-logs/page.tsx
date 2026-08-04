@@ -59,12 +59,14 @@ export default function SyncPage() {
   const [cacheReady, setCacheReady] = useState<boolean | null>(null);
   const [cacheHint, setCacheHint] = useState<string | null>(null);
   const [downloadingDropped, setDownloadingDropped] = useState(false);
+  const [downloadingDebugLog, setDownloadingDebugLog] = useState(false);
 
   const isActive = run?.status === "pending" || run?.status === "running";
   const canStart = cacheReady === true && !starting && !isActive;
   const droppedExport = (run?.stats?.dropped_export || null) as DroppedExportMeta | null;
   const canDownloadDropped =
     !isActive && Boolean(droppedExport?.available) && !downloadingDropped;
+  const canDownloadDebugLog = Boolean(run) && !downloadingDebugLog;
 
   const loadLatest = useCallback(async () => {
     try {
@@ -148,6 +150,23 @@ export default function SyncPage() {
     }
   };
 
+  const downloadDebugLog = async () => {
+    setDownloadingDebugLog(true);
+    setError(null);
+    try {
+      const blob = await apiDownload("/api/v1/sync/debug.log");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "sync-latest.log";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось скачать лог");
+    } finally {
+      setDownloadingDebugLog(false);
+    }
+  };
+
   const startSync = async () => {
     setStarting(true);
     setError(null);
@@ -219,6 +238,18 @@ export default function SyncPage() {
           onClick={() => void downloadDroppedXlsx()}
         >
           {downloadingDropped ? "Скачивание…" : "Скачать отброшенные (XLSX)"}
+        </button>
+        <button
+          className="secondary"
+          disabled={!canDownloadDebugLog}
+          title={
+            canDownloadDebugLog
+              ? "Детальный лог текущей/последней синхронизации (можно скачать во время выполнения)"
+              : "Лог появится после запуска синхронизации"
+          }
+          onClick={() => void downloadDebugLog()}
+        >
+          {downloadingDebugLog ? "Скачивание…" : "Скачать лог"}
         </button>
         {cacheReady === false && (
           <span className="filters-meta" style={{ color: "var(--muted)" }}>

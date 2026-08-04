@@ -11,6 +11,10 @@ from app.modules.sync_engine.dropped_export import (
     dropped_xlsx_exists,
     dropped_xlsx_path,
 )
+from app.modules.sync_engine.run_file_log import (
+    sync_debug_log_exists,
+    sync_debug_log_path,
+)
 from app.modules.sync_engine.progress import build_initial_progress
 from app.modules.sync_engine.unified import (
     create_run,
@@ -121,6 +125,25 @@ def download_sync_dropped_xlsx() -> FileResponse:
         path,
         media_type=_XLSX_MEDIA,
         filename="sync-dropped-latest.xlsx",
+    )
+
+
+@router.get(
+    "/sync/debug.log",
+    response_class=FileResponse,
+    summary="Download latest sync debug log (overwritten each sync; partial while running)",
+)
+def download_sync_debug_log() -> FileResponse:
+    path = sync_debug_log_path()
+    if not sync_debug_log_exists():
+        raise ProviderError(
+            "Debug-лог синхронизации ещё не создан — выполните синхронизацию",
+            code="SYNC_DEBUG_LOG_MISSING",
+        )
+    return FileResponse(
+        path,
+        media_type="text/plain; charset=utf-8",
+        filename="sync-latest.log",
     )
 
 

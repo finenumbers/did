@@ -29,6 +29,7 @@ from app.modules.sync_engine.progress import (
     stage_for_provider_phase,
     stage_status,
 )
+from app.modules.sync_engine.run_file_log import begin_sync_debug_log, end_sync_debug_log
 from app.modules.sync_engine.run_logging import log_run
 from app.modules.sync_engine.service import SyncService
 from app.providers.dto.common import ConnectionConfig
@@ -249,6 +250,7 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
         run.progress = build_initial_progress()
     db.commit()
 
+    begin_sync_debug_log(run.id, triggered_by=run.triggered_by)
     begin_dropped_export()
     dropped_meta: dict[str, Any] = {"available": False}
     dropped_written = False
@@ -359,6 +361,15 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
             except Exception:
                 logger.exception("Best-effort dropped XLSX write on sync exit failed")
         end_dropped_export()
+        try:
+            db.refresh(run)
+            end_sync_debug_log(
+                status=run.status.value if run.status else None,
+                error_summary=run.error_summary,
+            )
+        except Exception:
+            logger.exception("Failed to close sync debug log")
+            end_sync_debug_log()
 
 
 def _finish_run(

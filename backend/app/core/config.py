@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     admin_api_token: str = ""
     # Latest-only XLSX of sync unmapped/duplicate rows (overwritten each unified sync)
     sync_dropped_xlsx_path: str = "/data/sync/sync_dropped_latest.xlsx"
+    # Latest-only detailed sync debug log (truncated at each new unified sync)
+    sync_debug_log_path: str = "/data/sync/sync_latest.log"
 
     @property
     def cors_origins_list(self) -> list[str]:

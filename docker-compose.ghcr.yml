@@ -31,6 +31,7 @@ services:
       ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-changeme-session-secret}
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
       SYNC_DROPPED_XLSX_PATH: /data/sync/sync_dropped_latest.xlsx
+      SYNC_DEBUG_LOG_PATH: /data/sync/sync_latest.log
     volumes:
       - did_sync_data:/data/sync
     ports:

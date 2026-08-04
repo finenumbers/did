@@ -98,3 +98,7 @@ Aurora free numbers load via plain **HTTP** to `bill.auroratelecom.ru:8080` (pub
 ## 8. Sync dropped XLSX volume
 
 Backend writes the latest unmapped/duplicate numbers report to `/data/sync/sync_dropped_latest.xlsx` (volume `did_sync_data`). Download from **Синхронизация** after a finished run. The file is overwritten on each new sync.
+
+## 8b. Sync debug log
+
+Backend writes a detailed sync debug log to `/data/sync/sync_latest.log` on the same volume. The file is **truncated at the start of every new sync** and flushed after each stage / progress line (partial download is valid while a sync is running). Download from **Синхронизация → Скачать лог**.

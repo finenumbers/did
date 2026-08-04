@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.sync import SyncRun
+from app.modules.sync_engine.run_file_log import get_sync_debug_log
 
 STAGE_DEFS: list[dict[str, str]] = [
     {"id": "prepare", "group": "Общее", "label": "Подготовка"},
@@ -111,6 +112,9 @@ class SyncProgressTracker:
         run.progress["current_stage_id"] = stage_id
         run.progress = deepcopy(run.progress)
         self._save(run)
+        fl = get_sync_debug_log()
+        if fl is not None:
+            fl.stage_begin(stage_id, detail)
 
     def detail(self, stage_id: str, detail: str) -> None:
         run = self._load()
@@ -118,6 +122,9 @@ class SyncProgressTracker:
         stage["detail"] = detail
         run.progress = deepcopy(run.progress)
         self._save(run)
+        fl = get_sync_debug_log()
+        if fl is not None:
+            fl.stage_progress(stage_id, detail=detail)
 
     def progress(
         self,
@@ -145,6 +152,16 @@ class SyncProgressTracker:
         stage["progress"] = prog
         run.progress = deepcopy(run.progress)
         self._save(run)
+        fl = get_sync_debug_log()
+        if fl is not None:
+            fl.stage_progress(
+                stage_id,
+                detail=detail,
+                substage=substage,
+                current=current,
+                total=total,
+                unit=unit,
+            )
 
     def end(self, stage_id: str, detail: str = "", *, status: str = "done") -> None:
         run = self._load()
@@ -155,6 +172,9 @@ class SyncProgressTracker:
             stage["detail"] = detail
         run.progress = deepcopy(run.progress)
         self._save(run)
+        fl = get_sync_debug_log()
+        if fl is not None:
+            fl.stage_end(stage_id, detail, status=status)
 
     def skip(self, stage_id: str, reason: str = "") -> None:
         self.end(stage_id, detail=reason, status="skipped")
