@@ -36,6 +36,46 @@ def _exc_summary(exc: BaseException, *, limit: int = 2000) -> str:
     return f"{type(exc).__name__}: {exc}"[:limit]
 
 
+def _number_reload_detail(
+    *,
+    fetched: int,
+    parsed: int,
+    upserted: int,
+) -> str:
+    """Human-readable free/purchased stage summary with drop breakdown."""
+    unmapped = max(0, int(fetched) - int(parsed))
+    duplicates = max(0, int(parsed) - int(upserted))
+    return (
+        f"fetched={fetched}, parsed={parsed}, upserted={upserted}, "
+        f"unmapped_dropped={unmapped}, duplicates_dropped={duplicates}"
+    )
+
+
+def _number_reload_stats(
+    *,
+    fetched: int,
+    parsed: int,
+    persist_stats: dict[str, Any],
+    previous: int,
+) -> dict[str, Any]:
+    upserted = int(persist_stats.get("upserted") or 0)
+    deduped = persist_stats.get("deduped_input")
+    if deduped is not None:
+        upserted_for_dupes = int(deduped)
+    else:
+        upserted_for_dupes = upserted
+    unmapped = max(0, int(fetched) - int(parsed))
+    duplicates = max(0, int(parsed) - upserted_for_dupes)
+    return {
+        **persist_stats,
+        "previous": previous,
+        "fetched": fetched,
+        "parsed": parsed,
+        "unmapped_dropped": unmapped,
+        "duplicates_dropped": duplicates,
+    }
+
+
 class SyncService:
     def __init__(self, db: Session):
         self.db = db
@@ -354,27 +394,26 @@ class SyncService:
                     )
                 else:
                     persist_stats = {}
+                parsed = int(result.parsed) if result.parsed else len(numbers)
+                fetched = int(result.fetched)
+                stats["categories"]["free_numbers"] = _number_reload_stats(
+                    fetched=fetched,
+                    parsed=parsed,
+                    persist_stats=persist_stats,
+                    previous=previous,
+                )
                 await _free_progress(
                     f"Записано {persist_stats.get('upserted', 0)}",
                     persist_stats.get("upserted"),
                     len(numbers),
                 )
-                stats["categories"]["free_numbers"] = {
-                    **persist_stats,
-                    "previous": previous,
-                }
-                log_job(
-                    self.db,
-                    job.id,
-                    SyncLogLevel.info,
-                    f"Free numbers fetched={result.fetched}",
+                free_detail = _number_reload_detail(
+                    fetched=fetched,
+                    parsed=parsed,
+                    upserted=int(persist_stats.get("upserted") or 0),
                 )
+                log_job(self.db, job.id, SyncLogLevel.info, f"Free numbers {free_detail}")
                 self.db.commit()
-                free_detail = f"fetched={result.fetched}"
-                if isinstance(stats.get("categories", {}).get("free_numbers"), dict):
-                    free_detail += (
-                        f", upserted={stats['categories']['free_numbers'].get('upserted', 0)}"
-                    )
                 await _hook("free", "end", free_detail)
             else:
                 self.db.commit()
@@ -459,23 +498,23 @@ class SyncService:
                     )
                 else:
                     persist_stats = {}
-                stats["categories"]["purchased_numbers"] = {
-                    **persist_stats,
-                    "previous": previous,
-                }
+                parsed = int(result.parsed) if result.parsed else len(numbers)
+                fetched = int(result.fetched)
+                stats["categories"]["purchased_numbers"] = _number_reload_stats(
+                    fetched=fetched,
+                    parsed=parsed,
+                    persist_stats=persist_stats,
+                    previous=previous,
+                )
+                purch_detail = _number_reload_detail(
+                    fetched=fetched,
+                    parsed=parsed,
+                    upserted=int(persist_stats.get("upserted") or 0),
+                )
                 log_job(
-                    self.db,
-                    job.id,
-                    SyncLogLevel.info,
-                    f"Purchased numbers fetched={result.fetched}",
+                    self.db, job.id, SyncLogLevel.info, f"Purchased numbers {purch_detail}"
                 )
                 self.db.commit()
-                purch_detail = f"fetched={result.fetched}"
-                if isinstance(stats.get("categories", {}).get("purchased_numbers"), dict):
-                    purch_detail += (
-                        ", upserted="
-                        f"{stats['categories']['purchased_numbers'].get('upserted', 0)}"
-                    )
                 await _hook("purchased", "end", purch_detail)
             else:
                 self.db.commit()
