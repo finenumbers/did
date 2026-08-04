@@ -49,5 +49,7 @@ class SyncResult:
     warnings: list[str] = field(default_factory=list)
     limitations: list[SyncLimitation] = field(default_factory=list)
     items: list[Any] = field(default_factory=list)
+    # Raw API items that failed to produce provider_number_key / NormalizedNumber
+    unmapped_raw: list[dict[str, Any]] = field(default_factory=list)
     raw_envelopes: list[RawHttpResult] = field(default_factory=list)
     diagnostics: DiagnosticsResult | None = None

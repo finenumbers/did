@@ -169,8 +169,9 @@ class RunexisProvider(AbstractProvider):
         *,
         inventory_kind: InventoryKind,
         city_lookup: dict[str, tuple],
-    ) -> list:
+    ) -> tuple[list, list[dict]]:
         mapped = []
+        unmapped_raw: list[dict] = []
         for item in items:
             region_name = item.region_name
             region_id = item.region_external_id
@@ -188,7 +189,9 @@ class RunexisProvider(AbstractProvider):
             )
             if mapped_item:
                 mapped.append(mapped_item)
-        return mapped
+            else:
+                unmapped_raw.append(item.raw_payload)
+        return mapped, unmapped_raw
 
     async def sync_free_numbers(self, connection: ConnectionConfig, **kwargs: Any) -> SyncResult:
         # VERIFIED sole source: Numbering API search_numbers (Runexis-Numbering-API.docx)
@@ -223,7 +226,7 @@ class RunexisProvider(AbstractProvider):
             else:
                 dropped_non_free += 1
         city_lookup: dict[str, tuple] = kwargs.get("city_lookup") or {}
-        mapped = self._map_items(
+        mapped, unmapped_raw = self._map_items(
             free_parsed, inventory_kind=InventoryKind.free, city_lookup=city_lookup
         )
         warnings = [
@@ -246,6 +249,7 @@ class RunexisProvider(AbstractProvider):
             fetched=len(free_parsed),
             parsed=len(mapped),
             items=mapped,
+            unmapped_raw=unmapped_raw,
             raw_envelopes=envelopes,
             warnings=warnings,
         )
@@ -261,12 +265,13 @@ class RunexisProvider(AbstractProvider):
             if not parser.is_free_management_item(p)
         ]
         city_lookup: dict[str, tuple] = kwargs.get("city_lookup") or {}
-        mapped = self._map_items(
+        mapped, unmapped_raw = self._map_items(
             parsed, inventory_kind=InventoryKind.purchased, city_lookup=city_lookup
         )
         return SyncResult(
             fetched=len(parsed),
             parsed=len(mapped),
             items=mapped,
+            unmapped_raw=unmapped_raw,
             raw_envelopes=envelopes,
         )

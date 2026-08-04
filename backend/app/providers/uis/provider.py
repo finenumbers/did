@@ -91,15 +91,19 @@ class UisProvider(AbstractProvider):
             on_progress=on_progress,
         )
         mapped = []
+        unmapped_raw: list[dict] = []
         for item in items:
             parsed = parser.parse_available_item(item)
             mapped_item = mapper.map_number(parsed, inventory_kind=InventoryKind.free)
             if mapped_item:
                 mapped.append(mapped_item)
+            else:
+                unmapped_raw.append(item)
         return SyncResult(
             fetched=len(items),
             parsed=len(mapped),
             items=mapped,
+            unmapped_raw=unmapped_raw,
             raw_envelopes=envelopes,
         )
 
@@ -113,14 +117,18 @@ class UisProvider(AbstractProvider):
             on_progress=on_progress,
         )
         mapped = []
+        unmapped_raw: list[dict] = []
         for item in items:
             parsed = parser.parse_virtual_item(item)
             mapped_item = mapper.map_number(parsed, inventory_kind=InventoryKind.purchased)
             if mapped_item:
                 mapped.append(mapped_item)
+            else:
+                unmapped_raw.append(item)
         return SyncResult(
             fetched=len(items),
             parsed=len(mapped),
             items=mapped,
+            unmapped_raw=unmapped_raw,
             raw_envelopes=envelopes,
         )

@@ -90,6 +90,7 @@ class SipOutProvider(AbstractProvider):
         parsed = parser.parse_number_list(raw)
         city_lookup: dict[str, tuple] = kwargs.get("city_lookup") or {}
         mapped = []
+        unmapped_raw: list[dict] = []
         for item in parsed:
             city_name = region_name = region_id = None
             if item.city_external_id and item.city_external_id in city_lookup:
@@ -106,10 +107,13 @@ class SipOutProvider(AbstractProvider):
             )
             if mapped_item:
                 mapped.append(mapped_item)
+            else:
+                unmapped_raw.append(item.raw_payload)
         return SyncResult(
             fetched=len(parsed),
             parsed=len(mapped),
             items=mapped,
+            unmapped_raw=unmapped_raw,
             raw_envelopes=[raw],
             warnings=["Item fields are EXAMPLE-CONFIRMED only"] if mapped else [],
         )
@@ -121,6 +125,7 @@ class SipOutProvider(AbstractProvider):
         parsed = parser.parse_number_list(raw)
         city_lookup: dict[str, tuple] = kwargs.get("city_lookup") or {}
         mapped = []
+        unmapped_raw: list[dict] = []
         for item in parsed:
             city_name = region_name = region_id = None
             if item.city_external_id and item.city_external_id in city_lookup:
@@ -137,9 +142,12 @@ class SipOutProvider(AbstractProvider):
             )
             if mapped_item:
                 mapped.append(mapped_item)
+            else:
+                unmapped_raw.append(item.raw_payload)
         return SyncResult(
             fetched=len(parsed),
             parsed=len(mapped),
             items=mapped,
+            unmapped_raw=unmapped_raw,
             raw_envelopes=[raw],
         )

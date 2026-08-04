@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.models.enums import InventoryKind, ProviderCode, SyncJobStatus, SyncLogLevel
 from app.models.providers import Provider
 from app.models.sync import SyncJob
+from app.modules.sync_engine.dropped_export import record_number_drops
 from app.modules.sync_engine.logging import log_job
 from app.modules.sync_engine.modes import SyncMode
 from app.modules.sync_engine.persist import (
@@ -326,6 +327,12 @@ class SyncService:
                     stats["limitations"] = limitations
                     return stats
 
+                record_number_drops(
+                    provider=provider.code.value,
+                    inventory_kind=InventoryKind.free.value,
+                    unmapped_raw=list(result.unmapped_raw or []),
+                    numbers=numbers,
+                )
                 await _free_progress("Буфер → каталог…", 0, len(numbers))
                 log_job(
                     self.db,
@@ -463,6 +470,12 @@ class SyncService:
                     stats["limitations"] = limitations
                     return stats
 
+                record_number_drops(
+                    provider=provider.code.value,
+                    inventory_kind=InventoryKind.purchased.value,
+                    unmapped_raw=list(result.unmapped_raw or []),
+                    numbers=numbers,
+                )
                 log_job(
                     self.db,
                     job.id,

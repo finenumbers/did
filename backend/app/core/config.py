@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     admin_session_secret: str = ""
     # Optional machine token (Bearer) in addition to login sessions
     admin_api_token: str = ""
+    # Latest-only XLSX of sync unmapped/duplicate rows (overwritten each unified sync)
+    sync_dropped_xlsx_path: str = "/data/sync/sync_dropped_latest.xlsx"
 
     @property
     def cors_origins_list(self) -> list[str]:

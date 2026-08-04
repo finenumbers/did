@@ -97,12 +97,17 @@ class FinenumbersProvider(AbstractProvider):
                     "ranges": len(ranges),
                 },
             )
+        mapped = [n for n in numbers if n.provider_number_key]
+        unmapped_raw = [
+            n.raw_payload for n in numbers if not n.provider_number_key and n.raw_payload
+        ]
         return SyncResult(
             fetched=len(ranges),
-            parsed=len(numbers),
-            items=numbers,
+            parsed=len(mapped),
+            items=mapped,
+            unmapped_raw=unmapped_raw,
             raw_envelopes=envelopes,
-            warnings=[f"Expanded {len(ranges)} ranges into {len(numbers)} numbers"],
+            warnings=[f"Expanded {len(ranges)} ranges into {len(mapped)} numbers"],
         )
 
     async def sync_purchased_numbers(self, connection: ConnectionConfig, **kwargs: Any) -> SyncResult:

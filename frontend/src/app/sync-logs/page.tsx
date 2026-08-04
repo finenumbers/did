@@ -1,8 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ApiError, apiFetch } from "@/lib/api/client";
+import { ApiError, apiFetch, apiUrl } from "@/lib/api/client";
 import type { SyncRun, SyncStage } from "@/lib/types/api";
+
+type DroppedExportMeta = {
+  available?: boolean;
+  unmapped?: number;
+  duplicates?: number;
+};
 
 type SyncLogRow = {
   id: string;
@@ -52,9 +58,13 @@ export default function SyncPage() {
   const [error, setError] = useState<string | null>(null);
   const [cacheReady, setCacheReady] = useState<boolean | null>(null);
   const [cacheHint, setCacheHint] = useState<string | null>(null);
+  const [downloadingDropped, setDownloadingDropped] = useState(false);
 
   const isActive = run?.status === "pending" || run?.status === "running";
   const canStart = cacheReady === true && !starting && !isActive;
+  const droppedExport = (run?.stats?.dropped_export || null) as DroppedExportMeta | null;
+  const canDownloadDropped =
+    !isActive && Boolean(droppedExport?.available) && !downloadingDropped;
 
   const loadLatest = useCallback(async () => {
     try {
@@ -121,6 +131,33 @@ export default function SyncPage() {
     return () => clearInterval(t);
   }, [isActive, run?.id, loadLatest, loadLogs]);
 
+  const downloadDroppedXlsx = async () => {
+    setDownloadingDropped(true);
+    setError(null);
+    try {
+      const res = await fetch(apiUrl("/api/v1/sync/dropped.xlsx"), { cache: "no-store" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const msg =
+          (data as { error?: { message?: string } })?.error?.message ||
+          (data as { detail?: string })?.detail ||
+          res.statusText ||
+          "Ошибка скачивания";
+        throw new Error(msg);
+      }
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "sync-dropped-latest.xlsx";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось скачать отчёт");
+    } finally {
+      setDownloadingDropped(false);
+    }
+  };
+
   const startSync = async () => {
     setStarting(true);
     setError(null);
@@ -180,6 +217,18 @@ export default function SyncPage() {
           }}
         >
           Обновить
+        </button>
+        <button
+          className="secondary"
+          disabled={!canDownloadDropped}
+          title={
+            canDownloadDropped
+              ? `unmapped=${droppedExport?.unmapped ?? 0}, duplicates=${droppedExport?.duplicates ?? 0}`
+              : "Отчёт появится после завершения синхронизации"
+          }
+          onClick={() => void downloadDroppedXlsx()}
+        >
+          {downloadingDropped ? "Скачивание…" : "Скачать отброшенные (XLSX)"}
         </button>
         {cacheReady === false && (
           <span className="filters-meta" style={{ color: "var(--muted)" }}>

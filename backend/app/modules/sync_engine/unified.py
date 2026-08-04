@@ -16,6 +16,11 @@ from app.core.db import SessionLocal
 from app.models.enums import ProviderCode, SyncJobStatus, SyncJobType, SyncLogLevel
 from app.models.providers import Provider
 from app.models.sync import SyncJob, SyncRun
+from app.modules.sync_engine.dropped_export import (
+    begin_dropped_export,
+    end_dropped_export,
+    write_dropped_xlsx,
+)
 from app.modules.sync_engine.modes import SyncMode
 from app.modules.sync_engine.progress import (
     SyncProgressTracker,
@@ -192,86 +197,106 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
         run.progress = build_initial_progress()
     db.commit()
 
-    log_run(db, run.id, SyncLogLevel.info, "Unified sync started")
+    begin_dropped_export()
+    dropped_meta: dict[str, Any] = {"available": False}
+    try:
+        log_run(db, run.id, SyncLogLevel.info, "Unified sync started")
 
-    tracker.begin("prepare", "Проверка подключений провайдеров")
-    providers = {
-        p.code: p
-        for p in db.scalars(select(Provider).options(joinedload(Provider.connection))).all()
-    }
-    missing = [c.value for c in PROVIDER_ORDER if c not in providers]
-    if missing:
-        tracker.fail("prepare", f"Нет провайдеров в БД: {', '.join(missing)}")
-        _finish_run(db, run, SyncJobStatus.failed, f"Missing providers: {missing}")
-        return
-    tracker.end("prepare", "Провайдеры найдены")
+        tracker.begin("prepare", "Проверка подключений провайдеров")
+        providers = {
+            p.code: p
+            for p in db.scalars(select(Provider).options(joinedload(Provider.connection))).all()
+        }
+        missing = [c.value for c in PROVIDER_ORDER if c not in providers]
+        if missing:
+            tracker.fail("prepare", f"Нет провайдеров в БД: {', '.join(missing)}")
+            try:
+                dropped_meta = write_dropped_xlsx()
+            except Exception:
+                logger.exception("Failed to write sync dropped XLSX")
+            _finish_run(db, run, SyncJobStatus.failed, f"Missing providers: {missing}")
+            return
+        tracker.end("prepare", "Провайдеры найдены")
 
-    provider_failures: list[str] = []
-    provider_ok = 0
-    category_stats: dict[str, Any] = {}
+        provider_failures: list[str] = []
+        provider_ok = 0
+        category_stats: dict[str, Any] = {}
 
-    for code in PROVIDER_ORDER:
-        provider = providers[code]
-        if not provider.is_enabled:
-            for phase in ("dictionaries", "free", "purchased"):
-                sid = stage_for_provider_phase(code.value, phase)
-                if sid:
-                    tracker.skip(sid, "provider disabled")
-            log_run(db, run.id, SyncLogLevel.info, f"Provider {code.value}: skipped (disabled)")
-            continue
-        ok = await _sync_provider(
-            db,
-            run=run,
-            tracker=tracker,
-            provider=provider,
-            category_stats=category_stats,
+        for code in PROVIDER_ORDER:
+            provider = providers[code]
+            if not provider.is_enabled:
+                for phase in ("dictionaries", "free", "purchased"):
+                    sid = stage_for_provider_phase(code.value, phase)
+                    if sid:
+                        tracker.skip(sid, "provider disabled")
+                log_run(
+                    db, run.id, SyncLogLevel.info, f"Provider {code.value}: skipped (disabled)"
+                )
+                continue
+            ok = await _sync_provider(
+                db,
+                run=run,
+                tracker=tracker,
+                provider=provider,
+                category_stats=category_stats,
+            )
+            if ok:
+                provider_ok += 1
+            else:
+                provider_failures.append(code.value)
+
+        await _run_operator_enrichment(
+            db, run=run, tracker=tracker, category_stats=category_stats
         )
-        if ok:
-            provider_ok += 1
+
+        tracker.begin("finalize", "Завершение")
+        try:
+            dropped_meta = write_dropped_xlsx()
+        except Exception:
+            logger.exception("Failed to write sync dropped XLSX")
+            dropped_meta = {"available": False, "error": "write_failed"}
+
+        summary = {
+            "providers_ok": provider_ok,
+            "providers_failed": provider_failures,
+            "categories": category_stats,
+            "dropped_export": dropped_meta,
+        }
+        run.stats = summary
+        db.commit()
+        tracker.end(
+            "finalize",
+            f"ok={provider_ok}, failed={len(provider_failures)}",
+        )
+
+        if provider_failures and provider_ok == 0:
+            status = SyncJobStatus.failed
+            err = "All providers failed: " + ", ".join(provider_failures)
+        elif provider_failures:
+            status = SyncJobStatus.partial
+            err = "Partial: failed " + ", ".join(provider_failures)
         else:
-            provider_failures.append(code.value)
+            status = SyncJobStatus.success
+            err = None
 
-    await _run_operator_enrichment(db, run=run, tracker=tracker, category_stats=category_stats)
+        db.refresh(run)
+        if (
+            stage_status(run.progress, "operator_enrichment") == "failed"
+            and status == SyncJobStatus.success
+        ):
+            status = SyncJobStatus.partial
+            err = "operator enrichment failed"
 
-    tracker.begin("finalize", "Завершение")
-    summary = {
-        "providers_ok": provider_ok,
-        "providers_failed": provider_failures,
-        "categories": category_stats,
-    }
-    run.stats = summary
-    db.commit()
-    tracker.end(
-        "finalize",
-        f"ok={provider_ok}, failed={len(provider_failures)}",
-    )
-
-    if provider_failures and provider_ok == 0:
-        status = SyncJobStatus.failed
-        err = "All providers failed: " + ", ".join(provider_failures)
-    elif provider_failures:
-        status = SyncJobStatus.partial
-        err = "Partial: failed " + ", ".join(provider_failures)
-    else:
-        status = SyncJobStatus.success
-        err = None
-
-    db.refresh(run)
-    if (
-        stage_status(run.progress, "operator_enrichment") == "failed"
-        and status == SyncJobStatus.success
-    ):
-        status = SyncJobStatus.partial
-        err = "operator enrichment failed"
-
-    _finish_run(db, run, status, err)
-    log_run(
-        db,
-        run.id,
-        SyncLogLevel.info if status == SyncJobStatus.success else SyncLogLevel.warning,
-        f"Unified sync finished status={status.value}",
-        summary,
-    )
+        _finish_run(db, run, status, err)
+        log_run(
+            db,
+            run.id,
+            SyncLogLevel.info if status == SyncJobStatus.success else SyncLogLevel.warning,
+            f"Unified sync finished status={status.value}",
+            summary,
+        )
+    finally:
+        end_dropped_export()
 
 
 def _finish_run(

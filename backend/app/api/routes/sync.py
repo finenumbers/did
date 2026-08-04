@@ -1,24 +1,35 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.models.sync import SyncRun, SyncRunLog
+from app.modules.sync_engine.dropped_export import (
+    dropped_xlsx_exists,
+    dropped_xlsx_path,
+)
 from app.modules.sync_engine.progress import build_initial_progress
-from app.modules.sync_engine.unified import create_run, get_latest_run, spawn_unified_run
+from app.modules.sync_engine.unified import (
+    create_run,
+    get_latest_run,
+    spawn_unified_run,
+)
 from app.providers.errors import ProviderError
 from app.schemas.common import Page
 from app.schemas.sync import (
+    StageProgressOut,
     SyncLogOut,
     SyncProgressOut,
     SyncRunOut,
     SyncStageOut,
-    StageProgressOut,
 )
 
 router = APIRouter(tags=["Sync"])
+
+_XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
 def _run_out(run: SyncRun) -> SyncRunOut:
@@ -92,6 +103,25 @@ def get_unified_sync_run(run_id: UUID, db: Session = Depends(get_db)) -> SyncRun
     if not run:
         raise ProviderError("Sync run not found", code="SYNC_RUN_NOT_FOUND")
     return _run_out(run)
+
+
+@router.get(
+    "/sync/dropped.xlsx",
+    response_class=FileResponse,
+    summary="Download latest sync dropped-numbers XLSX (unmapped + duplicates)",
+)
+def download_sync_dropped_xlsx() -> FileResponse:
+    path = dropped_xlsx_path()
+    if not dropped_xlsx_exists():
+        raise ProviderError(
+            "Отчёт по отброшенным номерам ещё не создан — выполните синхронизацию",
+            code="SYNC_DROPPED_EXPORT_MISSING",
+        )
+    return FileResponse(
+        path,
+        media_type=_XLSX_MEDIA,
+        filename="sync-dropped-latest.xlsx",
+    )
 
 
 @router.get(
