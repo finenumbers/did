@@ -259,7 +259,7 @@ export default function SyncPage() {
       )}
 
       {run && (
-        <div className="grid-2">
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div className="panel">
             <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>Этапы</h2>
             {run.error_summary && (
