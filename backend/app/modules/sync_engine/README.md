@@ -16,7 +16,7 @@
 - Schedule at/after 00:00 Europe/Moscow when enabled and min PSTN INN cache is ready (`last_fired` after lock acquire; fail-closed if mark fails)
 - Postgres advisory lock + unique partial index: one active sync at a time (single backend replica assumed)
 - Orphan reclaim: `running` SyncRun with free advisory lock is marked failed so schedule can retry
-- Unlock failure detaches the DB connection (never return a locked conn to the pool)
+- Unlock failure detaches the DB connection (never return a locked conn to the pool; no pool-wide unlock_all on checkin)
 - Providers in unified order: SipOut, Runexis, UIS, Aurora (free only), Finenumbers
 - UIS: hard-fail if `total_items` exceeds what pagination can fetch within `MAX_OFFSET` (no silent truncate)
 - Known limitation: free cutover may commit before a purchased wipe-guard failure (split inventory for that provider)
