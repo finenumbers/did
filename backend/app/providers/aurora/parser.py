@@ -75,10 +75,25 @@ def decode_csv_bytes(data: bytes) -> tuple[str, str]:
         ) from exc
 
 
+def normalize_row(row: list[str], *, filename: str | None = None) -> list[str]:
+    """Normalize provider row shape before the 5-column contract check.
+
+    MSK.csv currently inserts a status column (e.g. СВОБОДЕН) at index 1.
+    Drop that column when the row has exactly 6 fields so classic mapping applies.
+    """
+    if not row:
+        return row
+    name = (filename or "").rsplit("/", 1)[-1].lower()
+    if name == "msk.csv" and len(row) == 6:
+        return [row[0], *row[2:]]
+    return row
+
+
 def parse_probe_bytes(
     data: bytes,
     *,
     truncated: bool = False,
+    filename: str | None = None,
 ) -> tuple[ParsedNumberItem | None, dict[str, Any]]:
     """Parse first valid free-number row from a CSV head sample."""
     text, encoding = decode_csv_bytes(data)
@@ -93,9 +108,10 @@ def parse_probe_bytes(
         if not row or all(not (c or "").strip() for c in row):
             continue
         scanned += 1
-        if len(row) != contract.EXPECTED_COLUMNS:
+        normalized = normalize_row(row, filename=filename)
+        if len(normalized) != contract.EXPECTED_COLUMNS:
             continue
-        parsed = parse_row(row)
+        parsed = parse_row(normalized, original_column_count=len(row))
         if parsed:
             return parsed, {
                 "encoding": encoding,
@@ -115,7 +131,11 @@ def parse_csv_text(text: str) -> list[list[str]]:
     return rows
 
 
-def row_to_raw_payload(row: list[str]) -> dict[str, Any]:
+def row_to_raw_payload(
+    row: list[str],
+    *,
+    original_column_count: int | None = None,
+) -> dict[str, Any]:
     phone = row[contract.COL_PHONE] if len(row) > contract.COL_PHONE else ""
     number_type = row[contract.COL_TYPE] if len(row) > contract.COL_TYPE else ""
     fee = row[contract.COL_FEE] if len(row) > contract.COL_FEE else ""
@@ -124,7 +144,10 @@ def row_to_raw_payload(row: list[str]) -> dict[str, Any]:
         row[contract.COL_DISPLAY_MASK] if len(row) > contract.COL_DISPLAY_MASK else ""
     )
     city_name, region_name = parse_region(region)
-    return {
+    column_count = (
+        original_column_count if original_column_count is not None else len(row)
+    )
+    payload: dict[str, Any] = {
         "phone_raw": phone,
         "number_type": number_type,
         "period_price_raw": fee,
@@ -132,14 +155,21 @@ def row_to_raw_payload(row: list[str]) -> dict[str, Any]:
         "display_mask": display_mask,
         "city_name": city_name,
         "region_name": region_name,
-        "column_count": len(row),
+        "column_count": column_count,
     }
+    if original_column_count == 6 and len(row) == contract.EXPECTED_COLUMNS:
+        payload["dropped_status_column"] = True
+    return payload
 
 
-def parse_row(row: list[str]) -> ParsedNumberItem | None:
+def parse_row(
+    row: list[str],
+    *,
+    original_column_count: int | None = None,
+) -> ParsedNumberItem | None:
     if len(row) < contract.EXPECTED_COLUMNS:
         return None
-    payload = row_to_raw_payload(row)
+    payload = row_to_raw_payload(row, original_column_count=original_column_count)
     msisdn = normalize_phone(payload["phone_raw"])
     if not msisdn or not (len(msisdn) == 11 and msisdn.startswith("7")):
         return None
@@ -157,7 +187,12 @@ def parse_row(row: list[str]) -> ParsedNumberItem | None:
     )
 
 
-def parse_free_csv(raw: RawHttpResult, *, raw_bytes: bytes | None = None) -> tuple[
+def parse_free_csv(
+    raw: RawHttpResult,
+    *,
+    raw_bytes: bytes | None = None,
+    filename: str | None = None,
+) -> tuple[
     list[ParsedNumberItem],
     list[dict[str, Any]],
     dict[str, Any],
@@ -170,19 +205,28 @@ def parse_free_csv(raw: RawHttpResult, *, raw_bytes: bytes | None = None) -> tup
     rows = parse_csv_text(text)
     items: list[ParsedNumberItem] = []
     unmapped: list[dict[str, Any]] = []
+    source_name = filename or contract.csv_filename(raw.request_url or "")
     for row in rows:
-        if len(row) != contract.EXPECTED_COLUMNS:
-            unmapped.append(row_to_raw_payload(row) if row else {"column_count": 0})
+        normalized = normalize_row(row, filename=source_name)
+        if len(normalized) != contract.EXPECTED_COLUMNS:
+            unmapped.append(
+                row_to_raw_payload(row, original_column_count=len(row))
+                if row
+                else {"column_count": 0}
+            )
             continue
-        parsed = parse_row(row)
+        parsed = parse_row(normalized, original_column_count=len(row))
         if parsed:
             items.append(parsed)
         else:
-            unmapped.append(row_to_raw_payload(row))
+            unmapped.append(
+                row_to_raw_payload(normalized, original_column_count=len(row))
+            )
     meta = {
         "encoding": encoding,
         "row_count": len(rows),
         "parsed": len(items),
         "unmapped": len(unmapped),
+        "file": source_name or None,
     }
     return items, unmapped, meta

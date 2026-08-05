@@ -66,9 +66,11 @@ class AuroraProvider(AbstractProvider):
                     details=probe,
                     raw=raw,
                 )
+            probe_name = contract.csv_filename(raw.request_url or client.csv_url)
             sample, meta = parser.parse_probe_bytes(
                 client.raw_bytes(raw),
                 truncated=bool((raw.body_json or {}).get("truncated")),
+                filename=probe_name,
             )
             if not sample:
                 return DiagnosticsResult(
@@ -135,8 +137,6 @@ class AuroraProvider(AbstractProvider):
         unmapped_raw: list[dict[str, Any]] = []
         file_metas: list[dict[str, Any]] = []
         envelopes: list[RawHttpResult] = []
-        seen_msisdn: set[str] = set()
-        duplicates = 0
         cumulative_rows = 0
 
         for idx, url in enumerate(urls, start=1):
@@ -156,7 +156,9 @@ class AuroraProvider(AbstractProvider):
             )
             try:
                 parsed_items, file_unmapped, meta = parser.parse_free_csv(
-                    raw, raw_bytes=client.raw_bytes(raw)
+                    raw,
+                    raw_bytes=client.raw_bytes(raw),
+                    filename=fname,
                 )
             except ProviderParseError as exc:
                 raise ProviderParseError(
@@ -207,22 +209,12 @@ class AuroraProvider(AbstractProvider):
                 )
             )
             unmapped_raw.extend(file_unmapped)
-
-            kept = 0
-            for item in parsed_items:
-                msisdn = item.msisdn or ""
-                if msisdn and msisdn in seen_msisdn:
-                    duplicates += 1
-                    continue
-                if msisdn:
-                    seen_msisdn.add(msisdn)
-                all_parsed.append(item)
-                kept += 1
+            all_parsed.extend(parsed_items)
 
             await emit_progress(
                 on_progress,
                 (
-                    f"Aurora: {fname} разобрано {kept} "
+                    f"Aurora: {fname} разобрано {len(parsed_items)} "
                     f"(encoding={meta.get('encoding')}, rows={row_count})"
                 ),
                 cumulative_rows,
@@ -239,17 +231,10 @@ class AuroraProvider(AbstractProvider):
 
         await emit_progress(
             on_progress,
-            f"Aurora: итого {len(mapped)} номеров (files={total_files}, dupes={duplicates})",
+            f"Aurora: итого {len(mapped)} номеров (files={total_files})",
             len(mapped),
             cumulative_rows or None,
         )
-        if duplicates:
-            logger.warning(
-                "Aurora CSV merge duplicates_skipped=%s unique=%s files=%s",
-                duplicates,
-                len(mapped),
-                total_files,
-            )
 
         return SyncResult(
             fetched=cumulative_rows,
@@ -259,7 +244,6 @@ class AuroraProvider(AbstractProvider):
             raw_envelopes=envelopes,
             warnings=[
                 f"files={total_files}",
-                f"duplicates_skipped={duplicates}",
                 f"unmapped={len(unmapped_raw)}",
                 *[f"{m['file']}={m['parsed']}" for m in file_metas],
             ],

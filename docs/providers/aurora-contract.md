@@ -21,7 +21,7 @@ Sources: [`aurora/SOURCE.md`](aurora/SOURCE.md) and [`aurora/raw/sample.csv`](au
   - directory URL → that prefix + fixed file list
   - legacy single `*.csv` URL (incl. old `all_free.csv`) → **parent directory** + fixed file list (the named file itself is not fetched)
 - Fail-closed: any file HTTP error / size cap / parse failure fails the whole free stage (no partial catalog cutover)
-- Merge: concatenate rows; dedupe by MSISDN (first file wins)
+- Merge: concatenate all mapped rows from regional files; catalog dedupe by MSISDN happens in the sync engine (**last wins**). Cross-file duplicates are exported on the Sync dropped XLSX `duplicates` sheet (same path as UIS).
 - Each successful sync fully replaces Aurora free catalog; row count may shrink or grow vs previous run (no size-ratio wipe guard). Sync UI shows was/became counts.
 
 ## Encoding / CSV shape — VERIFIED (live)
@@ -32,17 +32,19 @@ Sources: [`aurora/SOURCE.md`](aurora/SOURCE.md) and [`aurora/raw/sample.csv`](au
 | Delimiter | `;` |
 | Header row | **none** |
 | Quoting | RFC-ish CSV; column 1 typically quoted (`"+7 (…)"`) |
-| Column count | **5** per row |
+| Column count | **5** per row (classic). **`MSK.csv` may have 6 columns** with a status field at index 1 (e.g. `СВОБОДЕН`); that column is ignored and the remaining five map as below |
 
 ## Columns — VERIFIED (live)
 
 | Index | Meaning | Example |
 |---|---|---|
 | 0 | Phone (display-formatted) | `+7 (3652) 777007` |
-| 1 | Beauty / tariff type | `ПЛАТИНОВЫЙ`, `ПРОСТОЙ`, … |
+| 1 | Beauty / tariff type (`MSK.csv`: after dropping status col) | `ПЛАТИНОВЫЙ`, `ПРОСТОЙ`, … |
 | 2 | Period fee text | `75990 Руб.` or `ДОГОВОРНАЯ` |
 | 3 | Geo text | `г. Симферополь\|Республика Крым` or `г. Москва` or `Российская Федерация` |
 | 4 | Display mask description | `[ AAA-XXX - 3 одинаковых в начале ] …` |
+
+`MSK.csv` 6-column layout (live): `phone; status; type; fee; geo; display_mask` — status discarded before mapping.
 
 ## Capabilities
 

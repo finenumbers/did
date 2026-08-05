@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ApiError, apiDownload, apiFetch } from "@/lib/api/client";
 import type { SyncRun, SyncStage } from "@/lib/types/api";
 
@@ -21,10 +21,93 @@ type InventorySummaryRow = {
   limited?: boolean;
 };
 
+/** Thousands with regular spaces: 31771 → "31 771". */
+function formatCount(value: number | string): string {
+  const n = typeof value === "number" ? value : Number(String(value).replace(/\s/g, ""));
+  if (!Number.isFinite(n)) return String(value);
+  const sign = n < 0 ? "-" : "";
+  const abs = Math.trunc(Math.abs(n));
+  return sign + String(abs).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
+
 function formatDelta(delta: number): string {
-  if (delta > 0) return `+${delta.toLocaleString()}`;
-  if (delta < 0) return delta.toLocaleString();
+  if (delta > 0) return `+${formatCount(delta)}`;
+  if (delta < 0) return formatCount(delta);
   return "0";
+}
+
+function formatPlainNumbers(text: string): string {
+  return text.replace(/\d+/g, (m) => formatCount(m));
+}
+
+function renderStageDetail(s: SyncStage): ReactNode {
+  const parts: string[] = [];
+  if (s.detail) parts.push(s.detail);
+  if (s.substage && s.substage !== s.detail) parts.push(s.substage);
+  const cur = s.progress?.current;
+  const tot = s.progress?.total;
+  if (cur != null && tot != null) {
+    parts.push(
+      `${formatCount(cur)} / ${formatCount(tot)}${s.progress?.unit ? ` ${s.progress.unit}` : ""}`,
+    );
+  } else if (cur != null) {
+    parts.push(formatCount(cur));
+  }
+  const raw = parts.filter(Boolean).join(" · ");
+  if (!raw) return "—";
+
+  // Tokenize known metrics / «Записано» so we can style them; format other digits too.
+  const tokenRe =
+    /(unmapped_dropped=\d+|duplicates_dropped=\d+|Записано\s+\d+|\d+)/g;
+  const nodes: ReactNode[] = [];
+  let last = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+  while ((match = tokenRe.exec(raw)) !== null) {
+    if (match.index > last) {
+      nodes.push(raw.slice(last, match.index));
+    }
+    const tok = match[0];
+    if (tok.startsWith("unmapped_dropped=")) {
+      const n = Number(tok.split("=")[1]);
+      const label = `unmapped_dropped=${formatCount(n)}`;
+      nodes.push(
+        n !== 0 ? (
+          <span key={key++} style={{ color: "#c62828", fontWeight: 700 }}>
+            {label}
+          </span>
+        ) : (
+          <span key={key++}>{label}</span>
+        ),
+      );
+    } else if (tok.startsWith("duplicates_dropped=")) {
+      const n = Number(tok.split("=")[1]);
+      const label = `duplicates_dropped=${formatCount(n)}`;
+      nodes.push(
+        n !== 0 ? (
+          <span key={key++} style={{ color: "#c62828", fontWeight: 700 }}>
+            {label}
+          </span>
+        ) : (
+          <span key={key++}>{label}</span>
+        ),
+      );
+    } else if (tok.startsWith("Записано")) {
+      const n = Number(tok.replace(/\D+/g, ""));
+      nodes.push(
+        <span key={key++} style={{ color: "#2e7d32", fontWeight: 700 }}>
+          {`Записано ${formatCount(n)}`}
+        </span>,
+      );
+    } else {
+      nodes.push(<span key={key++}>{formatCount(tok)}</span>);
+    }
+    last = match.index + tok.length;
+  }
+  if (last < raw.length) {
+    nodes.push(formatPlainNumbers(raw.slice(last)));
+  }
+  return <>{nodes}</>;
 }
 
 type SyncLogRow = {
@@ -211,20 +294,6 @@ export default function SyncPage() {
     }
   };
 
-  const stageDetail = (s: SyncStage): string => {
-    const parts: string[] = [];
-    if (s.detail) parts.push(s.detail);
-    if (s.substage && s.substage !== s.detail) parts.push(s.substage);
-    const cur = s.progress?.current;
-    const tot = s.progress?.total;
-    if (cur != null && tot != null) {
-      parts.push(`${cur} / ${tot}${s.progress?.unit ? ` ${s.progress.unit}` : ""}`);
-    } else if (cur != null) {
-      parts.push(String(cur));
-    }
-    return parts.filter(Boolean).join(" · ") || "—";
-  };
-
   const groups = useMemo(
     () => groupStages(run?.progress?.stages || []),
     [run?.progress?.stages],
@@ -250,7 +319,7 @@ export default function SyncPage() {
           disabled={!canDownloadDropped}
           title={
             canDownloadDropped
-              ? `unmapped=${droppedExport?.unmapped ?? 0}, duplicates=${droppedExport?.duplicates ?? 0}`
+              ? `unmapped=${formatCount(droppedExport?.unmapped ?? 0)}, duplicates=${formatCount(droppedExport?.duplicates ?? 0)}`
               : "Отчёт появится после завершения синхронизации"
           }
           onClick={() => void downloadDroppedXlsx()}
@@ -343,7 +412,7 @@ export default function SyncPage() {
                           </span>
                         </td>
                         <td style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
-                          {stageDetail(s)}
+                          {renderStageDetail(s)}
                         </td>
                       </tr>
                     ))}
@@ -386,8 +455,8 @@ export default function SyncPage() {
                             </span>
                           ) : null}
                         </td>
-                        <td>{Number(row.previous || 0).toLocaleString()}</td>
-                        <td>{Number(row.current || 0).toLocaleString()}</td>
+                        <td>{formatCount(Number(row.previous || 0))}</td>
+                        <td>{formatCount(Number(row.current || 0))}</td>
                         <td>{formatDelta(Number(row.delta || 0))}</td>
                       </tr>
                     ))}

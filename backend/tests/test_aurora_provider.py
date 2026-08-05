@@ -115,6 +115,48 @@ def test_short_row_unmapped():
     assert meta["unmapped"] == 1
 
 
+def test_msk_six_column_row_drops_status():
+    text = (
+        '"+7 (495) 2360003";СВОБОДЕН;ЗОЛОТОЙ;15990 Руб.;г. Москва;'
+        "[ XXX-000-X - Первый десяток ]\n"
+    )
+    data = text.encode("cp1251")
+    items, unmapped, meta = parser.parse_free_csv(
+        _raw_from_bytes(data, url="http://bill.auroratelecom.ru:8080/bgbilling/numbers/MSK.csv"),
+        raw_bytes=data,
+        filename="MSK.csv",
+    )
+    assert meta["unmapped"] == 0
+    assert len(items) == 1
+    assert unmapped == []
+    item = items[0]
+    assert item.msisdn == "74952360003"
+    assert item.number_type == "ЗОЛОТОЙ"
+    assert item.period_price == Decimal("15990")
+    assert item.city_name == "г. Москва"
+    assert item.raw_payload.get("dropped_status_column") is True
+    assert item.raw_payload.get("column_count") == 6
+
+
+def test_six_column_row_unmapped_outside_msk():
+    text = (
+        '"+7 (495) 2360003";СВОБОДЕН;ЗОЛОТОЙ;15990 Руб.;г. Москва;'
+        "[ XXX-000-X - Первый десяток ]\n"
+    )
+    data = text.encode("cp1251")
+    items, unmapped, meta = parser.parse_free_csv(
+        _raw_from_bytes(
+            data, url="http://bill.auroratelecom.ru:8080/bgbilling/numbers/Crimea.csv"
+        ),
+        raw_bytes=data,
+        filename="Crimea.csv",
+    )
+    assert items == []
+    assert len(unmapped) == 1
+    assert meta["unmapped"] == 1
+    assert unmapped[0].get("column_count") == 6
+
+
 def test_resolve_csv_urls_default_has_six_no_all_free():
     urls = contract.resolve_csv_urls(None)
     assert len(urls) == 6
@@ -173,7 +215,8 @@ def test_parse_probe_discards_truncated_trailing_line():
     assert meta.get("scanned_rows", 0) >= 1
 
 
-def test_sync_merges_and_dedupes(monkeypatch):
+def test_sync_keeps_cross_file_duplicates_for_engine(monkeypatch):
+    """Provider returns all mapped rows; persist/XLSX dedupe (last wins) happens later."""
     row_a = (
         '"+7 (495) 1111111";ПРОСТОЙ;100 Руб.;г. Москва;[x]\n'
         '"+7 (495) 2222222";ПРОСТОЙ;100 Руб.;г. Москва;[x]\n'
@@ -207,11 +250,27 @@ def test_sync_merges_and_dedupes(monkeypatch):
             on_progress=on_progress,
         )
     )
-    keys = sorted(n.provider_number_key for n in result.items)
-    assert keys == ["74951111111", "74952222222", "78123333333"]
-    assert "duplicates_skipped=1" in result.warnings
+    keys = [n.provider_number_key for n in result.items]
+    assert sorted(keys) == [
+        "74951111111",
+        "74952222222",
+        "74952222222",
+        "78123333333",
+    ]
+    assert result.parsed == 4
+    assert "duplicates_skipped=" not in " ".join(result.warnings)
     assert any("Crimea.csv" in d for d in progress)
-    assert any("итого" in d and "dupes=1" for d in progress)
+    assert any("итого" in d and "4 номеров" for d in progress)
+
+    from app.modules.sync_engine.dropped_export import split_dedupe_drops
+
+    dropped, kept = split_dedupe_drops(result.items)
+    assert len(kept) == 3
+    assert len(dropped) == 1
+    assert dropped[0].provider_number_key == "74952222222"
+    # last-wins keeps the later file's fee
+    kept_dup = next(n for n in kept if n.provider_number_key == "74952222222")
+    assert kept_dup.period_price == Decimal("200")
 
 
 def test_sync_fail_closed_on_one_file(monkeypatch):
