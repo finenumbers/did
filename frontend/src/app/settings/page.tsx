@@ -427,7 +427,7 @@ export default function SettingsPage() {
                       : code === "uis"
                         ? "(Data API)"
                         : code === "aurora"
-                          ? "(CSV free)"
+                          ? "(CSV directory)"
                           : ""}
                   <input
                     value={d.baseUrl}
@@ -441,7 +441,7 @@ export default function SettingsPage() {
                           : code === "uis"
                             ? "https://dataapi.uiscom.ru/v2.0"
                             : code === "aurora"
-                              ? "http://bill.auroratelecom.ru:8080/bgbilling/numbers/all_free.csv"
+                              ? "http://bill.auroratelecom.ru:8080/bgbilling/numbers/"
                               : undefined
                     }
                   />
@@ -449,8 +449,10 @@ export default function SettingsPage() {
 
                 {code === "aurora" ? (
                   <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
-                    Публичный CSV свободных номеров (HTTP). Auth не требуется. Купленные и
-                    справочники не поддерживаются.
+                    Публичные региональные CSV свободных номеров (HTTP): Crimea, Grozny, MSK,
+                    Sevastopol, Simferopol, SPb. Файл all_free.csv не используется. Base URL —
+                    каталог (или legacy путь к .csv → берётся родительская папка). Auth не
+                    требуется. Купленные и справочники не поддерживаются.
                   </div>
                 ) : code === "sipout" || code === "finenumbers" ? (
                   <label>

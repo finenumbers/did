@@ -93,7 +93,7 @@ UIS requires the server egress IP in the personal account API allowlist before s
 
 ## 7b. Aurora Telecom CSV egress
 
-Aurora free numbers load via plain **HTTP** to `bill.auroratelecom.ru:8080` (public CSV, no auth). The backend container must be allowed outbound HTTP to that host/port. No credentials in Settings — only optional CSV URL override.
+Aurora free numbers load via plain **HTTP** to `bill.auroratelecom.ru:8080` (public regional CSVs, no auth): `Crimea.csv`, `Grozny.csv`, `MSK.csv`, `Sevastopol.csv`, `Simferopol.csv`, `SPb.csv` under `/bgbilling/numbers/`. The legacy `all_free.csv` is **not** fetched. The backend container must be allowed outbound HTTP to that host/port. No credentials in Settings — optional `base_url` is the directory prefix (a legacy single `.csv` URL is treated as its parent directory).
 
 ## 8. Sync dropped XLSX volume
 

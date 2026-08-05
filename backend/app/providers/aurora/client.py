@@ -1,4 +1,4 @@
-"""Aurora Telecom CSV client — read-only GET of free numbers export."""
+"""Aurora Telecom CSV client — read-only GET of regional free exports."""
 
 from __future__ import annotations
 
@@ -35,8 +35,13 @@ class AuroraClient:
             total_timeout=200.0,
         )
         self.retry = retry or RetryPolicy()
-        self.csv_url = (connection.base_url or "").strip() or contract.DEFAULT_CSV_URL
-        self._validate_url(self.csv_url)
+        self.csv_urls = contract.resolve_csv_urls(connection.base_url)
+        if not self.csv_urls:
+            raise ProviderTransportError("Aurora CSV URL list is empty")
+        for url in self.csv_urls:
+            self._validate_url(url)
+        # First URL used for probe / back-compat attribute
+        self.csv_url = self.csv_urls[0]
 
     @staticmethod
     def _validate_url(url: str) -> None:
@@ -48,6 +53,11 @@ class AuroraClient:
             raise ProviderTransportError(
                 f"Aurora URL host not allowed: {host!r} (expected {_ALLOWED_HOST})"
             )
+        name = (parsed.path or "").rsplit("/", 1)[-1].lower()
+        if name == "all_free.csv":
+            raise ProviderTransportError(
+                "Aurora all_free.csv is not used; configure directory base for regional CSVs"
+            )
 
     def _client_kwargs(self, timeout: httpx.Timeout) -> dict[str, Any]:
         return {
@@ -56,7 +66,9 @@ class AuroraClient:
             "trust_env": False,
         }
 
-    async def fetch_csv(self) -> RawHttpResult:
+    async def fetch_csv(self, url: str | None = None) -> RawHttpResult:
+        target = url or self.csv_url
+        self._validate_url(target)
         timeout = httpx.Timeout(
             self.timeout.total_timeout,
             connect=self.timeout.connect_timeout,
@@ -65,24 +77,26 @@ class AuroraClient:
 
         async def _once() -> httpx.Response:
             async with httpx.AsyncClient(**self._client_kwargs(timeout)) as client:
-                return await client.get(self.csv_url)
+                return await client.get(target)
 
+        fname = contract.csv_filename(target)
         start = time.perf_counter()
         response = await request_with_retries(
             retry=self.retry,
-            label="Aurora CSV fetch",
+            label=f"Aurora CSV fetch {fname}",
             do_request=_once,
         )
         elapsed = (time.perf_counter() - start) * 1000
         if response.status_code >= 400:
             raise ProviderTransportError(
-                f"Aurora CSV HTTP {response.status_code}",
-                details={"status_code": response.status_code},
+                f"Aurora CSV HTTP {response.status_code} for {fname}",
+                details={"status_code": response.status_code, "file": fname, "url": target},
             )
         content = response.content
         if len(content) > contract.MAX_CSV_BYTES:
             raise ProviderTransportError(
-                f"Aurora CSV exceeded MAX_CSV_BYTES={contract.MAX_CSV_BYTES}"
+                f"Aurora CSV {fname} exceeded MAX_CSV_BYTES={contract.MAX_CSV_BYTES}",
+                details={"file": fname, "bytes": len(content)},
             )
         return RawHttpResult(
             status_code=response.status_code,
@@ -93,8 +107,12 @@ class AuroraClient:
             request_url=str(response.url),
         )
 
-    async def fetch_csv_head(self, *, max_bytes: int = PROBE_MAX_BYTES) -> RawHttpResult:
+    async def fetch_csv_head(
+        self, url: str | None = None, *, max_bytes: int = PROBE_MAX_BYTES
+    ) -> RawHttpResult:
         """Stream only the first bytes for connection test (not full sync)."""
+        target = url or self.csv_url
+        self._validate_url(target)
         timeout = httpx.Timeout(
             min(self.timeout.total_timeout, 60.0),
             connect=self.timeout.connect_timeout,
@@ -103,8 +121,7 @@ class AuroraClient:
 
         async def _once() -> httpx.Response:
             async with httpx.AsyncClient(**self._client_kwargs(timeout)) as client:
-                async with client.stream("GET", self.csv_url) as response:
-                    # For retryable statuses, drain and return as-is
+                async with client.stream("GET", target) as response:
                     if response.status_code in self.retry.retry_on_status:
                         await response.aread()
                         return httpx.Response(
@@ -132,10 +149,11 @@ class AuroraClient:
                         request=response.request,
                     )
 
+        fname = contract.csv_filename(target)
         start = time.perf_counter()
         response = await request_with_retries(
             retry=self.retry,
-            label="Aurora CSV head",
+            label=f"Aurora CSV head {fname}",
             do_request=_once,
         )
         elapsed = (time.perf_counter() - start) * 1000
@@ -151,7 +169,7 @@ class AuroraClient:
             },
             headers=dict(response.headers),
             elapsed_ms=elapsed,
-            request_url=str(response.url) if response.url else self.csv_url,
+            request_url=str(response.url) if response.url else target,
         )
 
     def raw_bytes(self, raw: RawHttpResult) -> bytes:
@@ -159,10 +177,11 @@ class AuroraClient:
         return raw.body_text.encode("latin-1")
 
     async def probe(self) -> tuple[RawHttpResult, dict[str, Any]]:
-        """Fetch CSV head for test_connection (bounded)."""
-        raw = await self.fetch_csv_head()
+        """Fetch CSV head of the first regional file for test_connection."""
+        raw = await self.fetch_csv_head(self.csv_urls[0])
         return raw, {
-            "url": self.csv_url,
+            "url": self.csv_urls[0],
+            "files": [contract.csv_filename(u) for u in self.csv_urls],
             "bytes": len(self.raw_bytes(raw)),
             "status_code": raw.status_code,
             "truncated": bool((raw.body_json or {}).get("truncated")),

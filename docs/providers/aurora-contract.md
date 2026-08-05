@@ -4,11 +4,24 @@ Sources: [`aurora/SOURCE.md`](aurora/SOURCE.md) and [`aurora/raw/sample.csv`](au
 
 ## Transport — VERIFIED (live)
 
-- Method: **GET**
-- URL (default): `http://bill.auroratelecom.ru:8080/bgbilling/numbers/all_free.csv`
+- Method: **GET** (one request per regional file)
+- Default directory base: `http://bill.auroratelecom.ru:8080/bgbilling/numbers/`
+- Fixed file list (order):
+  1. `Crimea.csv`
+  2. `Grozny.csv`
+  3. `MSK.csv`
+  4. `Sevastopol.csv`
+  5. `Simferopol.csv`
+  6. `SPb.csv`
+- **`all_free.csv` is not part of the inventory fetch** (legacy aggregate; do not download)
 - Auth: none
-- Body: CSV file, no JSON envelope
-- Overridable via provider Settings `base_url` (full CSV URL)
+- Body: CSV file per URL, no JSON envelope
+- Settings `base_url` (optional):
+  - empty → default directory base + fixed file list
+  - directory URL → that prefix + fixed file list
+  - legacy single `*.csv` URL (incl. old `all_free.csv`) → **parent directory** + fixed file list (the named file itself is not fetched)
+- Fail-closed: any file HTTP error / size cap / parse failure fails the whole free stage (no partial catalog cutover)
+- Merge: concatenate rows; dedupe by MSISDN (first file wins)
 
 ## Encoding / CSV shape — VERIFIED (live)
 
@@ -34,13 +47,14 @@ Sources: [`aurora/SOURCE.md`](aurora/SOURCE.md) and [`aurora/raw/sample.csv`](au
 
 | Capability | Supported | Notes |
 |---|---|---|
-| free_numbers | yes | Full CSV download + parse |
+| free_numbers | yes | Sequential GET of all regional CSVs + parse + merge |
 | purchased_numbers | **no** | No purchased export in contract |
 | dictionaries | **no** | No regions/cities API; geo is per-row text |
-| test_connection | yes | GET + parse first valid 5-column row |
+| test_connection | yes | GET head of first regional file + parse first valid 5-column row |
 
 ## Out of scope
 
 - Write / buy / reserve endpoints
-- Pagination (single file)
+- Dynamic pagination (fixed file list only)
 - Auth credentials
+- Fetching `all_free.csv`

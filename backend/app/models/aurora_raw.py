@@ -7,7 +7,7 @@ from app.models.base import Base, RawSyncMixin
 
 
 class AuroraFreeNumberRaw(RawSyncMixin, Base):
-    """VERIFIED live free CSV export all_free.csv."""
+    """VERIFIED live free inventory from regional Aurora CSVs (merged)."""
 
     __tablename__ = "aurora_free_numbers_raw"
 

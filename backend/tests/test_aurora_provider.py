@@ -1,13 +1,18 @@
-"""Unit tests for Aurora Telecom CSV parser/mapper (no live HTTP)."""
+"""Unit tests for Aurora Telecom CSV parser/mapper/multi-file (no live HTTP)."""
 
 from __future__ import annotations
 
+import asyncio
 from decimal import Decimal
 from pathlib import Path
+import pytest
 
 from app.models.enums import InventoryKind
-from app.providers.aurora import mapper, parser
-from app.providers.dto.common import RawHttpResult
+from app.providers.aurora import contract, mapper, parser
+from app.providers.aurora.client import AuroraClient
+from app.providers.aurora.provider import AuroraProvider
+from app.providers.dto.common import ConnectionConfig, RawHttpResult
+from app.providers.errors import ProviderTransportError
 
 SAMPLE_PATH = (
     Path(__file__).resolve().parents[2]
@@ -19,14 +24,15 @@ SAMPLE_PATH = (
 )
 
 
-def _raw_from_bytes(data: bytes, status: int = 200) -> RawHttpResult:
+def _raw_from_bytes(data: bytes, status: int = 200, url: str = "") -> RawHttpResult:
     return RawHttpResult(
         status_code=status,
         body_text=data.decode("latin-1"),
         body_json={"bytes_len": len(data)},
         headers={},
         elapsed_ms=1.0,
-        request_url="http://bill.auroratelecom.ru:8080/bgbilling/numbers/all_free.csv",
+        request_url=url
+        or "http://bill.auroratelecom.ru:8080/bgbilling/numbers/Crimea.csv",
     )
 
 
@@ -109,13 +115,30 @@ def test_short_row_unmapped():
     assert meta["unmapped"] == 1
 
 
-def test_whitespace_base_url_falls_back_to_default():
-    from app.providers.aurora.client import AuroraClient
-    from app.providers.aurora import contract
-    from app.providers.dto.common import ConnectionConfig
+def test_resolve_csv_urls_default_has_six_no_all_free():
+    urls = contract.resolve_csv_urls(None)
+    assert len(urls) == 6
+    assert all(u.startswith(contract.DEFAULT_CSV_BASE) for u in urls)
+    names = [u.rsplit("/", 1)[-1] for u in urls]
+    assert names == list(contract.DEFAULT_CSV_FILES)
+    assert "all_free.csv" not in names
 
+
+def test_resolve_csv_urls_legacy_all_free_uses_dirname():
+    urls = contract.resolve_csv_urls(
+        "http://bill.auroratelecom.ru:8080/bgbilling/numbers/all_free.csv"
+    )
+    assert len(urls) == 6
+    assert "all_free.csv" not in "".join(urls)
+    assert urls[0].endswith("/Crimea.csv")
+    assert urls[-1].endswith("/SPb.csv")
+
+
+def test_whitespace_base_url_falls_back_to_regional_list():
     client = AuroraClient(ConnectionConfig(base_url="   ", auth_settings={}))
-    assert client.csv_url == contract.DEFAULT_CSV_URL
+    assert len(client.csv_urls) == 6
+    assert client.csv_url == client.csv_urls[0]
+    assert client.csv_url.endswith("/Crimea.csv")
 
 
 def test_decode_prefers_valid_utf8_over_cp1251_mojibake():
@@ -127,7 +150,6 @@ def test_decode_prefers_valid_utf8_over_cp1251_mojibake():
     text, enc = parser.decode_csv_bytes(data)
     assert enc == "utf-8-sig"
     assert "ПРОСТОЙ" in text
-    # Live-like cp1251 still selects primary encoding
     cp = line.encode("cp1251")
     _text2, enc2 = parser.decode_csv_bytes(cp)
     assert enc2 == "cp1251"
@@ -142,12 +164,80 @@ def test_parse_probe_bytes_first_row():
 
 
 def test_parse_probe_discards_truncated_trailing_line():
-    """Stream head may cut mid-row; truncated trailing line must not break parse."""
     head = SAMPLE_PATH.read_bytes()[:800]
-    # Ensure we cut mid-line (no trailing newline) and mark truncated
     cut = head.rstrip(b"\r\n")
     assert not cut.endswith((b"\n", b"\r"))
     sample, meta = parser.parse_probe_bytes(cut, truncated=True)
     assert sample is not None
     assert sample.msisdn and sample.msisdn.startswith("7")
     assert meta.get("scanned_rows", 0) >= 1
+
+
+def test_sync_merges_and_dedupes(monkeypatch):
+    row_a = (
+        '"+7 (495) 1111111";ПРОСТОЙ;100 Руб.;г. Москва;[x]\n'
+        '"+7 (495) 2222222";ПРОСТОЙ;100 Руб.;г. Москва;[x]\n'
+    ).encode("cp1251")
+    row_b = (
+        '"+7 (495) 2222222";ПРОСТОЙ;200 Руб.;г. Москва;[dup]\n'
+        '"+7 (812) 3333333";ПРОСТОЙ;100 Руб.;г. Санкт-Петербург;[x]\n'
+    ).encode("cp1251")
+
+    async def fake_fetch(self, url: str | None = None) -> RawHttpResult:
+        target = url or self.csv_url
+        name = target.rsplit("/", 1)[-1]
+        if name == "Crimea.csv":
+            data = row_a
+        elif name == "Grozny.csv":
+            data = row_b
+        else:
+            data = b"\n"  # empty regional export (no rows)
+        return _raw_from_bytes(data, url=target)
+
+    monkeypatch.setattr(AuroraClient, "fetch_csv", fake_fetch)
+
+    progress: list[str] = []
+
+    def on_progress(detail: str, current=None, total=None):
+        progress.append(detail)
+
+    result = asyncio.run(
+        AuroraProvider().sync_free_numbers(
+            ConnectionConfig(base_url=None, auth_settings={}),
+            on_progress=on_progress,
+        )
+    )
+    keys = sorted(n.provider_number_key for n in result.items)
+    assert keys == ["74951111111", "74952222222", "78123333333"]
+    assert "duplicates_skipped=1" in result.warnings
+    assert any("Crimea.csv" in d for d in progress)
+    assert any("итого" in d and "dupes=1" for d in progress)
+
+
+def test_sync_fail_closed_on_one_file(monkeypatch):
+    calls: list[str] = []
+
+    async def fake_fetch(self, url: str | None = None) -> RawHttpResult:
+        target = url or self.csv_url
+        name = target.rsplit("/", 1)[-1]
+        calls.append(name)
+        if name == "Grozny.csv":
+            raise ProviderTransportError(
+                "Aurora CSV HTTP 500 for Grozny.csv",
+                details={"file": "Grozny.csv"},
+            )
+        data = '"+7 (495) 1111111";ПРОСТОЙ;100 Руб.;г. Москва;[x]\n'.encode("cp1251")
+        return _raw_from_bytes(data, url=target)
+
+    monkeypatch.setattr(AuroraClient, "fetch_csv", fake_fetch)
+
+    with pytest.raises(ProviderTransportError, match="Grozny"):
+        asyncio.run(
+            AuroraProvider().sync_free_numbers(
+                ConnectionConfig(base_url=None, auth_settings={})
+            )
+        )
+    assert "Crimea.csv" in calls
+    assert "Grozny.csv" in calls
+    # Fail-closed: must not continue past the failed file
+    assert "MSK.csv" not in calls
