@@ -530,7 +530,7 @@ async def _run_operator_enrichment(
     tracker: SyncProgressTracker,
     category_stats: dict[str, Any],
 ) -> None:
-    tracker.begin("operator_enrichment", "Обогащение операторов PSTN")
+    tracker.begin("operator_enrichment", "Обогащение PSTN")
     provider = db.scalars(
         select(Provider)
         .options(joinedload(Provider.connection))

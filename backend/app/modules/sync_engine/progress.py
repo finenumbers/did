@@ -25,7 +25,7 @@ STAGE_DEFS: list[dict[str, str]] = [
     {"id": "uis_purchased", "group": "UIS", "label": "Купленные номера"},
     {"id": "aurora_free", "group": "Aurora Telecom", "label": "Свободные номера"},
     {"id": "finenumbers_free", "group": "Finenumbers", "label": "Свободные номера"},
-    {"id": "operator_enrichment", "group": "Общее", "label": "Обогащение операторов"},
+    {"id": "operator_enrichment", "group": "Общее", "label": "Обогащение PSTN"},
     {"id": "finalize", "group": "Общее", "label": "Завершение"},
 ]
 
