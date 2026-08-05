@@ -10,6 +10,23 @@ type DroppedExportMeta = {
   duplicates?: number;
 };
 
+type InventorySummaryRow = {
+  provider: string;
+  kind: string;
+  label: string;
+  previous: number;
+  current: number;
+  delta: number;
+  refused_wipe?: boolean;
+  limited?: boolean;
+};
+
+function formatDelta(delta: number): string {
+  if (delta > 0) return `+${delta.toLocaleString()}`;
+  if (delta < 0) return delta.toLocaleString();
+  return "0";
+}
+
 type SyncLogRow = {
   id: string;
   level: string;
@@ -64,6 +81,7 @@ export default function SyncPage() {
   const isActive = run?.status === "pending" || run?.status === "running";
   const canStart = cacheReady === true && !starting && !isActive;
   const droppedExport = (run?.stats?.dropped_export || null) as DroppedExportMeta | null;
+  const inventorySummary = (run?.stats?.inventory_summary || []) as InventorySummaryRow[];
   const canDownloadDropped =
     !isActive && Boolean(droppedExport?.available) && !downloadingDropped;
   const canDownloadDebugLog = Boolean(run) && !downloadingDebugLog;
@@ -335,6 +353,50 @@ export default function SyncPage() {
             ))}
           </div>
 
+          {inventorySummary.length > 0 && (
+            <div className="panel">
+              <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>Результат по источникам</h2>
+              <p style={{ marginTop: 0, color: "var(--muted)", fontSize: "0.85rem" }}>
+                Сколько номеров было в каталоге до синхронизации и сколько стало после полной
+                перезагрузки (объём может вырасти или уменьшиться).
+              </p>
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Источник</th>
+                      <th>Было</th>
+                      <th>Стало</th>
+                      <th>Δ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inventorySummary.map((row) => (
+                      <tr key={`${row.provider}-${row.kind}`}>
+                        <td>
+                          {row.label}
+                          {row.refused_wipe ? (
+                            <span className="badge fail" style={{ marginLeft: "0.5rem" }}>
+                              отказ wipe
+                            </span>
+                          ) : null}
+                          {row.limited ? (
+                            <span className="badge warn" style={{ marginLeft: "0.5rem" }}>
+                              limited
+                            </span>
+                          ) : null}
+                        </td>
+                        <td>{Number(row.previous || 0).toLocaleString()}</td>
+                        <td>{Number(row.current || 0).toLocaleString()}</td>
+                        <td>{formatDelta(Number(row.delta || 0))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           <div className="panel">
             <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>Лог</h2>
             {logs.length === 0 ? (
@@ -360,11 +422,6 @@ export default function SyncPage() {
                   </tbody>
                 </table>
               </div>
-            )}
-            {run.stats && Object.keys(run.stats).length > 0 && (
-              <pre style={{ whiteSpace: "pre-wrap", fontSize: "0.8rem", marginTop: "1rem" }}>
-                {JSON.stringify(run.stats, null, 2)}
-              </pre>
             )}
           </div>
         </div>

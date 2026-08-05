@@ -31,6 +31,7 @@ from app.modules.sync_engine.progress import (
 )
 from app.modules.sync_engine.run_file_log import begin_sync_debug_log, end_sync_debug_log
 from app.modules.sync_engine.run_logging import log_run
+from app.modules.sync_engine.safety import build_inventory_summary
 from app.modules.sync_engine.service import SyncService
 from app.providers.dto.common import ConnectionConfig
 from app.providers.errors import ProviderCapabilityLimitedError, ProviderError
@@ -313,10 +314,12 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
             logger.exception("Failed to write sync dropped XLSX")
             dropped_meta = {"available": False, "error": "write_failed"}
 
+        inventory_summary = build_inventory_summary(category_stats)
         summary = {
             "providers_ok": provider_ok,
             "providers_failed": provider_failures,
             "categories": category_stats,
+            "inventory_summary": inventory_summary,
             "dropped_export": dropped_meta,
         }
         run.stats = summary

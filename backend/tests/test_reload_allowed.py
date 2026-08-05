@@ -1,7 +1,11 @@
 """Wipe-guard unit tests (no DB)."""
 
 from app.models.enums import InventoryKind, MappingConfidence
-from app.modules.sync_engine.safety import count_unique_provider_keys, reload_allowed
+from app.modules.sync_engine.safety import (
+    build_inventory_summary,
+    count_unique_provider_keys,
+    reload_allowed,
+)
 from app.providers.dto.numbers import NormalizedNumber
 
 
@@ -40,19 +44,20 @@ def test_first_load_allows_any_positive():
     assert reason is None
 
 
-def test_free_requires_about_90_percent():
+def test_shrink_or_grow_always_allowed_when_positive():
     ok, reason = reload_allowed(previous=10_000, incoming=100, kind="free")
-    assert ok is False
-    assert "min_allowed" in (reason or "")
+    assert ok is True
+    assert reason is None
     ok2, _ = reload_allowed(previous=10_000, incoming=9_500, kind="free")
     assert ok2 is True
+    ok3, _ = reload_allowed(previous=52714, incoming=31771, kind="free")
+    assert ok3 is True
 
 
-def test_small_purchased_half_rule():
+def test_purchased_shrink_allowed_when_positive():
     ok, reason = reload_allowed(previous=40, incoming=10, kind="purchased")
-    assert ok is False
-    ok2, _ = reload_allowed(previous=40, incoming=25, kind="purchased")
-    assert ok2 is True
+    assert ok is True
+    assert reason is None
 
 
 def test_unique_key_count_last_wins_set():
@@ -60,10 +65,21 @@ def test_unique_key_count_last_wins_set():
     assert count_unique_provider_keys(nums) == 2
 
 
-def test_guard_uses_unique_not_raw_length():
-    # 10000 raw rows but only 5000 unique keys must refuse vs previous=10000
-    previous = 10_000
-    unique = 5_000
-    ok, reason = reload_allowed(previous=previous, incoming=unique, kind="free")
-    assert ok is False
-    assert "min_allowed" in (reason or "")
+def test_build_inventory_summary_was_became():
+    rows = build_inventory_summary(
+        {
+            "aurora": {
+                "free_numbers": {"previous": 52714, "upserted": 31771, "fetched": 37372},
+            },
+            "sipout": {
+                "free_numbers": {"previous": 100, "upserted": 120},
+                "purchased_numbers": {"previous": 10, "upserted": 8},
+            },
+            "operator_enrichment": {"updated": 1},
+        }
+    )
+    by_label = {r["label"]: r for r in rows}
+    assert by_label["Aurora Telecom · свободные"]["delta"] == 31771 - 52714
+    assert by_label["SipOut · свободные"]["current"] == 120
+    assert by_label["SipOut · купленные"]["delta"] == -2
+    assert len(rows) == 3

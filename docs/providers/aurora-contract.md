@@ -22,6 +22,7 @@ Sources: [`aurora/SOURCE.md`](aurora/SOURCE.md) and [`aurora/raw/sample.csv`](au
   - legacy single `*.csv` URL (incl. old `all_free.csv`) → **parent directory** + fixed file list (the named file itself is not fetched)
 - Fail-closed: any file HTTP error / size cap / parse failure fails the whole free stage (no partial catalog cutover)
 - Merge: concatenate rows; dedupe by MSISDN (first file wins)
+- Each successful sync fully replaces Aurora free catalog; row count may shrink or grow vs previous run (no size-ratio wipe guard). Sync UI shows was/became counts.
 
 ## Encoding / CSV shape — VERIFIED (live)
 
