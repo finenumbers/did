@@ -44,7 +44,7 @@ function LoginForm() {
   return (
     <div className="login-page">
       <form className="login-card panel" onSubmit={onSubmit}>
-        <img src="/logo-full.png" alt="fine numbers" className="login-logo" />
+        <img src="/logo-login.png" alt="fine numbers" className="login-logo" />
         <h1>Вход администратора</h1>
         <p className="login-hint">Внутренняя панель аналитики нумерации</p>
         <label>

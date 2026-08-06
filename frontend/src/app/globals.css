@@ -417,10 +417,11 @@ mark.search-hit {
   font-size: 1.35rem;
 }
 .login-logo {
-  height: 36px;
+  height: 40px;
   width: auto;
   object-fit: contain;
   align-self: flex-start;
+  background: transparent;
 }
 .login-hint {
   margin: 0;
