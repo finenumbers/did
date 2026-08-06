@@ -46,17 +46,20 @@ function renderStageDetail(s: SyncStage): ReactNode {
   if (s.substage && s.substage !== s.detail) parts.push(s.substage);
   const cur = s.progress?.current;
   const tot = s.progress?.total;
+  // Keep raw integers here — formatCount runs once in the token pass below.
+  // Pre-formatting would insert spaces, then /\d+/ would split "100 000" into
+  // "100" + "000" → "100 0".
   if (cur != null && tot != null) {
     parts.push(
-      `${formatCount(cur)} / ${formatCount(tot)}${s.progress?.unit ? ` ${s.progress.unit}` : ""}`,
+      `${cur} / ${tot}${s.progress?.unit ? ` ${s.progress.unit}` : ""}`,
     );
   } else if (cur != null) {
-    parts.push(formatCount(cur));
+    parts.push(String(cur));
   }
   const raw = parts.filter(Boolean).join(" · ");
   if (!raw) return "—";
 
-  // Tokenize known metrics / «Записано» so we can style them; format other digits too.
+  // Tokenize known metrics / «Записано» so we can style them; format other digits once.
   const tokenRe =
     /(unmapped_dropped=\d+|duplicates_dropped=\d+|Записано\s+\d+|\d+)/g;
   const nodes: ReactNode[] = [];
