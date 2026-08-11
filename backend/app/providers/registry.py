@@ -7,6 +7,7 @@ from app.providers.finenumbers import FinenumbersProvider
 from app.providers.runexis import RunexisProvider
 from app.providers.sipout import SipOutProvider
 from app.providers.uis import UisProvider
+from app.providers.voximplant import VoximplantProvider
 
 PROVIDER_REGISTRY: dict[ProviderCode, type[AbstractProvider]] = {
     ProviderCode.runexis: RunexisProvider,
@@ -15,6 +16,7 @@ PROVIDER_REGISTRY: dict[ProviderCode, type[AbstractProvider]] = {
     ProviderCode.uis: UisProvider,
     ProviderCode.aurora: AuroraProvider,
     ProviderCode.exolve: ExolveProvider,
+    ProviderCode.voximplant: VoximplantProvider,
 }
 
 

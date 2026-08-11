@@ -9,7 +9,14 @@ import type {
   SyncSchedule,
 } from "@/lib/types/api";
 
-type ProviderCode = "sipout" | "runexis" | "uis" | "aurora" | "finenumbers" | "exolve";
+type ProviderCode =
+  | "sipout"
+  | "runexis"
+  | "uis"
+  | "aurora"
+  | "finenumbers"
+  | "exolve"
+  | "voximplant";
 
 type Draft = {
   baseUrl: string;
@@ -20,6 +27,7 @@ type Draft = {
   numberingPassword: string;
   numberingBaseUrl: string;
   accessToken: string;
+  credentialsJson: string;
   settings: ProviderSettings | null;
   message: string | null;
   error: string | null;
@@ -36,6 +44,7 @@ const EMPTY_DRAFT: Draft = {
   numberingPassword: "",
   numberingBaseUrl: "",
   accessToken: "",
+  credentialsJson: "",
   settings: null,
   message: null,
   error: null,
@@ -49,6 +58,7 @@ const PROVIDERS: { code: ProviderCode; title: string }[] = [
   { code: "uis", title: "UIS" },
   { code: "aurora", title: "Aurora Telecom" },
   { code: "exolve", title: "Exolve" },
+  { code: "voximplant", title: "Voximplant" },
   { code: "finenumbers", title: "Finenumbers" },
 ];
 
@@ -71,6 +81,7 @@ export default function SettingsPage() {
     uis: { ...EMPTY_DRAFT },
     aurora: { ...EMPTY_DRAFT },
     exolve: { ...EMPTY_DRAFT },
+    voximplant: { ...EMPTY_DRAFT },
     finenumbers: { ...EMPTY_DRAFT },
   });
   const [pageError, setPageError] = useState<string | null>(null);
@@ -116,6 +127,7 @@ export default function SettingsPage() {
       uis: { ...EMPTY_DRAFT },
       aurora: { ...EMPTY_DRAFT },
       exolve: { ...EMPTY_DRAFT },
+      voximplant: { ...EMPTY_DRAFT },
       finenumbers: { ...EMPTY_DRAFT },
     };
     for (const { code } of PROVIDERS) {
@@ -150,6 +162,10 @@ export default function SettingsPage() {
       auth_settings = d.apiKey ? { key: d.apiKey } : undefined;
     } else if (code === "exolve") {
       auth_settings = d.apiKey ? { api_key: d.apiKey } : undefined;
+    } else if (code === "voximplant") {
+      auth_settings = d.credentialsJson
+        ? { credentials_json: d.credentialsJson }
+        : undefined;
     } else if (code === "uis") {
       auth_settings = d.accessToken ? { access_token: d.accessToken } : undefined;
     } else if (code === "aurora") {
@@ -435,7 +451,9 @@ export default function SettingsPage() {
                           ? "(CSV directory)"
                           : code === "exolve"
                             ? "(Numbering API)"
-                            : ""}
+                            : code === "voximplant"
+                              ? "(Management API)"
+                              : ""}
                   <input
                     value={d.baseUrl}
                     onChange={(e) => setDraft(code, { baseUrl: e.target.value })}
@@ -451,7 +469,9 @@ export default function SettingsPage() {
                               ? "http://bill.auroratelecom.ru:8080/bgbilling/numbers/"
                               : code === "exolve"
                                 ? "https://api.exolve.ru"
-                                : undefined
+                                : code === "voximplant"
+                                  ? "https://api.voximplant.com"
+                                  : undefined
                     }
                   />
                 </label>
@@ -486,6 +506,31 @@ export default function SettingsPage() {
                       {d.settings?.auth_settings_masked?.api_key
                         ? " Ключ сохранён."
                         : " Ключ ещё не задан."}
+                    </div>
+                  </>
+                ) : code === "voximplant" ? (
+                  <>
+                    <label>
+                      Service Account credentials (JSON)
+                      <textarea
+                        rows={6}
+                        placeholder={
+                          d.settings?.auth_settings_masked?.private_key
+                            ? "credentials сохранены (private_key masked). Вставьте новый JSON, чтобы заменить."
+                            : '{"account_id":…,"key_id":"…","private_key":"-----BEGIN PRIVATE KEY-----\\n…"}'
+                        }
+                        value={d.credentialsJson}
+                        onChange={(e) => setDraft(code, { credentialsJson: e.target.value })}
+                        style={{ width: "100%", fontFamily: "monospace", fontSize: "0.85rem" }}
+                      />
+                    </label>
+                    <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
+                      ЛК Voximplant → Settings → Service accounts → Generate key. Read-only: все
+                      свободные RU-номера (Categories → Regions → GetNewPhoneNumbers). Купленные /
+                      Attach не вызываются.
+                      {d.settings?.auth_settings_masked?.private_key
+                        ? " Credentials сохранены."
+                        : " Credentials ещё не заданы."}
                     </div>
                   </>
                 ) : code === "sipout" || code === "finenumbers" ? (

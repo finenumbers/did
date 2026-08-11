@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Voximplant Authorization</title></head>
+<body>
+<pre>&gt; For a complete documentation index, fetch https://docs.voximplant.ai/llms.txt
+
+# Authorization
+
+Most Voximplant Management API calls require authentication and authorization, which link API calls to your account. Service accounts and API keys are the primary authentication methods. For method-level HTTP documentation, see the [Management API reference](/api-reference/management-api/reference).
+
+## Service accounts
+
+A service account is a way to grant access to the Voximplant Management API on behalf of your developer account. You can manage the permissions of each service account by assigning one or more roles to it. If a service account has no assigned roles, it will only have access to the basic Management API methods.
+
+Go to the [Service accounts](https://manage.voximplant.com/settings/service_accounts) section and click **Add** in the upper right corner. In the dialogue opened, click **Add role** and specify as many roles as you need. For example, if you want to enable this new account to just start cloud scenarios, add the **Scenarios** role. Put a short description (if needed), click **Generate key**, and specify where to save a private key.
+
+#### Please note
+
+Since Voximplant does not store the keys, save them securely on your side.
+
+Next, form [a JWT](https://jwt.io/) using RS256. The required fields are:
+
+* **kid** – key\_id to be specified in the header section
+* **iat** – start date, it should be [a Numeric date value](https://tools.ietf.org/html/rfc7519#section-4.1.6) (UNIX timestamp)
+* **iss** – account\_id
+* **exp** – end date, up to **iat**+3600 seconds. It should be [a Numeric date value](https://tools.ietf.org/html/rfc7519#section-4.1.6) (UNIX timestamp)
+
+The parent account can manage all child accounts, so it is not necessary to create service accounts for all child accounts. To manage a child account, specify the child account ID in the **iss** field of the JWT token.
+
+#### Token creation
+
+You can create tokens [manually](#json-web-token).
+
+From now on, you should substitute this token in every HTTP request to the Voximplant HTTP Management API, e.g.:
+
+```curl title="Token in the request — Request"
+curl -H "Authorization: Bearer ${TOKEN}" https://api.voximplant.com/platform_api/StartScenarios/?rule_id=1
+```
+
+```json title="Token in the request — Response"
+{
+  "result": 1,
+  "media_session_access_url": "http://1.2.3.4:12092/request/eb769701de54cfa5.1539237068.6369268_1.2.3.4/1df792ad965d7105",
+  "media_session_access_secure_url": "https://1.2.3.4:12092/request/eb769701de54cfa5.1539237068.6369268_1.2.3.4/1df792ad965d7105"
+}
+```
+
+## JSON web token
+
+To use most [Voximplant Management API](/api-reference/management-api/reference) functions, you need to generate a JSON Web Token. Learn how to do that via CLI and a bash script.
+
+### Creating
+
+First, go to the [Service accounts](https://manage.voximplant.com/settings/service_accounts) section to create a new account and generate a JSON with its credentials (**Add** → **Generate a key**). Do not forget about the role; it allows using certain features and making certain requests. Then save the **result** value as a **credentials.json** file.
+
+Read more about [authentication through service accounts](#json-web-token).
+
+You can do the same via the [CreateKey](/api-reference/management-api/reference/role-system/create-key) method of the Management API.
+
+Next, create a **token.sh** file in the same folder with the following code. Note that the code uses a [jq](https://stedolan.github.io/jq/) tool that is not a built-in command, so you have to install it manually ([download jq here](https://stedolan.github.io/jq/download/)).
+
+```bash title="token.sh"
+#!/usr/bin/env bash
+
+credentials="${PWD}/credentials.json"
+
+account_id=$(cat $credentials | jq -r ".account_id")
+key_id=$(cat $credentials | jq -r ".key_id")
+rsa_secret=$(cat $credentials | jq -r ".private_key")
+
+timestamp() {
+    date +"%s"
+}
+
+test_payload=$( jq -n \
+    --arg iat "$(timestamp)" \
+    --arg iss "$account_id" \
+    --arg exp "$(($(timestamp)+3600))" \
+    '{
+        iat: $iat | tonumber,
+        iss: $iss | tonumber,
+        exp: $exp | tonumber
+    }'
+)
+
+set -o pipefail
+
+header_template=$( jq -n \
+    --arg typ "JWT" \
+    --arg alg "RS256" \
+    --arg kid "$key_id" \
+    '{typ: $typ, alg: $alg, kid: $kid}'
+)
+
+b64enc() { openssl enc -base64 -A | tr '+/' '-_' | tr -d '='; }
+json() { jq -c . | LC_CTYPE=C tr -d '\n'; }
+rs_sign() { openssl dgst -binary -sha"${1}" -sign &lt;(printf '%s\n' "$2"); }
+
+sign() {
+    local secret=$rsa_secret
+    algo=RS256
+    header=$header_template || return
+    payload=$test_payload
+
+    signed_content="$(json &lt;&lt;&lt;"$header" | b64enc).$(json &lt;&lt;&lt;"$payload" | b64enc)"
+
+    sig=$(printf %s "$signed_content" | rs_sign "${algo#RS}" "$secret" | b64enc)
+
+    printf 'Authorization: Bearer %s.%s\n' "${signed_content}" "${sig}"
+}
+
+sign
+```
+
+#### Quick copy-paste
+
+You can create a **token.sh** by downloading the script from our site.
+
+Download token.sh
+
+#### Permissions
+
+You may need to run `chmod +x token.sh` to execute the script properly.
+
+### Usage
+
+Use your JWT in CLI via `curl` with the `-H` key specified. For example, request the first 20 users of the specified Voximplant application:
+
+```curl title="GetUsers — Request"
+curl -H "`bash token.sh`" https://api.voximplant.com/platform_api/GetUsers/?application_id=4152784
+```
+
+```json title="GetUsers — Response"
+{
+  "result": [
+    {
+      "user_active": true,
+      "balance": 1,
+      "user_id": 1,
+      "user_name": "iden-1",
+      "user_display_name": "iden-1",
+      "frozen": false,
+      "modified": "2020-10-09 20:20:14"
+    },
+    {
+      "user_active": true,
+      "balance": 0,
+      "user_id": 2,
+      "user_name": "iden-2",
+      "user_display_name": "iden-2",
+      "frozen": false,
+      "modified": "2017-01-05 10:12:03"
+    }
+  ],
+  "count": 2,
+  "total_count": 2
+}
+```</pre>
+</body>
+</html>

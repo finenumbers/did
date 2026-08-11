@@ -1,0 +1,213 @@
+> For a complete documentation index, fetch https://docs.voximplant.ai/llms.txt
+
+# GetPhoneNumberCategories
+
+POST https://api.voximplant.com/platform_api/GetPhoneNumberCategories
+
+Gets the phone number categories.
+
+Allowed roles: `Owner`, `Admin`, `Accountant`, `Payer`.
+
+**Example request:** Get the all phone number categories.
+
+Reference: https://docs.voximplant.ai/api-reference/management-api/reference/phone-numbers/get-phone-number-categories
+
+## Authentication
+
+- `Authorization` header (bearer token, required) — Voximplant Management API uses signed JWT tokens generated from your service-account private key. Pass the token in the `Authorization` header as a Bearer value: ``` Authorization: Bearer $VOXIMPLANT_TOKEN ``` See [Authorization](/api-reference/management-api/authorization) for ready-to-copy snippets in bash, Python, Node.js and Go that turn your `credentials.json` into a token.
+
+## Request
+
+### Query parameters
+
+- `country_code` (list of string, optional) — Country code list separated by semicolons (;)
+- `sandbox` (string, optional) — Flag allows you to display phone number categories only of the sandbox, real or all .The following values are possible: 'all', 'true', 'false'
+- `locale` (string, optional) — The 2-letter locale code. Supported values are EN, RU
+
+## Response
+
+### 200
+
+Successful response
+
+- `result` (list of object, optional)
+  - `country_code` (string, optional) — The country code
+  - `localized_country_name` (string, optional) — The localized country name
+  - `phone_prefix` (string, optional) — The country phone prefix
+  - `can_list_phone_numbers` (boolean, optional) — Whether to list phone numbers
+  - `phone_categories` (list of object, optional) — The phone categories
+    - `phone_category_name` (string, optional) — The phone category name
+    - `country_has_states` (boolean, optional) — Whether the chosen phone number country has states
+    - `localized_country_name` (string, optional) — The localized country name
+    - `localized_phone_category_name` (string, optional) — The localized phone category name
+    - `localized_phone_region_name` (string, optional) — The localized phone region name
+  - `emergency_calls_to_be_enabled` (boolean, optional) — Whether you need to make a request to enable calls to emergency numbers
+
+## Examples
+
+**Response**
+
+```json
+{
+  "result": [
+    {
+      "country_code": "RU",
+      "phone_prefix": "7",
+      "can_list_phone_numbers": true,
+      "phone_categories": [
+        {
+          "phone_category_name": "GEOGRAPHIC",
+          "country_has_states": false
+        },
+        {
+          "phone_category_name": "MOBILE",
+          "country_has_states": false
+        }
+      ]
+    },
+    {
+      "country_code": "US",
+      "phone_prefix": "1",
+      "can_list_phone_numbers": false,
+      "phone_categories": [
+        {
+          "phone_category_name": "GEOGRAPHIC",
+          "country_has_states": true
+        },
+        {
+          "phone_category_name": "TOLLFREE",
+          "country_has_states": false
+        }
+      ]
+    }
+  ]
+}
+```
+
+**SDK Code**
+
+```python Example 1
+import requests
+
+url = "https://api.voximplant.com/platform_api/GetPhoneNumberCategories"
+
+headers = {"Authorization": "Bearer <token>"}
+
+response = requests.post(url, headers=headers)
+
+print(response.json())
+```
+
+```javascript Example 1
+const url = 'https://api.voximplant.com/platform_api/GetPhoneNumberCategories';
+const options = {method: 'POST', headers: {Authorization: 'Bearer <token>'}};
+
+try {
+  const response = await fetch(url, options);
+  const data = await response.json();
+  console.log(data);
+} catch (error) {
+  console.error(error);
+}
+```
+
+```go Example 1
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"io"
+)
+
+func main() {
+
+	url := "https://api.voximplant.com/platform_api/GetPhoneNumberCategories"
+
+	req, _ := http.NewRequest("POST", url, nil)
+
+	req.Header.Add("Authorization", "Bearer <token>")
+
+	res, _ := http.DefaultClient.Do(req)
+
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+
+	fmt.Println(res)
+	fmt.Println(string(body))
+
+}
+```
+
+```ruby Example 1
+require 'uri'
+require 'net/http'
+
+url = URI("https://api.voximplant.com/platform_api/GetPhoneNumberCategories")
+
+http = Net::HTTP.new(url.host, url.port)
+http.use_ssl = true
+
+request = Net::HTTP::Post.new(url)
+request["Authorization"] = 'Bearer <token>'
+
+response = http.request(request)
+puts response.read_body
+```
+
+```java Example 1
+import com.mashape.unirest.http.HttpResponse;
+import com.mashape.unirest.http.Unirest;
+
+HttpResponse<String> response = Unirest.post("https://api.voximplant.com/platform_api/GetPhoneNumberCategories")
+  .header("Authorization", "Bearer <token>")
+  .asString();
+```
+
+```php Example 1
+<?php
+require_once('vendor/autoload.php');
+
+$client = new \GuzzleHttp\Client();
+
+$response = $client->request('POST', 'https://api.voximplant.com/platform_api/GetPhoneNumberCategories', [
+  'headers' => [
+    'Authorization' => 'Bearer <token>',
+  ],
+]);
+
+echo $response->getBody();
+```
+
+```csharp Example 1
+using RestSharp;
+
+var client = new RestClient("https://api.voximplant.com/platform_api/GetPhoneNumberCategories");
+var request = new RestRequest(Method.POST);
+request.AddHeader("Authorization", "Bearer <token>");
+IRestResponse response = client.Execute(request);
+```
+
+```swift Example 1
+import Foundation
+
+let headers = ["Authorization": "Bearer <token>"]
+
+let request = NSMutableURLRequest(url: NSURL(string: "https://api.voximplant.com/platform_api/GetPhoneNumberCategories")! as URL,
+                                        cachePolicy: .useProtocolCachePolicy,
+                                    timeoutInterval: 10.0)
+request.httpMethod = "POST"
+request.allHTTPHeaderFields = headers
+
+let session = URLSession.shared
+let dataTask = session.dataTask(with: request as URLRequest, completionHandler: { (data, response, error) -> Void in
+  if (error != nil) {
+    print(error as Any)
+  } else {
+    let httpResponse = response as? HTTPURLResponse
+    print(httpResponse)
+  }
+})
+
+dataTask.resume()
+```

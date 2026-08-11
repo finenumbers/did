@@ -1,0 +1,275 @@
+> For a complete documentation index, fetch https://docs.voximplant.ai/llms.txt
+
+# GetPhoneNumbers
+
+POST https://api.voximplant.com/platform_api/GetPhoneNumbers
+
+Gets the account phone numbers.
+
+Allowed roles: `Owner`, `Admin`, `Developer`, `Supervisor`, `Accountant`, `Support`, `Payer`.
+
+**Example request:** Get two attached phone numbers.
+
+Reference: https://docs.voximplant.ai/api-reference/management-api/reference/phone-numbers/get-phone-numbers
+
+## Authentication
+
+- `Authorization` header (bearer token, required) — Voximplant Management API uses signed JWT tokens generated from your service-account private key. Pass the token in the `Authorization` header as a Bearer value: ``` Authorization: Bearer $VOXIMPLANT_TOKEN ``` See [Authorization](/api-reference/management-api/authorization) for ready-to-copy snippets in bash, Python, Node.js and Go that turn your `credentials.json` into a token.
+
+## Request
+
+### Query parameters
+
+- `phone_id` (list of integer, optional) — Particular phone ID to filter
+- `phone_number` (list of string, optional) — Phone number list separated by semicolons (;) that can be used instead of **phone_id**
+- `activation_status` (list of string, optional) — Phone number activation statuses to filter, separated by semicolons (;). The possible values are: ACTIVE, ACTIVATING, DEACTIVATED, PROVISIONING, AWAITING_BUSINESS_PHONE_NUMBER_CONFIGURATION, LEGAL_OWNERSHIP_LIMIT_REACHED, GOSUSLUGI_DECLINED, SELF_BAN_ENABLED
+- `application_id` (integer, optional) — Application ID
+- `application_name` (string, optional) — Application name that can be used instead of **application_id**
+- `is_bound_to_application` (boolean, optional) — Whether the phone number bound to an application
+- `phone_template` (string, optional) — Phone number start to filter
+- `country_code` (list of string, optional) — Country code list separated by semicolons (;)
+- `phone_category_name` (string, optional) — Phone category name. See the [GetPhoneNumberCategories] method
+- `canceled` (boolean, optional) — Whether the subscription is cancelled to filter
+- `deactivated` (boolean, optional) — Whether the subscription is frozen to filter
+- `auto_charge` (boolean, optional) — Whether the auto_charge flag is enabled
+- `from_phone_next_renewal` (string, optional) — UTC 'from' date filter in the following format: YYYY-MM-DD
+- `to_phone_next_renewal` (string, optional) — UTC 'to' date filter in the following format: YYYY-MM-DD
+- `from_phone_purchase_date` (string, optional) — UTC 'from' date filter in 24-h format: YYYY-MM-DD HH:mm:ss
+- `to_phone_purchase_date` (string, optional) — UTC 'to' date filter in 24-h format: YYYY-MM-DD HH:mm:ss
+- `child_account_id` (list of integer, optional) — Child account ID list separated by semicolons (;). Use the 'all' value to select all child accounts
+- `children_phones_only` (boolean, optional, default: false) — Whether to get the children phones only
+- `verification_name` (string, optional) — Required account verification name to filter
+- `verification_status` (list of string, optional) — Account verification status list separated by semicolons (;). The following values are possible: REQUIRED, IN_PROGRESS, VERIFIED
+- `from_unverified_hold_until` (string, optional) — Unverified phone hold until the date (from ...) in the following format: YYYY-MM-DD
+- `to_unverified_hold_until` (string, optional) — Unverified phone hold until the date (... to) in the following format: YYYY-MM-DD
+- `can_be_used` (boolean, optional) — Whether a not verified account can use the phone
+- `order_by` (string, optional) — Following values are available: 'phone_number' (ascent order), 'phone_price' (ascent order), 'phone_country_code' (ascent order), 'deactivated' (deactivated first, active last), 'purchase_date' (descent order), 'phone_next_renewal' (ascent order), 'verification_status', 'unverified_hold_until' (ascent order), 'verification_name'
+- `sandbox` (string, optional) — Flag allows you to display only the numbers of the sandbox, real numbers, or all numbers. The following values are possible: 'all', 'true', 'false'
+- `count` (integer, optional, default: 100) — Maximum returning record count
+- `offset` (integer, optional, default: 0) — First **N** records are skipped in the output
+- `phone_region_name` (list of string, optional) — Region names list separated by semicolons (;)
+- `rule_id` (list of integer, optional) — Rule ID list separated by semicolons (;)
+- `rule_name` (list of string, optional) — Rule names list separated by semicolons (;). Can be used only if __application_id__ or __application_name__ is specified
+- `is_bound_to_rule` (boolean, optional) — Whether the phone number is bound to some rule
+
+## Response
+
+### 200
+
+Successful response
+
+- `result` (list of object, optional) — Phone numbers info
+  - `phone_id` (integer, optional) — The phone ID
+  - `phone_number` (string, optional) — The phone number
+  - `phone_price` (double, optional) — The phone monthly charge in the account's currency
+  - `phone_country_code` (string, optional) — The phone country code (2 symbols)
+  - `activation_status` (string, optional) — Phone number activation status
+  - `phone_next_renewal` (string, optional) — Date string as returned by the Management API. The next renewal date in the following format: YYYY-MM-DD
+  - `phone_purchase_date` (string, optional) — Timestamp in YYYY-MM-DD HH:mm:ss format. The purchase date in 24-h format: YYYY-MM-DD HH:mm:ss
+  - `deactivated` (boolean, optional) — Whether the subscription is frozen
+  - `canceled` (boolean, optional) — Whether the subscription is cancelled
+  - `auto_charge` (boolean, optional) — Whether to charge automatically
+  - `application_id` (integer, optional) — ID of the bound application
+  - `application_name` (string, optional) — Name of the bound application
+  - `rule_id` (integer, optional) — ID of the bound rule
+  - `rule_name` (string, optional) — Name of the bound rule
+  - `category_name` (string, optional) — The phone category name (MOBILE, GEOGRAPHIC, TOLLFREE, MOSCOW495)
+  - `required_verification` (string, optional) — Whether the verification is required for the account
+  - `verification_status` (string, optional) — The account verification status. The following values are possible: REQUIRED, IN_PROGRESS, VERIFIED
+  - `unverified_hold_until` (string, optional) — Date string as returned by the Management API. Unverified phone hold until the date in the following format: YYYY-MM-DD (if the account verification is required). The number is detached on that day automatically!
+  - `can_be_used` (boolean, optional) — Whether a not verified account can use the phone
+  - `is_sms_supported` (boolean, optional) — Whether SMS is supported for this phone number. SMS needs to be explicitly enabled via the \[ControlSms] Management API before sending or receiving SMS. If SMS is supported and enabled, SMS can be sent from this phone number via the \[SendSmsMessage] Management API and received via the \[InboundSmsCallback] property of the HTTP callback. See this article for HTTP callback details
+  - `is_sms_enabled` (boolean, optional) — Whether SMS sending and receiving is enabled for this phone number via the [ControlSms] Management API
+  - `incoming_sms_callback_url` (string, optional) — If set, the callback of an incoming SMS is sent to this url, otherwise, it is sent to the general account URL
+  - `emergency_calls_to_be_enabled` (boolean, optional) — Whether you need to make a request to enable calls to emergency numbers
+  - `emergency_calls_enabled` (boolean, optional) — Whether calls to emergency numbers are enabled
+  - `subscription_id` (integer, optional) — Phone number subscription ID
+  - `extended_application_name` (string, optional) — Full application name, e.g. myapp.myaccount.n1.voximplant.com
+  - `phone_region_name` (string, optional) — Phone region name
+  - `modified` (string, optional) — Timestamp in YYYY-MM-DD HH:mm:ss format. UTC date of an event associated with the number in 24-h format: YYYY-MM-DD HH:mm:ss
+- `total_count` (integer, optional) — Total found phone count
+- `count` (integer, optional) — Returned phone count
+
+## Examples
+
+**Response**
+
+```json
+{
+  "result": [
+    {
+      "phone_id": 1,
+      "phone_number": "74957893798",
+      "phone_price": 0.45,
+      "phone_country_code": "RU",
+      "phone_next_renewal": "2013-11-10",
+      "phone_purchase_date": "2013-10-10 04:02:47",
+      "deactivated": false,
+      "canceled": false,
+      "auto_charge": true,
+      "category_name": "GEOGRAPHIC",
+      "required_verification": "RU",
+      "verification_status": "REQUIRED",
+      "unverified_hold_until": "2013-10-24",
+      "can_be_used": false,
+      "is_sms_supported": true,
+      "is_sms_enabled": false,
+      "emergency_calls_to_be_enabled": true,
+      "emergency_calls_enabled": true,
+      "subscription_id": 12,
+      "modified": "2021-10-10 11:25:02"
+    },
+    {
+      "phone_id": 3,
+      "phone_number": "12055645250",
+      "phone_price": 0.4,
+      "phone_country_code": "US",
+      "phone_next_renewal": "2013-09-28",
+      "phone_purchase_date": "2013-08-28 14:13:36",
+      "deactivated": true,
+      "canceled": false,
+      "auto_charge": false,
+      "application_id": 1,
+      "application_name": "app1.myaccount191.voximplant.com",
+      "category_name": "GEOGRAPHIC",
+      "can_be_used": true,
+      "is_sms_supported": false,
+      "is_sms_enabled": false,
+      "emergency_calls_to_be_enabled": true,
+      "emergency_calls_enabled": true,
+      "subscription_id": 13,
+      "modified": "2021-12-10 07:20:12"
+    }
+  ],
+  "total_count": 4,
+  "count": 2
+}
+```
+
+**SDK Code**
+
+```python Example 1
+import requests
+
+url = "https://api.voximplant.com/platform_api/GetPhoneNumbers"
+
+headers = {"Authorization": "Bearer <token>"}
+
+response = requests.post(url, headers=headers)
+
+print(response.json())
+```
+
+```javascript Example 1
+const url = 'https://api.voximplant.com/platform_api/GetPhoneNumbers';
+const options = {method: 'POST', headers: {Authorization: 'Bearer <token>'}};
+
+try {
+  const response = await fetch(url, options);
+  const data = await response.json();
+  console.log(data);
+} catch (error) {
+  console.error(error);
+}
+```
+
+```go Example 1
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"io"
+)
+
+func main() {
+
+	url := "https://api.voximplant.com/platform_api/GetPhoneNumbers"
+
+	req, _ := http.NewRequest("POST", url, nil)
+
+	req.Header.Add("Authorization", "Bearer <token>")
+
+	res, _ := http.DefaultClient.Do(req)
+
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+
+	fmt.Println(res)
+	fmt.Println(string(body))
+
+}
+```
+
+```ruby Example 1
+require 'uri'
+require 'net/http'
+
+url = URI("https://api.voximplant.com/platform_api/GetPhoneNumbers")
+
+http = Net::HTTP.new(url.host, url.port)
+http.use_ssl = true
+
+request = Net::HTTP::Post.new(url)
+request["Authorization"] = 'Bearer <token>'
+
+response = http.request(request)
+puts response.read_body
+```
+
+```java Example 1
+import com.mashape.unirest.http.HttpResponse;
+import com.mashape.unirest.http.Unirest;
+
+HttpResponse<String> response = Unirest.post("https://api.voximplant.com/platform_api/GetPhoneNumbers")
+  .header("Authorization", "Bearer <token>")
+  .asString();
+```
+
+```php Example 1
+<?php
+require_once('vendor/autoload.php');
+
+$client = new \GuzzleHttp\Client();
+
+$response = $client->request('POST', 'https://api.voximplant.com/platform_api/GetPhoneNumbers', [
+  'headers' => [
+    'Authorization' => 'Bearer <token>',
+  ],
+]);
+
+echo $response->getBody();
+```
+
+```csharp Example 1
+using RestSharp;
+
+var client = new RestClient("https://api.voximplant.com/platform_api/GetPhoneNumbers");
+var request = new RestRequest(Method.POST);
+request.AddHeader("Authorization", "Bearer <token>");
+IRestResponse response = client.Execute(request);
+```
+
+```swift Example 1
+import Foundation
+
+let headers = ["Authorization": "Bearer <token>"]
+
+let request = NSMutableURLRequest(url: NSURL(string: "https://api.voximplant.com/platform_api/GetPhoneNumbers")! as URL,
+                                        cachePolicy: .useProtocolCachePolicy,
+                                    timeoutInterval: 10.0)
+request.httpMethod = "POST"
+request.allHTTPHeaderFields = headers
+
+let session = URLSession.shared
+let dataTask = session.dataTask(with: request as URLRequest, completionHandler: { (data, response, error) -> Void in
+  if (error != nil) {
+    print(error as Any)
+  } else {
+    let httpResponse = response as? HTTPURLResponse
+    print(httpResponse)
+  }
+})
+
+dataTask.resume()
+```

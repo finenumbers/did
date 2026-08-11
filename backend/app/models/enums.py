@@ -8,6 +8,7 @@ class ProviderCode(str, enum.Enum):
     uis = "uis"
     aurora = "aurora"
     exolve = "exolve"
+    voximplant = "voximplant"
 
 
 class InventoryKind(str, enum.Enum):

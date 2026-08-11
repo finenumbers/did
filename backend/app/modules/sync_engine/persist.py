@@ -36,6 +36,12 @@ from app.models.exolve_raw import (
     ExolveRegionRaw,
 )
 from app.models.uis_raw import UisFreeNumberRaw, UisPurchasedNumberRaw
+from app.models.voximplant_raw import (
+    VoximplantCategoryRaw,
+    VoximplantCityRaw,
+    VoximplantFreeNumberRaw,
+    VoximplantRegionRaw,
+)
 from app.modules.sync_engine.hashing import payload_hash
 from app.modules.sync_engine.staging import (
     cutover_from_staging,
@@ -126,6 +132,10 @@ def wipe_provider_numbers(
         if inventory_kind != InventoryKind.free:
             raise ValueError("Exolve supports free inventory wipe only")
         wiped_raw = db.execute(delete(ExolveFreeNumberRaw)).rowcount or 0
+    elif provider_code == ProviderCode.voximplant:
+        if inventory_kind != InventoryKind.free:
+            raise ValueError("Voximplant supports free inventory wipe only")
+        wiped_raw = db.execute(delete(VoximplantFreeNumberRaw)).rowcount or 0
     elif provider_code == ProviderCode.finenumbers:
         wiped_raw = 0
     else:
@@ -180,6 +190,8 @@ def _region_model(provider_code: str):
         return RunexisRegionRaw
     if provider_code == "exolve":
         return ExolveRegionRaw
+    if provider_code == "voximplant":
+        return VoximplantRegionRaw
     raise ValueError(f"Unsupported provider for regions: {provider_code}")
 
 
@@ -190,6 +202,8 @@ def _city_model(provider_code: str):
         return RunexisCityRaw
     if provider_code == "exolve":
         return ExolveCityRaw
+    if provider_code == "voximplant":
+        return VoximplantCityRaw
     raise ValueError(f"Unsupported provider for cities: {provider_code}")
 
 
@@ -211,6 +225,10 @@ def persist_regions(
             row = db.scalar(select(model_cls).where(model_cls.external_key == key))
         parent_id = None
         region_code = None
+        category_name = None
+        phone_count = None
+        phone_price = None
+        phone_installation_price = None
         if provider_code == "exolve" and isinstance(region.raw_payload, dict):
             parent_id = (
                 str(region.raw_payload.get("parent_region_id"))
@@ -222,6 +240,24 @@ def persist_regions(
                 if region.raw_payload.get("region_code") is not None
                 else None
             )
+        if provider_code == "voximplant" and isinstance(region.raw_payload, dict):
+            region_code = (
+                str(region.raw_payload.get("region_code") or region.raw_payload.get("phone_region_code") or "").strip()
+                or None
+            )
+            category_name = (
+                str(region.raw_payload.get("phone_category_name") or "").strip() or None
+            )
+            try:
+                phone_count = (
+                    int(region.raw_payload.get("phone_count"))
+                    if region.raw_payload.get("phone_count") is not None
+                    else None
+                )
+            except (TypeError, ValueError):
+                phone_count = None
+            phone_price = region.raw_payload.get("phone_price")
+            phone_installation_price = region.raw_payload.get("phone_installation_price")
         if row and row.payload_hash == ph:
             row.source_loaded_at = loaded
             row.sync_job_id = job_id
@@ -240,6 +276,13 @@ def persist_regions(
                 row.eng_name = region.eng_name
                 row.parent_region_id = parent_id
                 row.region_code = region_code
+            elif isinstance(row, VoximplantRegionRaw):
+                row.eng_name = region.eng_name
+                row.region_code = region_code
+                row.category_name = category_name
+                row.phone_count = phone_count
+                row.phone_price = phone_price
+                row.phone_installation_price = phone_installation_price
         else:
             kwargs: dict[str, Any] = {
                 "sync_job_id": job_id,
@@ -261,6 +304,15 @@ def persist_regions(
                     eng_name=region.eng_name,
                     parent_region_id=parent_id,
                     region_code=region_code,
+                )
+            elif provider_code == "voximplant":
+                kwargs.update(
+                    eng_name=region.eng_name,
+                    region_code=region_code,
+                    category_name=category_name,
+                    phone_count=phone_count,
+                    phone_price=phone_price,
+                    phone_installation_price=phone_installation_price,
                 )
             db.add(model_cls(**kwargs))
         count += 1
@@ -301,7 +353,7 @@ def persist_cities(
                 row.city_name = city.name
                 row.region_external_id = city.region_external_id
                 row.region_name = city.region_name
-                if isinstance(row, ExolveCityRaw):
+                if isinstance(row, (ExolveCityRaw, VoximplantCityRaw)):
                     row.eng_name = city.eng_name
         else:
             if provider_code == "sipout":
@@ -321,6 +373,21 @@ def persist_cities(
             elif provider_code == "exolve":
                 db.add(
                     ExolveCityRaw(
+                        sync_job_id=job_id,
+                        source_loaded_at=loaded,
+                        raw_payload=city.raw_payload,
+                        payload_hash=ph,
+                        external_key=key,
+                        city_external_id=city.city_external_id,
+                        city_name=city.name,
+                        eng_name=city.eng_name,
+                        region_external_id=city.region_external_id,
+                        region_name=city.region_name,
+                    )
+                )
+            elif provider_code == "voximplant":
+                db.add(
+                    VoximplantCityRaw(
                         sync_job_id=job_id,
                         source_loaded_at=loaded,
                         raw_payload=city.raw_payload,
@@ -373,6 +440,54 @@ def persist_exolve_categories(
         if row is None:
             db.add(
                 ExolveCategoryRaw(
+                    sync_job_id=job_id,
+                    source_loaded_at=loaded,
+                    raw_payload=raw,
+                    payload_hash=ph,
+                    external_key=str(key),
+                    category_external_id=str(key),
+                    category_name=item.get("category_name"),
+                    type_id=item.get("type_id"),
+                    type_name=item.get("type_name"),
+                )
+            )
+        else:
+            row.sync_job_id = job_id
+            row.source_loaded_at = loaded
+            row.raw_payload = raw
+            row.payload_hash = ph
+            row.category_external_id = str(key)
+            row.category_name = item.get("category_name")
+            row.type_id = item.get("type_id")
+            row.type_name = item.get("type_name")
+        count += 1
+    db.flush()
+    return count
+
+
+def persist_voximplant_categories(
+    db: Session,
+    *,
+    job_id: uuid.UUID,
+    categories: list[dict[str, Any]],
+) -> int:
+    """Upsert Voximplant RU categories by phone_category_name."""
+    loaded = _now()
+    count = 0
+    for item in categories:
+        key = item.get("category_external_id")
+        if not key:
+            continue
+        raw = item.get("raw_payload") if isinstance(item.get("raw_payload"), dict) else item
+        ph = payload_hash(raw)
+        row = db.scalar(
+            select(VoximplantCategoryRaw).where(
+                VoximplantCategoryRaw.external_key == str(key)
+            )
+        )
+        if row is None:
+            db.add(
+                VoximplantCategoryRaw(
                     sync_job_id=job_id,
                     source_loaded_at=loaded,
                     raw_payload=raw,
@@ -1094,6 +1209,12 @@ def build_city_lookup(db: Session, provider_code: str) -> dict[str, tuple[str | 
             if not c.city_external_id:
                 continue
             lookup[c.city_external_id] = (c.city_name, c.region_external_id, c.region_name)
+    elif provider_code == "voximplant":
+        cities = db.scalars(select(VoximplantCityRaw)).all()
+        for c in cities:
+            if not c.city_external_id:
+                continue
+            lookup[c.city_external_id] = (c.city_name, c.region_external_id, c.region_name)
     else:
         cities = db.scalars(select(RunexisCityRaw)).all()
         for c in cities:
@@ -1191,6 +1312,123 @@ def persist_exolve_numbers(
                 db,
                 provider_id=provider_id,
                 provider_code=ProviderCode.exolve,
+                inventory_kind=inventory_kind,
+            )
+        )
+
+    cutover_from_staging(
+        db,
+        wipe_fn=_wipe,
+        live_raw_table=table_name,
+        stg_raw=stg_raw,
+        live_catalog_table="numbers_catalog_normalized",
+        stg_catalog=stg_cat,
+    )
+    if on_progress:
+        try:
+            on_progress("cutover done", upserted, len(numbers))
+        except Exception:
+            logger.exception("persist on_progress failed")
+    return {
+        "upserted": upserted,
+        "marked_absent": 0,
+        "price_history": 0,
+        "status_history": 0,
+        "deduped_input": len(deduped),
+        "bulk_insert": 1,
+        "staged_cutover": 1,
+        **wipe_holder,
+    }
+
+
+def persist_voximplant_numbers(
+    db: Session,
+    *,
+    provider_id: uuid.UUID,
+    job_id: uuid.UUID,
+    inventory_kind: InventoryKind,
+    numbers: list[NormalizedNumber],
+    on_progress: Callable[[str, int | None, int | None], Any] | None = None,
+) -> dict[str, int]:
+    """Stage into TEMP tables, then atomic wipe+cutover (free only)."""
+    if inventory_kind != InventoryKind.free:
+        raise ValueError("Voximplant persist supports free inventory only")
+
+    deduped: dict[str, NormalizedNumber] = {}
+    for num in numbers:
+        if num.provider_number_key:
+            deduped[num.provider_number_key] = num
+    numbers = list(deduped.values())
+
+    loaded = _now()
+    table_name = "voximplant_free_numbers_raw"
+    stg_raw_name = f"{table_name}_stg"
+    stg_cat_name = "numbers_catalog_normalized_stg"
+
+    stg_raw = ensure_temp_staging(db, live_table=table_name, stg_table=stg_raw_name)
+    stg_cat = ensure_temp_staging(
+        db, live_table="numbers_catalog_normalized", stg_table=stg_cat_name
+    )
+
+    raw_rows: list[dict[str, Any]] = []
+    cat_rows: list[dict[str, Any]] = []
+    for num in numbers:
+        raw_id = uuid.uuid4()
+        ph = payload_hash(num.raw_payload)
+        buy = num.buy_price
+        period = num.period_price
+        raw_rows.append(
+            {
+                "id": raw_id,
+                "sync_job_id": job_id,
+                "source_loaded_at": loaded,
+                "raw_payload": num.raw_payload,
+                "payload_hash": ph,
+                "external_key": num.provider_number_key,
+                "phone": num.msisdn or num.provider_number_key,
+                "type_name": num.number_type,
+                "category_name": num.number_class,
+                "region_name": num.region_name or num.city_name,
+                "install_fee": buy,
+                "subscription_fee": period,
+                "created_at": loaded,
+            }
+        )
+        cat_rows.append(
+            _catalog_row(
+                num,
+                provider_id=provider_id,
+                job_id=job_id,
+                inventory_kind=inventory_kind,
+                table_name=table_name,
+                raw_id=raw_id,
+                loaded=loaded,
+            )
+        )
+
+    upserted = insert_staging_batches(
+        db,
+        stg_raw,
+        raw_rows,
+        on_progress=on_progress,
+        progress_label="Voximplant staging raw",
+    )
+    insert_staging_batches(
+        db,
+        stg_cat,
+        cat_rows,
+        on_progress=on_progress,
+        progress_label="Voximplant staging catalog",
+    )
+
+    wipe_holder: dict[str, int] = {}
+
+    def _wipe() -> None:
+        wipe_holder.update(
+            wipe_provider_numbers(
+                db,
+                provider_id=provider_id,
+                provider_code=ProviderCode.voximplant,
                 inventory_kind=inventory_kind,
             )
         )

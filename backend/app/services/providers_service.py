@@ -29,6 +29,8 @@ _AUTH_PLAIN_KEYS = frozenset(
         "numbering_login",
         "numbering_partition",
         "numbering_base_url",
+        "account_id",
+        "key_id",
     }
 )
 _AUTH_TOKEN_KEYS = frozenset(
@@ -102,6 +104,12 @@ class ProvidersService:
                 "Exolve: Bearer api_key from Settings. Read-only GetList + GetFree "
                 "(type×all regions). See exolve-contract.md. Purchased/Lock/Buy out of scope."
             )
+        elif code == ProviderCode.voximplant.value:
+            notice = (
+                "Voximplant: paste Service Account credentials.json (account_id, key_id, "
+                "private_key). JWT RS256 → Management API. Read-only RU Categories/Regions/"
+                "GetNewPhoneNumbers (all free). See voximplant-contract.md. Attach/purchased OOS."
+            )
         else:
             notice = (
                 "Provider integration is based on uploaded documentation contracts "
@@ -151,6 +159,18 @@ class ProvidersService:
             if code == ProviderCode.runexis.value and numbering_password_changed:
                 for key in _AUTH_NUMBERING_SESSION_KEYS:
                     merged.pop(key, None)
+            if code == ProviderCode.voximplant.value:
+                from app.providers.voximplant.auth_jwt import parse_credentials
+
+                try:
+                    creds = parse_credentials(merged)
+                except ProviderError as exc:
+                    raise ProviderError(str(exc)) from exc
+                merged = {
+                    "account_id": creds["account_id"],
+                    "key_id": creds["key_id"],
+                    "private_key": creds["private_key"],
+                }
             persist_auth_settings(conn, merged)
         if payload.extra_settings is not None:
             conn.extra_settings = payload.extra_settings

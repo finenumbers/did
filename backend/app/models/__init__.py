@@ -27,6 +27,12 @@ from app.models.exolve_raw import (
     ExolveRegionRaw,
 )
 from app.models.uis_raw import UisFreeNumberRaw, UisPurchasedNumberRaw
+from app.models.voximplant_raw import (
+    VoximplantCategoryRaw,
+    VoximplantCityRaw,
+    VoximplantFreeNumberRaw,
+    VoximplantRegionRaw,
+)
 
 __all__ = [
     "AuroraFreeNumberRaw",
@@ -34,6 +40,10 @@ __all__ = [
     "ExolveCityRaw",
     "ExolveFreeNumberRaw",
     "ExolveRegionRaw",
+    "VoximplantCategoryRaw",
+    "VoximplantCityRaw",
+    "VoximplantFreeNumberRaw",
+    "VoximplantRegionRaw",
     "Base",
     "NumberPriceHistory",
     "NumberStatusHistory",
