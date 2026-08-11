@@ -580,7 +580,11 @@ class RunexisNumberingClient:
             "filter": used_filter,
             "fresh_session": True,
             "concurrency": contract.NUMBERING_FETCH_CONCURRENCY,
+            # search_numbers_count is the vendor search total (all access states),
+            # not the free-only list size — never fail a natural short-page end on gap.
             "count_is_progress_hint": True,
+            "count_hint_policy": "progress_only",
+            "count_hint_semantics": "api_search_total_not_free_list_size",
         }
 
         try:
@@ -603,6 +607,11 @@ class RunexisNumberingClient:
             # Keep gap aligned with actual assembled list length.
             meta["raw_fetched"] = len(items)
             meta["count_hint_gap"] = max(0, count_hint - len(items)) if count_hint else 0
+            meta["list_ended_naturally"] = bool(
+                page_meta.get("final_short_page_offset") is not None or items
+            )
+            meta["count_hint_policy"] = "progress_only"
+            meta["count_hint_semantics"] = "api_search_total_not_free_list_size"
 
             if not items:
                 raise ProviderError(
@@ -614,7 +623,8 @@ class RunexisNumberingClient:
                 logger.warning(
                     "Runexis Numbering free list fetched=%s < count_hint=%s "
                     "count_hint_gap=%s sequential_verify=%s final_short_page_offset=%s "
-                    "(count is API total / progress, not free-only size); accepting",
+                    "policy=progress_only (count_hint is API search total, not free size); "
+                    "accepting natural list end",
                     len(items),
                     count_hint,
                     meta.get("count_hint_gap"),

@@ -315,17 +315,16 @@ class VoximplantProvider(AbstractProvider):
         logger.warning("Voximplant free integrity %s", integrity)
 
         if expected_total and len(mapped) < expected_total:
-            # Race on stock is possible; fail only if raw fetched also short vs totals.
-            fetched_raw = len(all_items)
-            if fetched_raw < expected_total:
-                raise ProviderError(
-                    (
-                        f"Voximplant free incomplete: fetched_raw={fetched_raw} "
-                        f"< sum(total_count)={expected_total}"
-                    ),
-                    code="VOXIMPLANT_FREE_INCOMPLETE",
-                    details=integrity,
-                )
+            # Gate on unique mapped keys (not raw length) so dedupe/map drops cannot
+            # hide an incomplete inventory. Small overshoot of raw vs sum is OK.
+            raise ProviderError(
+                (
+                    f"Voximplant free incomplete: unique_keys={len(mapped)} "
+                    f"< sum(total_count)={expected_total}"
+                ),
+                code="VOXIMPLANT_FREE_INCOMPLETE",
+                details=integrity,
+            )
 
         return SyncResult(
             fetched=len(all_items),

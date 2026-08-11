@@ -32,6 +32,7 @@ from app.modules.sync_engine.persist import (
     persist_runexis_numbers,
     persist_sipout_numbers,
     persist_uis_numbers,
+    preserve_operators_on_numbers,
 )
 from app.modules.sync_engine.progress import SyncProgressTracker, stage_for_provider_phase
 from app.modules.sync_engine.safety import count_unique_provider_keys, reload_allowed
@@ -207,10 +208,20 @@ class SyncService:
             job = self.db.get(SyncJob, job_id)
             assert job is not None
             job.status = SyncJobStatus.failed
-            job.error_summary = _exc_summary(exc)
+            summary = _exc_summary(exc)
+            if stats.get("_free_cutover_committed"):
+                summary = (
+                    f"{summary}; free inventory already cut over — "
+                    "catalog may be split (new free + previous purchased)"
+                )
+                stats["inventory_split"] = True
+            job.error_summary = summary
             job.finished_at = datetime.now(timezone.utc)
+            job.stats = {
+                k: v for k, v in stats.items() if not str(k).startswith("_")
+            }
             log_job(
-                self.db, job.id, SyncLogLevel.error, f"Sync failed: {_exc_summary(exc)}"
+                self.db, job.id, SyncLogLevel.error, f"Sync failed: {summary}"
             )
             self.db.commit()
             return job
@@ -223,7 +234,10 @@ class SyncService:
             except Exception:
                 self.db.rollback()
 
-        job.stats = {k: v for k, v in stats.items() if not str(k).startswith("_")}
+        public_stats = {k: v for k, v in stats.items() if not str(k).startswith("_")}
+        if stats.get("_inventory_split"):
+            public_stats["inventory_split"] = True
+        job.stats = public_stats
         job.finished_at = datetime.now(timezone.utc)
         self.db.commit()
         self.db.refresh(job)
@@ -446,6 +460,12 @@ class SyncService:
                     unmapped_raw=list(result.unmapped_raw or []),
                     numbers=numbers,
                 )
+                preserved_ops = preserve_operators_on_numbers(
+                    self.db,
+                    provider_id=provider.id,
+                    inventory_kind=InventoryKind.free,
+                    numbers=numbers,
+                )
                 persist_progress = _throttled_persist_progress(
                     self.db,
                     job_id=job.id,
@@ -460,7 +480,7 @@ class SyncService:
                     (
                         f"Staging cutover provider={provider.code.value} kind=free "
                         f"reload unique={unique_incoming} raw={len(numbers)} "
-                        f"(previous={previous})"
+                        f"(previous={previous}, operators_preserved={preserved_ops})"
                     ),
                 )
                 if provider.code == ProviderCode.sipout:
@@ -567,6 +587,9 @@ class SyncService:
                         f"Free integrity {result.extra_stats['integrity']}",
                         result.extra_stats["integrity"],
                     )
+                # Free cutover is committed; purchased failure after this = split inventory.
+                stats["_free_cutover_committed"] = True
+                free_block["operators_preserved"] = preserved_ops
                 self.db.commit()
                 await _hook("free", "end", free_detail)
             else:
@@ -624,10 +647,22 @@ class SyncService:
                         "fetched": result.fetched,
                         "reason": reason,
                     }
-                    stats["_fatal_error"] = reason
-                    log_job(self.db, job.id, SyncLogLevel.error, reason or "refused wipe")
+                    if stats.get("_free_cutover_committed"):
+                        stats["_inventory_split"] = True
+                        stats["inventory_split"] = True
+                        split_msg = (
+                            f"{reason}; free inventory already cut over — "
+                            "catalog may be split (new free + previous purchased)"
+                        )
+                        stats["_fatal_error"] = split_msg
+                        log_job(self.db, job.id, SyncLogLevel.error, split_msg)
+                    else:
+                        stats["_fatal_error"] = reason
+                        log_job(
+                            self.db, job.id, SyncLogLevel.error, reason or "refused wipe"
+                        )
                     self.db.commit()
-                    await _hook("purchased", "fail", reason or "refused wipe")
+                    await _hook("purchased", "fail", stats["_fatal_error"] or "refused wipe")
                     stats["limitations"] = limitations
                     return stats
 
@@ -635,6 +670,12 @@ class SyncService:
                     provider=provider.code.value,
                     inventory_kind=InventoryKind.purchased.value,
                     unmapped_raw=list(result.unmapped_raw or []),
+                    numbers=numbers,
+                )
+                preserve_operators_on_numbers(
+                    self.db,
+                    provider_id=provider.id,
+                    inventory_kind=InventoryKind.purchased,
                     numbers=numbers,
                 )
                 persist_progress = _throttled_persist_progress(

@@ -90,6 +90,35 @@ def stage_status(progress: dict[str, Any] | None, stage_id: str) -> str | None:
     return None
 
 
+def build_stage_timings(progress: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Per-stage wall times from progress started_at/finished_at (ISO UTC)."""
+    if not progress:
+        return []
+    out: list[dict[str, Any]] = []
+    for stage in progress.get("stages") or []:
+        started = stage.get("started_at")
+        finished = stage.get("finished_at")
+        duration_s: float | None = None
+        if started and finished:
+            try:
+                t0 = datetime.fromisoformat(str(started).replace("Z", "+00:00"))
+                t1 = datetime.fromisoformat(str(finished).replace("Z", "+00:00"))
+                duration_s = round((t1 - t0).total_seconds(), 3)
+            except (TypeError, ValueError):
+                duration_s = None
+        out.append(
+            {
+                "id": stage.get("id"),
+                "status": stage.get("status"),
+                "started_at": started,
+                "finished_at": finished,
+                "duration_s": duration_s,
+                "detail": stage.get("detail") or "",
+            }
+        )
+    return out
+
+
 class SyncProgressTracker:
     def __init__(self, db: Session, run_id: UUID):
         self.db = db

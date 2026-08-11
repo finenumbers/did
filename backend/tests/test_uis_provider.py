@@ -179,18 +179,16 @@ def test_iter_all_continues_after_short_page_when_total_not_reached(monkeypatch)
     assert integrity["total_items_mismatch"] is False
 
 
-def test_iter_all_empty_after_shortfall_does_not_raise(monkeypatch):
-    """total_items off-by-one with empty next page → warn, do not fail."""
+def test_iter_all_empty_after_shortfall_fails_closed(monkeypatch):
+    """total_items shortfall with empty next page → UIS_TOTAL_ITEMS_MISMATCH."""
     cfg = ConnectionConfig(
         base_url=contract.EXAMPLE_BASE_URL,
         auth_settings={"access_token": "t"},
     )
     client = UisClient(cfg, page_limit=1000)
     total = 28391
-    calls: list[int] = []
 
     async def fake_get_page(method, *, offset=0, limit=None):
-        calls.append(offset)
         lim = limit or 1000
         if offset < 28000:
             data = [{"phone_number": f"79{offset + i:09d}"} for i in range(lim)]
@@ -207,13 +205,9 @@ def test_iter_all_empty_after_shortfall_does_not_raise(monkeypatch):
         )
 
     monkeypatch.setattr(client, "get_page", fake_get_page)
-    items, _envs, integrity = asyncio.run(
-        client.iter_all(contract.METHOD_AVAILABLE_VIRTUAL_NUMBERS)
-    )
-    assert 28390 in calls
-    assert len(items) == 28390
-    assert integrity["total_items_mismatch"] is True
-    assert integrity["stopped_at_max_offset"] is False
+    with pytest.raises(ProviderError) as exc_info:
+        asyncio.run(client.iter_all(contract.METHOD_AVAILABLE_VIRTUAL_NUMBERS))
+    assert exc_info.value.code == "UIS_TOTAL_ITEMS_MISMATCH"
 
 
 def test_iter_all_fails_when_truncated_by_max_offset(monkeypatch):

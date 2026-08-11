@@ -191,3 +191,59 @@ def test_provider_capabilities():
     assert caps["free_numbers"]["supported"] is True
     assert caps["purchased_numbers"]["supported"] is False
     assert caps["dictionaries"]["supported"] is True
+
+
+def test_free_incomplete_on_unique_keys_shortfall():
+    """Global gate fails when unique mapped keys < sum(total_count)."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    provider = VoximplantProvider()
+    conn = _conn()
+    raw = RawHttpResult(200, "{}", {}, {}, 1, "u")
+
+    client = MagicMock()
+    client.get_account_info = AsyncMock(return_value=({"currency": "RUR"}, raw))
+    client.get_ru_categories = AsyncMock(
+        return_value=([{"phone_category_name": "GEOGRAPHIC"}], raw)
+    )
+    client.get_regions = AsyncMock(
+        return_value=([{"phone_region_id": 1, "phone_count": 5}], raw)
+    )
+
+    async def fake_iter(
+        *,
+        category,
+        region_id,
+        region_name=None,
+        on_progress=None,
+        expected_phone_count=None,
+    ):
+        items = [
+            {
+                "phone_number": "74950000001",
+                "phone_price": 1,
+                "phone_installation_price": 0,
+                "_vox_category": category,
+                "_vox_region_id": region_id,
+            },
+            {
+                "phone_number": "74950000002",
+                "phone_price": 1,
+                "phone_installation_price": 0,
+                "_vox_category": category,
+                "_vox_region_id": region_id,
+            },
+        ]
+        return items, [], {"total_count": 5, "fetched": 2}
+
+    client.iter_free_slice = fake_iter
+    provider._client = lambda connection, **kwargs: client  # type: ignore[method-assign]
+
+    async def run():
+        try:
+            await provider.sync_free_numbers(conn)
+            assert False, "expected incomplete"
+        except ProviderError as exc:
+            assert exc.code == "VOXIMPLANT_FREE_INCOMPLETE"
+
+    asyncio.run(run())

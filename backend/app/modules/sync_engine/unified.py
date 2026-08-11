@@ -26,6 +26,7 @@ from app.modules.sync_engine.modes import SyncMode
 from app.modules.sync_engine.progress import (
     SyncProgressTracker,
     build_initial_progress,
+    build_stage_timings,
     stage_for_provider_phase,
     stage_status,
 )
@@ -319,6 +320,8 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
 
         inventory_summary = build_inventory_summary(category_stats)
         catalog_checksum = build_catalog_checksum(category_stats)
+        db.refresh(run)
+        stage_timings = build_stage_timings(run.progress)
         summary = {
             "providers_ok": provider_ok,
             "providers_failed": provider_failures,
@@ -326,6 +329,7 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
             "inventory_summary": inventory_summary,
             "catalog_checksum": catalog_checksum,
             "dropped_export": dropped_meta,
+            "stage_timings": stage_timings,
         }
         run.stats = summary
         db.commit()
@@ -342,6 +346,22 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
                 f"enrich_matches_catalog={catalog_checksum.get('enrich_matches_catalog')}"
             ),
             catalog_checksum,
+        )
+        timing_compact = [
+            {
+                "id": t.get("id"),
+                "status": t.get("status"),
+                "duration_s": t.get("duration_s"),
+            }
+            for t in stage_timings
+            if t.get("duration_s") is not None
+        ]
+        log_run(
+            db,
+            run.id,
+            SyncLogLevel.info,
+            f"Stage timings count={len(timing_compact)}",
+            {"stage_timings": timing_compact},
         )
         tracker.end(
             "finalize",

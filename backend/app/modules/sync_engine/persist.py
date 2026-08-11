@@ -573,6 +573,61 @@ def persist_voximplant_categories(
     return count
 
 
+def load_present_operators(
+    db: Session,
+    *,
+    provider_id: uuid.UUID,
+    inventory_kind: InventoryKind,
+) -> dict[str, str]:
+    """msisdn → operator for currently present catalog rows (non-empty operator)."""
+    rows = db.execute(
+        select(NumbersCatalogNormalized.msisdn, NumbersCatalogNormalized.operator).where(
+            NumbersCatalogNormalized.provider_id == provider_id,
+            NumbersCatalogNormalized.inventory_kind == inventory_kind,
+            NumbersCatalogNormalized.is_currently_present.is_(True),
+            NumbersCatalogNormalized.msisdn.is_not(None),
+            NumbersCatalogNormalized.operator.is_not(None),
+            NumbersCatalogNormalized.operator != "",
+        )
+    ).all()
+    out: dict[str, str] = {}
+    for msisdn, operator in rows:
+        if msisdn and operator and str(operator).strip():
+            out[str(msisdn)] = str(operator).strip()
+    return out
+
+
+def preserve_operators_on_numbers(
+    db: Session,
+    *,
+    provider_id: uuid.UUID,
+    inventory_kind: InventoryKind,
+    numbers: list[NormalizedNumber],
+) -> int:
+    """Copy previous catalog.operator onto incoming numbers when incoming has none.
+
+    Survives wipe+cutover so Contour B enrich does not rewrite the whole catalog
+    every sync when the local INN cache already knows the operator.
+    """
+    prev = load_present_operators(
+        db, provider_id=provider_id, inventory_kind=inventory_kind
+    )
+    if not prev:
+        return 0
+    preserved = 0
+    for num in numbers:
+        if num.operator and str(num.operator).strip():
+            continue
+        msisdn = num.msisdn or num.provider_number_key
+        if not msisdn:
+            continue
+        op = prev.get(str(msisdn))
+        if op:
+            num.operator = op
+            preserved += 1
+    return preserved
+
+
 def _catalog_row(
     num: NormalizedNumber,
     *,

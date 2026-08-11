@@ -117,6 +117,44 @@ def test_page_all_accepts_free_list_below_count_hint():
     assert len(items) == 45
 
 
+def test_list_all_free_documents_count_hint_progress_only_policy():
+    """list_all_free_numbers must expose progress-only gap policy, not fail."""
+    from app.providers.runexis import contract as runexis_contract
+
+    data = [{"n": i, "access_state": 0} for i in range(45)]
+    limit = 20
+    scripts = {
+        0: [data[0:20]],
+        20: [data[20:40]],
+        40: [data[40:45]],
+        60: [[]],
+    }
+    client = ScriptedNumberingClient(scripts, count_hint=200)
+
+    async def _noop() -> None:
+        return None
+
+    client.connect = _noop  # type: ignore[method-assign]
+    client.aclose = _noop  # type: ignore[method-assign]
+
+    # Pin page size so scripted offsets match contract concurrency path.
+    orig_limit = runexis_contract.NUMBERING_PAGE_LIMIT
+    orig_conc = runexis_contract.NUMBERING_FETCH_CONCURRENCY
+    runexis_contract.NUMBERING_PAGE_LIMIT = limit
+    runexis_contract.NUMBERING_FETCH_CONCURRENCY = 1
+    try:
+        items, _envs, meta = asyncio.run(client.list_all_free_numbers())
+    finally:
+        runexis_contract.NUMBERING_PAGE_LIMIT = orig_limit
+        runexis_contract.NUMBERING_FETCH_CONCURRENCY = orig_conc
+
+    assert len(items) == 45
+    assert meta["count_hint_policy"] == "progress_only"
+    assert meta["count_hint_semantics"] == "api_search_total_not_free_list_size"
+    assert meta["count_hint_gap"] == 155
+    assert meta["list_ended_naturally"] is True
+
+
 def test_page_all_cancels_higher_offsets_after_short_page():
     """Short page must cancel slower higher-offset siblings (wall-time win)."""
     data = [{"n": i} for i in range(45)]

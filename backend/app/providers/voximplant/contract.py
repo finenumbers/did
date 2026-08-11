@@ -18,11 +18,11 @@ METHOD_GET_CATEGORIES = "GetPhoneNumberCategories"
 METHOD_GET_REGIONS = "GetPhoneNumberRegions"
 METHOD_GET_NEW_PHONES = "GetNewPhoneNumbers"
 
-# VERIFIED docs default for GetNewPhoneNumbers.count
-DEFAULT_PAGE_LIMIT = 20
+# VERIFIED docs default for GetNewPhoneNumbers.count is 20; larger is OPERATIONAL.
+DEFAULT_PAGE_LIMIT = 50
 MAX_OFFSET = 5_000_000
-# OPERATIONAL — keep low due to error 314 CONCURRENT_RESOURCE_LIMIT_EXCEEDED
-MAX_SLICE_CONCURRENCY = 3
+# OPERATIONAL — raised from 3; fail closed on API error 314
+MAX_SLICE_CONCURRENCY = 6
 JWT_TTL_SECONDS = 3600
 JWT_REFRESH_SKEW_SECONDS = 60
 

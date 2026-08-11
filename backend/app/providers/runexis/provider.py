@@ -258,9 +258,13 @@ class RunexisProvider(AbstractProvider):
             "access_state_distribution": dict(access_state_distribution),
             "sequential_verify": bool(meta.get("sequential_verify")),
             "final_short_page_offset": meta.get("final_short_page_offset"),
+            "list_ended_naturally": bool(meta.get("list_ended_naturally")),
             "count_hint": count_hint,
             "count_hint_gap": count_hint_gap,
             "count_is_progress_hint": True,
+            "count_hint_policy": meta.get("count_hint_policy") or "progress_only",
+            "count_hint_semantics": meta.get("count_hint_semantics")
+            or "api_search_total_not_free_list_size",
             "filter": meta.get("filter"),
         }
         warnings = [
@@ -271,7 +275,10 @@ class RunexisProvider(AbstractProvider):
             f"free_kept={len(free_parsed)}",
             f"dropped_non_free_status={dropped_non_free}",
             f"map_failed={len(unmapped_raw)}",
-            f"count_hint_gap={count_hint_gap} (info; count is progress hint, not fail)",
+            (
+                f"count_hint_gap={count_hint_gap} "
+                "(policy=progress_only; API search total ≠ free list size)"
+            ),
             f"sequential_verify={meta.get('sequential_verify')}",
             f"final_short_page_offset={meta.get('final_short_page_offset')}",
             f"access_state_distribution={dict(access_state_distribution)}",

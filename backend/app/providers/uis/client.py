@@ -131,10 +131,10 @@ class UisClient:
         Short page is not an early stop when ``total_items`` is known and
         ``offset < total`` (UIS may return a short page before the final rows).
 
-        Fail closed with ``UIS_PAGINATION_TRUNCATED`` only when the MAX_OFFSET
-        window is exhausted and ``fetched < total_items``. If pagination ends on
-        an empty page inside the window with a shortfall, treat ``total_items``
-        as a hint (log warning; do not fail the sync).
+        Fail closed with ``UIS_PAGINATION_TRUNCATED`` when the MAX_OFFSET window
+        is exhausted and ``fetched < total_items``. Also fail closed with
+        ``UIS_TOTAL_ITEMS_MISMATCH`` when pagination ends inside the window
+        (empty/short page) while ``fetched < total_items``.
         """
         from app.providers.progress_emit import emit_progress
         from app.providers.uis.parser import parse_list_page
@@ -206,13 +206,11 @@ class UisClient:
                         "stop_reason": stop_reason,
                     },
                 )
-            logger.warning(
-                "UIS %s total_items mismatch: fetched=%s total_items=%s "
-                "stop_reason=%s (continuing without fail)",
-                method,
-                len(items),
-                total,
-                stop_reason,
+            raise ProviderError(
+                f"UIS {method} incomplete: fetched {len(items)} of {total} "
+                f"(stop_reason={stop_reason})",
+                code="UIS_TOTAL_ITEMS_MISMATCH",
+                details=integrity,
             )
 
         return items, envelopes, integrity

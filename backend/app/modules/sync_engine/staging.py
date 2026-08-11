@@ -59,7 +59,7 @@ def insert_staging_batches(
     stg: Table,
     rows: list[dict[str, Any]],
     *,
-    batch_size: int = 3000,
+    batch_size: int = 8000,
     on_progress: Any | None = None,
     progress_label: str = "staging",
 ) -> int:
