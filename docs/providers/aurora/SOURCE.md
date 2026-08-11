@@ -37,6 +37,13 @@ Directory base (Settings optional override):
 | Columns | 5 (phone; type; fee; region; display mask) |
 | Content-Type | often unset |
 
+## Derived docs
+
+- [`../aurora-contract.md`](../aurora-contract.md)
+- [`../aurora-field-mapping.md`](../aurora-field-mapping.md)
+- [`../aurora-implementation-notes.md`](../aurora-implementation-notes.md)
+- Code: `backend/app/providers/aurora/contract.py`
+
 ## Rule
 
-Live regional URLs above + sample under `aurora/raw/` are the source of truth for shape. Derived `aurora-contract.md` / `aurora-field-mapping.md` must not invent columns. Integration is **read-only** (GET CSV only). Fail-closed: any regional file HTTP/parse failure fails the free sync stage.
+Live regional URLs above + sample under `aurora/raw/` are the source of truth for shape. Derived contract/mapping must not invent columns. Integration is **read-only** (GET CSV only). Fail-closed: any regional file HTTP/parse failure fails the free sync stage.

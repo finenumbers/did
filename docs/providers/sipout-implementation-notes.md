@@ -1,5 +1,22 @@
 # SipOut implementation notes
 
+Nav: [`sipout/SOURCE.md`](sipout/SOURCE.md) · [`sipout-contract.md`](sipout-contract.md) · [`sipout-field-mapping.md`](sipout-field-mapping.md)
+
+## Settings
+
+| Key | Purpose |
+|---|---|
+| `auth_settings.key` | API key (query param) |
+| `base_url` | LK userapi base (default from contract) |
+
+## Sync stages
+
+| Stage id | Phase |
+|---|---|
+| `sipout_dictionaries` | `did/get_cities` → regions + cities |
+| `sipout_free` | `did/free_list` |
+| `sipout_purchased` | `did/connected_list` |
+
 ## Implemented actions
 
 | Action | Use |

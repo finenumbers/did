@@ -1,5 +1,7 @@
 # Finenumbers PSTN contract
 
+Nav: [`finenumbers/SOURCE.md`](finenumbers/SOURCE.md) · [`finenumbers-field-mapping.md`](finenumbers-field-mapping.md) · [`finenumbers-implementation-notes.md`](finenumbers-implementation-notes.md) · code `backend/app/providers/finenumbers/contract.py`
+
 Source of truth for integration: `backend/app/providers/finenumbers/contract.py` and live PSTN API.
 Vendor HTML/PDF materials are not checked into this repo; markers below reflect code-confirmed usage.
 
@@ -60,6 +62,12 @@ Sync does **not** auto-refresh Contour B. Cache refresh is manual from Settings.
 | dictionaries (regions/cities) | no |
 | test connection | yes (`by-inn` page=1) |
 | operator enrichment | yes (local cache first, then lookup) |
+
+## Sync stages (product)
+
+| Stage id | Phase |
+|---|---|
+| `finenumbers_free` | Contour A inventory only |
 
 ## Read-only
 

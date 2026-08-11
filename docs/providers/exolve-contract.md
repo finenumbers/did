@@ -1,5 +1,7 @@
 # Exolve (МТС Exolve) — machine contract
 
+Nav: [`exolve/SOURCE.md`](exolve/SOURCE.md) · [`exolve-field-mapping.md`](exolve-field-mapping.md) · [`exolve-implementation-notes.md`](exolve-implementation-notes.md) · code `backend/app/providers/exolve/contract.py`
+
 Sources (local artifacts win — see [`exolve/SOURCE.md`](exolve/SOURCE.md)):
 - [`exolve/raw/Exolve-Numbering-API.md`](exolve/raw/Exolve-Numbering-API.md) — https://docs.exolve.ru/docs/ru/api-reference/numbering-api (full method index)
 - [`exolve/raw/Exolve-GetList.md`](exolve/raw/Exolve-GetList.md) — https://docs.exolve.ru/docs/ru/api-reference/numbering-api/reference/
@@ -49,6 +51,13 @@ Sync rules (completeness):
 4. Paginate each slice until short/empty page (`DEFAULT_PAGE_LIMIT = 500`; docs do not state a max); `offset > MAX_OFFSET` → fail `EXOLVE_PAGINATION_TRUNCATED` (no wipe).
 5. Merge slices; dedupe by normalized `number_code`.
 6. If all slices empty **and** docs-example canary is also 0 → fail with explicit LK inventory/balance message.
+
+## Sync stages (product) — OPERATIONAL
+
+| Stage id | Phase |
+|---|---|
+| `exolve_dictionaries` | GetList |
+| `exolve_free` | GetFree |
 
 ## NumberElement → catalog (summary)
 

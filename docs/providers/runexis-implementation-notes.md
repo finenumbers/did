@@ -1,11 +1,21 @@
 # Runexis implementation notes
 
+Nav: [`runexis/SOURCE.md`](runexis/SOURCE.md) · [`runexis-contract.md`](runexis-contract.md) · [`runexis-numbering-api-contract.md`](runexis-numbering-api-contract.md) · [`runexis-field-mapping.md`](runexis-field-mapping.md)
+
 ## Dual API surface
 
 | Surface | Base | Auth keys | Product use |
 |---|---|---|---|
 | DIDAPI (Scribe HTML) | `base_url` / `https://didapi.runexis.ru` | `email`, `password` → Bearer `token` | purchased, dictionaries, DIDAPI half of testConnection |
 | Numbering API (DOCX) | `numbering_base_url` / `https://did-api.runexis.ru/` | `numbering_login`, `numbering_password`, optional `numbering_partition` → `numbering_session_id` | **free / purchasable** catalog |
+
+## Sync stages
+
+| Stage id | Phase |
+|---|---|
+| `runexis_dictionaries` | DIDAPI regions/cities |
+| `runexis_free` | Numbering `search_numbers` (free filter) |
+| `runexis_purchased` | DIDAPI management (non-free) |
 
 ## Implemented
 

@@ -1,5 +1,7 @@
 # SipOut contract (documentation-derived)
 
+Nav: [`sipout/SOURCE.md`](sipout/SOURCE.md) · [`sipout-field-mapping.md`](sipout-field-mapping.md) · [`sipout-implementation-notes.md`](sipout-implementation-notes.md) · code `backend/app/providers/sipout/contract.py`
+
 Source: [`sipout/raw/SipOut.html`](sipout/raw/SipOut.html) only.
 
 ## Auth — VERIFIED
@@ -51,6 +53,14 @@ Sync default: **single** call without `city_id` crawl.
 - connected_list item: `did`, `user_comment`, `order_id`, `doc_status`, `order_doc_required`, `doc_required`, `status`, `city_id`, `has_sms`, `sign`
 - city: `id`, `name`, `eng_name`, `region_id`
 - region: `id`, `name`, `capital_city`, `eng_name`, `gmt`
+
+## Sync stages (product) — OPERATIONAL
+
+| Stage id | Phase |
+|---|---|
+| `sipout_dictionaries` | cities/regions |
+| `sipout_free` | free_list |
+| `sipout_purchased` | connected_list |
 
 ## UNVERIFIED / limitations
 

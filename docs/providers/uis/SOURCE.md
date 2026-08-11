@@ -14,6 +14,13 @@
 | [`raw/UIS-get-virtual-numbers.html`](raw/UIS-get-virtual-numbers.html) | Connected / purchased VN |
 | [`raw/UIS-login-user.html`](raw/UIS-login-user.html) | login.user |
 
+## Derived docs
+
+- [`../uis-contract.md`](../uis-contract.md)
+- [`../uis-field-mapping.md`](../uis-field-mapping.md)
+- [`../uis-implementation-notes.md`](../uis-implementation-notes.md)
+- Code: `backend/app/providers/uis/contract.py`
+
 ## Rule
 
-Saved HTML under `uis/raw/` is the method source of truth for UIS. Derived `uis-contract.md` / `uis-field-mapping.md` must not invent methods or fields. Integration is **read-only** (`get.*` with ЛК `access_token` only; `login.user` documented but unused by product).
+Saved HTML under `uis/raw/` is the method source of truth for UIS. Derived contract/mapping must not invent methods or fields. Integration is **read-only** (`get.*` with ЛК `access_token` only; `login.user` documented but unused by product).

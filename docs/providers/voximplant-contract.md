@@ -1,5 +1,7 @@
 # Voximplant — machine contract
 
+Nav: [`voximplant/SOURCE.md`](voximplant/SOURCE.md) · [`voximplant-field-mapping.md`](voximplant-field-mapping.md) · [`voximplant-implementation-notes.md`](voximplant-implementation-notes.md) · code `backend/app/providers/voximplant/contract.py`
+
 Sources (local artifacts win — see [`voximplant/SOURCE.md`](voximplant/SOURCE.md)):
 - [`voximplant/raw/Voximplant-Authorization.md`](voximplant/raw/Voximplant-Authorization.md)
 - [`voximplant/raw/Voximplant-Errors.md`](voximplant/raw/Voximplant-Errors.md)
@@ -58,6 +60,13 @@ Sync rules:
 5. Dedupe by normalized MSISDN (`7XXXXXXXXXX`).
 6. Low concurrency (≤4) due to error `314`; retry/backoff on concurrent limit — do not skip slice.
 7. `DEFAULT_PAGE_LIMIT = 20` until live probe proves a higher safe `count`.
+
+## Sync stages (product) — OPERATIONAL
+
+| Stage id | Phase |
+|---|---|
+| `voximplant_dictionaries` | Categories + Regions |
+| `voximplant_free` | GetNewPhoneNumbers |
 
 ## Prices
 

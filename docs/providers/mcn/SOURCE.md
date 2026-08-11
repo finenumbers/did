@@ -26,9 +26,16 @@ Saved under [`raw/`](raw/).
 | [`raw/MCN-NNP-openapi.json`](raw/MCN-NNP-openapi.json) + md/html | Информация о номерах | NNP/MNP lookup only — **not** free DID stock |
 | [`raw/MCN-base-api-help.md`](raw/MCN-base-api-help.md) / html | Base API help | Mentions `POST …/account/getFreeNumbers` without schema — not v1 primary |
 
+## Derived docs
+
+- [`../mcn-contract.md`](../mcn-contract.md)
+- [`../mcn-field-mapping.md`](../mcn-field-mapping.md)
+- [`../mcn-implementation-notes.md`](../mcn-implementation-notes.md)
+- Code: `backend/app/providers/mcn/contract.py`
+
 ## Rule
 
-Derived `mcn-contract.md` / `mcn-field-mapping.md` must not invent fields beyond archived OpenAPI.
+Derived contract/mapping must not invent fields beyond archived OpenAPI.
 
 **Product integration is read-only Витрина:** countries / regions / cities / numbers. Checkout/buy and NNP are out of scope for inventory sync.
 

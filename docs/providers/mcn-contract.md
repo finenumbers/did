@@ -1,5 +1,7 @@
 # MCN Telecom — machine contract
 
+Nav: [`mcn/SOURCE.md`](mcn/SOURCE.md) · [`mcn-field-mapping.md`](mcn-field-mapping.md) · [`mcn-implementation-notes.md`](mcn-implementation-notes.md) · code `backend/app/providers/mcn/contract.py`
+
 Sources (local artifacts win — see [`mcn/SOURCE.md`](mcn/SOURCE.md)):
 - [`mcn/raw/MCN-Vitrina-openapi.json`](mcn/raw/MCN-Vitrina-openapi.json) / [`MCN-Vitrina.md`](mcn/raw/MCN-Vitrina.md)
 - [`mcn/raw/MCN-token-help.md`](mcn/raw/MCN-token-help.md)
@@ -68,3 +70,10 @@ Sync rules:
 | `default_tariff.price_setup` | `buy_price` |
 | `default_tariff.price_per_period` (else `price`) | `period_price` |
 | `currency` | payload meta |
+
+## Sync stages (product) — OPERATIONAL
+
+| Stage id | Phase |
+|---|---|
+| `mcn_dictionaries` | countries / regions / cities |
+| `mcn_free` | showcase/numbers |

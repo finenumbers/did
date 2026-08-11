@@ -29,9 +29,16 @@ Saved under [`raw/`](raw/). Prefer HTML as verbatim page capture; `.md` is a sea
 | [`raw/Voximplant-GetPhoneNumbers.html`](raw/Voximplant-GetPhoneNumbers.html) / [`.md`](raw/Voximplant-GetPhoneNumbers.md) | Account phones | Purchased list (OOS v1) |
 | [`raw/Voximplant-AttachPhoneNumber.html`](raw/Voximplant-AttachPhoneNumber.html) / [`.md`](raw/Voximplant-AttachPhoneNumber.md) | Attach / buy | Mutation — never call |
 
+## Derived docs
+
+- [`../voximplant-contract.md`](../voximplant-contract.md)
+- [`../voximplant-field-mapping.md`](../voximplant-field-mapping.md)
+- [`../voximplant-implementation-notes.md`](../voximplant-implementation-notes.md)
+- Code: `backend/app/providers/voximplant/contract.py`
+
 ## Rule
 
-Saved artifacts under `voximplant/raw/` are the method source of truth for Voximplant. Derived `voximplant-contract.md` / `voximplant-field-mapping.md` must not invent methods or fields.
+Saved artifacts under `voximplant/raw/` are the method source of truth for Voximplant. Derived contract/mapping must not invent methods or fields.
 
 **Product integration is read-only:** Authorization + GetAccountInfo + GetPhoneNumberCategories + GetPhoneNumberRegions + GetNewPhoneNumbers. Attach / purchased inventory are archived and **out of scope**.
 

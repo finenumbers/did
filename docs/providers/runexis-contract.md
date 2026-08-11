@@ -1,5 +1,7 @@
 # Runexis contract (documentation-derived)
 
+Nav: [`runexis/SOURCE.md`](runexis/SOURCE.md) · [`runexis-numbering-api-contract.md`](runexis-numbering-api-contract.md) · [`runexis-field-mapping.md`](runexis-field-mapping.md) · [`runexis-implementation-notes.md`](runexis-implementation-notes.md) · code `backend/app/providers/runexis/contract.py`
+
 Sources:
 
 - DIDAPI REST: [`runexis/raw/Runexis.html`](runexis/raw/Runexis.html) — purchased inventory, Bearer auth, DIDAPI dictionaries.

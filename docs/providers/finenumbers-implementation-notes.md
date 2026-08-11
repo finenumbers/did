@@ -1,5 +1,20 @@
 # Finenumbers implementation notes
 
+Nav: [`finenumbers/SOURCE.md`](finenumbers/SOURCE.md) · [`finenumbers-contract.md`](finenumbers-contract.md) · [`finenumbers-field-mapping.md`](finenumbers-field-mapping.md)
+
+## Settings
+
+| Key | Purpose |
+|---|---|
+| `auth_settings.key` | Bearer token (alias `api_key` accepted by client) |
+| `base_url` | Default `https://pstn.finenumbers.com` |
+
+## Sync stages
+
+| Stage id | Phase |
+|---|---|
+| `finenumbers_free` | Contour A by-inn expand → catalog (no dictionaries stage) |
+
 ## Contour A — free inventory
 
 - Provider code: `finenumbers`.

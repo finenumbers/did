@@ -1,5 +1,7 @@
 # Aurora Telecom free CSV contract (documentation-derived)
 
+Nav: [`aurora/SOURCE.md`](aurora/SOURCE.md) · [`aurora-field-mapping.md`](aurora-field-mapping.md) · [`aurora-implementation-notes.md`](aurora-implementation-notes.md) · code `backend/app/providers/aurora/contract.py`
+
 Sources: [`aurora/SOURCE.md`](aurora/SOURCE.md) and [`aurora/raw/sample.csv`](aurora/raw/sample.csv).
 
 ## Transport — VERIFIED (live)

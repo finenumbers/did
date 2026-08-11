@@ -41,9 +41,16 @@ Saved under [`raw/`](raw/). Prefer HTML as verbatim page capture; `.md` is a sea
 
 Every documented GetFree success example includes `category_id` and usually `random: true`, even though the param table marks them optional. Live canaries compare docs-shaped requests vs no-category probes before choosing sync mode. See also the buying-number instruction Postman example.
 
+## Derived docs
+
+- [`../exolve-contract.md`](../exolve-contract.md)
+- [`../exolve-field-mapping.md`](../exolve-field-mapping.md)
+- [`../exolve-implementation-notes.md`](../exolve-implementation-notes.md)
+- Code: `backend/app/providers/exolve/contract.py`
+
 ## Rule
 
-Saved artifacts under `exolve/raw/` are the method source of truth for Exolve. Derived `exolve-contract.md` / `exolve-field-mapping.md` must not invent methods or fields.
+Saved artifacts under `exolve/raw/` are the method source of truth for Exolve. Derived contract/mapping must not invent methods or fields.
 
 **Product integration is read-only:** `GetList` + `GetFree` only. Lock / Unlock / Buy / Delete / purchased inventory / forwarding / AMD are archived for reference and **out of scope**.
 

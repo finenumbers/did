@@ -1,5 +1,7 @@
 # UIS implementation notes
 
+Nav: [`uis/SOURCE.md`](uis/SOURCE.md) · [`uis-contract.md`](uis-contract.md) · [`uis-field-mapping.md`](uis-field-mapping.md)
+
 ## Auth settings keys
 
 | Key | Purpose |
@@ -8,6 +10,13 @@
 | `user_id` | Optional agent customer user id (number as string in settings) |
 
 Product does **not** call `login.user`; session-via-password is unused. Vendor docs still describe that method separately.
+
+## Sync stages
+
+| Stage id | Phase |
+|---|---|
+| `uis_free` | `get.available_virtual_numbers` |
+| `uis_purchased` | `get.virtual_numbers` |
 
 ## Operational
 
