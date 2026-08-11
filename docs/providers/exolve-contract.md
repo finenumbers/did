@@ -4,6 +4,7 @@ Sources (local artifacts win — see [`exolve/SOURCE.md`](exolve/SOURCE.md)):
 - [`exolve/raw/Exolve-GetList.md`](exolve/raw/Exolve-GetList.md) — https://docs.exolve.ru/docs/ru/api-reference/numbering-api/reference/
 - [`exolve/raw/Exolve-GetFree.md`](exolve/raw/Exolve-GetFree.md) — https://docs.exolve.ru/docs/ru/api-reference/numbering-api/getting-free-numbers/
 - [`exolve/raw/Exolve-getting-api-key.md`](exolve/raw/Exolve-getting-api-key.md) — https://docs.exolve.ru/docs/ru/instructions/getting-api-key
+- [`exolve/raw/Exolve-buying-number.md`](exolve/raw/Exolve-buying-number.md) — https://docs.exolve.ru/docs/ru/instructions/buying-number/
 
 ## Auth
 
@@ -34,14 +35,18 @@ Required: `type_id`.
 Optional filters: `region_id`, `category_id`, `mask`, `limit`, `offset`, `random`.
 
 Sync rules (completeness):
-1. Prefer **omitting** `random` (stable pagination). Do not send `random: true` for inventory sync. If a live canary shows `random: false` returns data while omit is empty, fall back to `false`.
-2. Primary fetch = **type × every region_id** from GetList:
-   - DEF `1104` × all regions
-   - ABC `1105` × all regions
-   - KDU `1106` × Russia `10084` only (docs)
-3. Do **not** pass `category_id` in primary loop (all marketing categories in slice).
+1. Prefer **omitting** `random` for inventory pagination. Docs demos use `random: true`; canary also probes that shape. Do not use `random: true` in the production loop.
+2. Live canary decides slice mode:
+   - **Docs examples** (with `category_id` + `random: true`, e.g. Moscow DEF/`10000`, Moscow ABC/`10001`) vs **no-category** probes.
+   - If docs examples return numbers and no-category probes are empty → sync = **type × region × category** (categories from GetList `categories[]` for that `type_id`; fallback to docs category table).
+   - Otherwise → sync = **type × region** without `category_id`.
+3. Region fan-out:
+   - DEF `1104` × all GetList region_ids
+   - ABC `1105` × all GetList region_ids
+   - KDU `1106` × Russia `10084` only
 4. Paginate each slice until short/empty page; `offset > MAX_OFFSET` → fail `EXOLVE_PAGINATION_TRUNCATED` (no wipe).
 5. Merge slices; dedupe by normalized `number_code`.
+6. If all slices empty **and** docs-example canary is also 0 → fail with explicit LK inventory/balance message.
 
 ## NumberElement → catalog (summary)
 

@@ -17,6 +17,12 @@ from app.providers.retry import RetryPolicy, TimeoutConfig, request_with_retries
 logger = logging.getLogger(__name__)
 
 RandomMode = Literal["omit", "false", "true"]
+SyncMode = Literal["type_region", "type_region_category"]
+
+DOC_PROBE_NAMES = frozenset({"doc_moscow_def_regular", "doc_moscow_abc_regular"})
+NO_CATEGORY_PROBE_NAMES = frozenset(
+    {"moscow_def_random_false", "moscow_def_omit_random", "type_only_def"}
+)
 
 
 class ExolveClient:
@@ -35,8 +41,7 @@ class ExolveClient:
         raw_base = (connection.base_url or "").strip() or contract.EXAMPLE_BASE_URL
         self.base_url = raw_base.rstrip("/")
         self.page_limit = int(page_limit or contract.DEFAULT_PAGE_LIMIT)
-        # Default omit: docs examples use random=true; sending false correlated with
-        # empty inventory in production — omit keeps stable pagination without the flag.
+        # Default omit for inventory pagination (docs examples use random=true for demos).
         self.random_mode: RandomMode = random_mode or "omit"
         auth = connection.auth_settings or {}
         self._api_key = (auth.get(contract.AUTH_API_KEY) or "").strip() or None
@@ -109,6 +114,7 @@ class ExolveClient:
         offset: int,
         limit: int,
         random_mode: RandomMode | None = None,
+        category_id: int | None = None,
     ) -> dict[str, Any]:
         body: dict[str, Any] = {
             "type_id": int(type_id),
@@ -117,12 +123,13 @@ class ExolveClient:
         }
         if region_id is not None:
             body["region_id"] = int(region_id)
+        if category_id is not None:
+            body["category_id"] = int(category_id)
         mode = random_mode if random_mode is not None else self.random_mode
         if mode == "false":
             body["random"] = False
         elif mode == "true":
             body["random"] = True
-        # omit → do not send random
         return body
 
     async def get_free_page(
@@ -133,6 +140,7 @@ class ExolveClient:
         offset: int,
         limit: int | None = None,
         random_mode: RandomMode | None = None,
+        category_id: int | None = None,
     ) -> tuple[list[dict[str, Any]], RawHttpResult]:
         body = self._free_body(
             type_id=type_id,
@@ -140,6 +148,7 @@ class ExolveClient:
             offset=offset,
             limit=int(limit if limit is not None else self.page_limit),
             random_mode=random_mode,
+            category_id=category_id,
         )
         raw = await self._post(contract.PATH_GET_FREE, body)
         try:
@@ -152,13 +161,32 @@ class ExolveClient:
         return items, raw
 
     async def probe_get_free(self) -> list[dict[str, Any]]:
-        """Canary variants for Settings test_connection / sync diagnostics."""
+        """Canary variants: docs examples (with category) + no-category baselines."""
         probes: list[tuple[str, dict[str, Any]]] = [
+            (
+                "doc_moscow_def_regular",
+                {
+                    "type_id": contract.DOC_EXAMPLE_MOSCOW_DEF["type_id"],
+                    "region_id": contract.DOC_EXAMPLE_MOSCOW_DEF["region_id"],
+                    "category_id": contract.DOC_EXAMPLE_MOSCOW_DEF["category_id"],
+                    "random_mode": "true",
+                },
+            ),
+            (
+                "doc_moscow_abc_regular",
+                {
+                    "type_id": contract.DOC_EXAMPLE_MOSCOW_ABC["type_id"],
+                    "region_id": contract.DOC_EXAMPLE_MOSCOW_ABC["region_id"],
+                    "category_id": contract.DOC_EXAMPLE_MOSCOW_ABC["category_id"],
+                    "random_mode": "true",
+                },
+            ),
             (
                 "moscow_def_random_false",
                 {
                     "type_id": contract.TYPE_DEF,
                     "region_id": 10230,
+                    "category_id": None,
                     "random_mode": "false",
                 },
             ),
@@ -167,6 +195,7 @@ class ExolveClient:
                 {
                     "type_id": contract.TYPE_DEF,
                     "region_id": 10230,
+                    "category_id": None,
                     "random_mode": "omit",
                 },
             ),
@@ -175,6 +204,7 @@ class ExolveClient:
                 {
                     "type_id": contract.TYPE_DEF,
                     "region_id": None,
+                    "category_id": None,
                     "random_mode": "omit",
                 },
             ),
@@ -187,6 +217,7 @@ class ExolveClient:
                 offset=0,
                 limit=1,
                 random_mode=kwargs["random_mode"],  # type: ignore[arg-type]
+                category_id=kwargs["category_id"],  # type: ignore[arg-type]
             )
             summary = parser.summarize_free_payload(
                 raw.status_code, raw.body_json, raw.body_text or ""
@@ -195,6 +226,7 @@ class ExolveClient:
             summary["request"] = {
                 "type_id": kwargs["type_id"],
                 "region_id": kwargs["region_id"],
+                "category_id": kwargs["category_id"],
                 "random_mode": kwargs["random_mode"],
                 "limit": 1,
                 "offset": 0,
@@ -202,6 +234,24 @@ class ExolveClient:
             summary["parsed_len"] = len(items)
             out.append(summary)
         return out
+
+    @staticmethod
+    def probe_number_totals(probes: list[dict[str, Any]]) -> dict[str, int]:
+        doc_n = 0
+        no_cat_n = 0
+        for p in probes:
+            n = int(p.get("numbers_len") or 0)
+            name = str(p.get("probe") or "")
+            if name in DOC_PROBE_NAMES:
+                doc_n = max(doc_n, n)
+            if name in NO_CATEGORY_PROBE_NAMES:
+                no_cat_n = max(no_cat_n, n)
+        best = max((int(p.get("numbers_len") or 0) for p in probes), default=0)
+        return {
+            "doc_example_numbers": doc_n,
+            "no_category_numbers": no_cat_n,
+            "best_numbers": best,
+        }
 
     def choose_random_mode_from_probes(self, probes: list[dict[str, Any]]) -> RandomMode:
         """Prefer omit when random=false is empty but omit returns numbers."""
@@ -216,30 +266,49 @@ class ExolveClient:
             return "false"
         return "omit"
 
+    def choose_sync_mode_from_probes(self, probes: list[dict[str, Any]]) -> SyncMode:
+        """
+        If docs examples (with category_id) return numbers but no-category probes
+        do not, sync must pass category_id (type×region×category).
+        """
+        totals = self.probe_number_totals(probes)
+        if totals["doc_example_numbers"] > 0 and totals["no_category_numbers"] == 0:
+            return contract.SYNC_MODE_TYPE_REGION_CATEGORY  # type: ignore[return-value]
+        return contract.SYNC_MODE_TYPE_REGION  # type: ignore[return-value]
+
     async def iter_free_slice(
         self,
         *,
         type_id: int,
         region_id: int,
+        category_id: int | None = None,
         on_progress: ProgressCb | None = None,
         type_label: str = "",
         on_first_raw: Any | None = None,
     ) -> tuple[list[dict[str, Any]], list[RawHttpResult]]:
-        """Paginate one (type_id, region_id) slice until short/empty page."""
+        """Paginate one (type_id, region_id[, category_id]) slice until short/empty page."""
         items: list[dict[str, Any]] = []
         envelopes: list[RawHttpResult] = []
         offset = 0
         page_limit = self.page_limit
         first_logged = False
+        cat_part = f" category={category_id}" if category_id is not None else ""
         while offset <= contract.MAX_OFFSET:
             await emit_progress(
                 on_progress,
-                f"Exolve GetFree {type_label or type_id} region={region_id} offset={offset}",
+                (
+                    f"Exolve GetFree {type_label or type_id} "
+                    f"region={region_id}{cat_part} offset={offset}"
+                ),
                 len(items),
                 None,
             )
             page, raw = await self.get_free_page(
-                type_id=type_id, region_id=region_id, offset=offset, limit=page_limit
+                type_id=type_id,
+                region_id=region_id,
+                category_id=category_id,
+                offset=offset,
+                limit=page_limit,
             )
             envelopes.append(raw)
             if not first_logged and on_first_raw is not None:
@@ -255,12 +324,14 @@ class ExolveClient:
                 raise ProviderError(
                     (
                         "Exolve GetFree pagination truncated "
-                        f"type_id={type_id} region_id={region_id} offset={offset}"
+                        f"type_id={type_id} region_id={region_id} "
+                        f"category_id={category_id} offset={offset}"
                     ),
                     code="EXOLVE_PAGINATION_TRUNCATED",
                     details={
                         "type_id": type_id,
                         "region_id": region_id,
+                        "category_id": category_id,
                         "offset": offset,
                         "max_offset": contract.MAX_OFFSET,
                     },
