@@ -28,6 +28,8 @@ STAGE_DEFS: list[dict[str, str]] = [
     {"id": "exolve_free", "group": "Exolve", "label": "Свободные номера"},
     {"id": "voximplant_dictionaries", "group": "Voximplant", "label": "Справочники"},
     {"id": "voximplant_free", "group": "Voximplant", "label": "Свободные номера"},
+    {"id": "mcn_dictionaries", "group": "MCN Telecom", "label": "Справочники"},
+    {"id": "mcn_free", "group": "MCN Telecom", "label": "Свободные номера"},
     {"id": "finenumbers_free", "group": "Finenumbers", "label": "Свободные номера"},
     {"id": "operator_enrichment", "group": "Общее", "label": "Обогащение PSTN"},
     {"id": "finalize", "group": "Общее", "label": "Завершение"},
@@ -47,6 +49,8 @@ _PHASE_STAGE: dict[tuple[str, str], str] = {
     ("exolve", "free"): "exolve_free",
     ("voximplant", "dictionaries"): "voximplant_dictionaries",
     ("voximplant", "free"): "voximplant_free",
+    ("mcn", "dictionaries"): "mcn_dictionaries",
+    ("mcn", "free"): "mcn_free",
     ("finenumbers", "free"): "finenumbers_free",
 }
 

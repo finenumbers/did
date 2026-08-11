@@ -24,6 +24,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   finenumbers: "Finenumbers",
   exolve: "Exolve",
   voximplant: "Voximplant",
+  mcn: "MCN Telecom",
 };
 
 export function displayProviderCode(code: string): string {

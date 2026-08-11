@@ -16,7 +16,8 @@ type ProviderCode =
   | "aurora"
   | "finenumbers"
   | "exolve"
-  | "voximplant";
+  | "voximplant"
+  | "mcn";
 
 type Draft = {
   baseUrl: string;
@@ -59,6 +60,7 @@ const PROVIDERS: { code: ProviderCode; title: string }[] = [
   { code: "aurora", title: "Aurora Telecom" },
   { code: "exolve", title: "Exolve" },
   { code: "voximplant", title: "Voximplant" },
+  { code: "mcn", title: "MCN Telecom" },
   { code: "finenumbers", title: "Finenumbers" },
 ];
 
@@ -82,6 +84,7 @@ export default function SettingsPage() {
     aurora: { ...EMPTY_DRAFT },
     exolve: { ...EMPTY_DRAFT },
     voximplant: { ...EMPTY_DRAFT },
+    mcn: { ...EMPTY_DRAFT },
     finenumbers: { ...EMPTY_DRAFT },
   });
   const [pageError, setPageError] = useState<string | null>(null);
@@ -128,6 +131,7 @@ export default function SettingsPage() {
       aurora: { ...EMPTY_DRAFT },
       exolve: { ...EMPTY_DRAFT },
       voximplant: { ...EMPTY_DRAFT },
+      mcn: { ...EMPTY_DRAFT },
       finenumbers: { ...EMPTY_DRAFT },
     };
     for (const { code } of PROVIDERS) {
@@ -160,7 +164,7 @@ export default function SettingsPage() {
     let auth_settings: Record<string, string> | undefined;
     if (code === "sipout" || code === "finenumbers") {
       auth_settings = d.apiKey ? { key: d.apiKey } : undefined;
-    } else if (code === "exolve") {
+    } else if (code === "exolve" || code === "mcn") {
       auth_settings = d.apiKey ? { api_key: d.apiKey } : undefined;
     } else if (code === "voximplant") {
       auth_settings = d.credentialsJson
@@ -453,7 +457,9 @@ export default function SettingsPage() {
                             ? "(Numbering API)"
                             : code === "voximplant"
                               ? "(Management API)"
-                              : ""}
+                              : code === "mcn"
+                                ? "(Витрина)"
+                                : ""}
                   <input
                     value={d.baseUrl}
                     onChange={(e) => setDraft(code, { baseUrl: e.target.value })}
@@ -471,7 +477,9 @@ export default function SettingsPage() {
                                 ? "https://api.exolve.ru"
                                 : code === "voximplant"
                                   ? "https://api.voximplant.com"
-                                  : undefined
+                                  : code === "mcn"
+                                    ? "https://shop.mcn.ru"
+                                    : undefined
                     }
                   />
                 </label>
@@ -531,6 +539,31 @@ export default function SettingsPage() {
                       {d.settings?.auth_settings_masked?.private_key
                         ? " Credentials сохранены."
                         : " Credentials ещё не заданы."}
+                    </div>
+                  </>
+                ) : code === "mcn" ? (
+                  <>
+                    <label>
+                      API-токен (Интеграции)
+                      <input
+                        type="password"
+                        placeholder={
+                          d.settings?.auth_settings_masked?.api_key
+                            ? `текущее: ${String(d.settings.auth_settings_masked.api_key)}`
+                            : "токен из ЛК → Интеграции → Токены"
+                        }
+                        value={d.apiKey}
+                        onChange={(e) => setDraft(code, { apiKey: e.target.value })}
+                        style={{ width: "100%" }}
+                      />
+                    </label>
+                    <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
+                      ЛК MCN → Интеграции → Токены (роль администратора Integrations). Read-only
+                      Витрина: countries / regions / cities / numbers (RU). Checkout и NNP не
+                      вызываются.
+                      {d.settings?.auth_settings_masked?.api_key
+                        ? " Токен сохранён."
+                        : " Токен ещё не задан."}
                     </div>
                   </>
                 ) : code === "sipout" || code === "finenumbers" ? (

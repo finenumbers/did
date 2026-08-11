@@ -33,6 +33,7 @@ from app.models.voximplant_raw import (
     VoximplantFreeNumberRaw,
     VoximplantRegionRaw,
 )
+from app.models.mcn_raw import McnCityRaw, McnFreeNumberRaw, McnRegionRaw
 
 __all__ = [
     "AuroraFreeNumberRaw",
@@ -44,6 +45,9 @@ __all__ = [
     "VoximplantCityRaw",
     "VoximplantFreeNumberRaw",
     "VoximplantRegionRaw",
+    "McnCityRaw",
+    "McnFreeNumberRaw",
+    "McnRegionRaw",
     "Base",
     "NumberPriceHistory",
     "NumberStatusHistory",

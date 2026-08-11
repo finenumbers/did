@@ -26,6 +26,7 @@ from app.modules.sync_engine.persist import (
     persist_exolve_numbers,
     persist_voximplant_categories,
     persist_voximplant_numbers,
+    persist_mcn_numbers,
     persist_finenumbers_numbers,
     persist_regions,
     persist_runexis_numbers,
@@ -293,7 +294,11 @@ class SyncService:
                             if isinstance(geo.items, dict)
                             else []
                         )
-                    elif provider.code in (ProviderCode.exolve, ProviderCode.voximplant):
+                    elif provider.code in (
+                        ProviderCode.exolve,
+                        ProviderCode.voximplant,
+                        ProviderCode.mcn,
+                    ):
                         geo = await adapter.sync_regions(
                             connection, on_progress=_dict_progress
                         )
@@ -505,6 +510,15 @@ class SyncService:
                     )
                 elif provider.code == ProviderCode.voximplant:
                     persist_stats = persist_voximplant_numbers(
+                        self.db,
+                        provider_id=provider.id,
+                        job_id=job.id,
+                        inventory_kind=InventoryKind.free,
+                        numbers=numbers,
+                        on_progress=persist_progress,
+                    )
+                elif provider.code == ProviderCode.mcn:
+                    persist_stats = persist_mcn_numbers(
                         self.db,
                         provider_id=provider.id,
                         job_id=job.id,

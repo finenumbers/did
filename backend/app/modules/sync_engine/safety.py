@@ -14,6 +14,7 @@ _PROVIDER_LABELS: dict[str, str] = {
     "finenumbers": "Finenumbers",
     "exolve": "Exolve",
     "voximplant": "Voximplant",
+    "mcn": "MCN Telecom",
 }
 _KIND_LABELS: dict[str, str] = {
     "free_numbers": "свободные",

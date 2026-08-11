@@ -19,6 +19,7 @@ from app.modules.sync_engine.scheduler import sync_schedule_loop
 from app.providers.aurora import contract as aurora_contract
 from app.providers.exolve import contract as exolve_contract
 from app.providers.voximplant import contract as voximplant_contract
+from app.providers.mcn import contract as mcn_contract
 from app.providers.finenumbers import contract as finenumbers_contract
 from app.providers.runexis import contract as runexis_contract
 from app.providers.sipout import contract as sipout_contract
@@ -67,6 +68,12 @@ def seed_providers() -> None:
                 ProviderCode.voximplant,
                 "Voximplant",
                 voximplant_contract.EXAMPLE_BASE_URL,
+                {},
+            ),
+            (
+                ProviderCode.mcn,
+                "MCN Telecom",
+                mcn_contract.EXAMPLE_BASE_URL,
                 {},
             ),
         ]

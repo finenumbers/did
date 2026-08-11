@@ -49,6 +49,7 @@ PROVIDER_ORDER = (
     ProviderCode.aurora,
     ProviderCode.exolve,
     ProviderCode.voximplant,
+    ProviderCode.mcn,
     ProviderCode.finenumbers,
 )
 ACTIVE_STATUSES = (SyncJobStatus.pending, SyncJobStatus.running)

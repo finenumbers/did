@@ -1,0 +1,474 @@
+<!DOCTYPE html><html><head><meta charset=utf-8><title>MCN Витрина (showcase) OpenAPI extract</title></head><body><pre># MCN Витрина (showcase) OpenAPI extract
+
+Base: https://shop.mcn.ru
+
+## Paths
+
+### GET `/api/protected/cart`
+
+- summary: Cart
+- operationId: CartProtectedController_getCart_protected
+
+### PATCH `/api/protected/cart`
+
+- summary: Update cart. ForOtt
+- operationId: CartProtectedController_updateCart_protected
+
+### POST `/api/protected/cart/item`
+
+- summary: Item in cart
+- operationId: CartProtectedController_addItem_protected
+
+### DELETE `/api/protected/cart/item/{id}`
+
+- summary: Item from cart
+- operationId: CartProtectedController_deleteItem_protected
+- parameters:
+  - `id` (path, required=True, type=number, default=None)
+
+### PUT `/api/protected/cart/item/{id}`
+
+- summary: Replace item in cart
+- operationId: CartProtectedController_replaceItem_protected
+- parameters:
+  - `id` (path, required=True, type=number, default=None)
+
+### POST `/api/protected/cart/items`
+
+- summary: Item in cart
+- operationId: CartProtectedController_addItems_protected
+
+### DELETE `/api/protected/cart/items`
+
+- summary: Items from cart
+- operationId: CartProtectedController_deleteItems_protected
+
+### PUT `/api/protected/cart/items`
+
+- summary: Replace items in cart
+- operationId: CartProtectedController_replaceItems_protected
+
+### GET `/api/protected/cart/items/count`
+
+- summary: Items in cart count
+- operationId: CartProtectedController_itemsCount_protected
+
+### POST `/api/protected/checkout`
+
+- summary: Enabled products
+- operationId: CheckoutController_createCheckout_protected
+
+### POST `/api/protected/checkout/ott-numbers`
+
+- summary: Buy OTT numbers
+- operationId: CheckoutController_buyOttNumbers_protected
+
+### GET `/api/protected/checkout/v2`
+
+- summary: None
+- operationId: CheckoutController_createCheckoutV2_protected
+- parameters:
+  - `deliveryAddress` (query, required=False, type=string, default=None)
+  - `fio` (query, required=False, type=string, default=None)
+  - `contactPhone` (query, required=False, type=string, default=None)
+  - `deliveryMethod` (query, required=False, type=string, default=None)
+  - `numberOfSim` (query, required=False, type=string, default=None)
+
+### GET `/api/protected/nnp/{phone}/info`
+
+- summary: Get number info
+- operationId: NnpHttpController_getNumberInfo_protected
+- parameters:
+  - `phone` (path, required=True, type=string, default=None)
+
+### GET `/api/protected/porting`
+
+- summary: get account portings
+- operationId: PortingProtectedContoller_getAccountPortings_protected
+
+### POST `/api/protected/porting/application`
+
+- summary: create application
+- operationId: PortingProtectedContoller_createApplication_protected
+
+### GET `/api/protected/porting/application/{applicationLink}`
+
+- summary: get application
+- operationId: PortingProtectedContoller_getApplication_protected
+- parameters:
+  - `applicationLink` (path, required=True, type=string, default=None)
+
+### GET `/api/protected/porting/fields`
+
+- summary: porting fields
+- operationId: PortingProtectedContoller_getFieldsByShowcaseId_protected
+
+### GET `/api/protected/porting/settings`
+
+- summary: all porting settings
+- operationId: PortingProtectedContoller_getAllPortingSettings_protected
+
+### POST `/api/protected/porting/settings`
+
+- summary: updated porting settings
+- operationId: PortingProtectedContoller_createPortingSettings_protected
+
+### GET `/api/protected/porting/settings/template/{id}`
+
+- summary: porting settings template
+- operationId: PortingProtectedContoller_getPortingSettingsTemplate_protected
+- parameters:
+  - `id` (path, required=True, type=number, default=None)
+
+### PATCH `/api/protected/porting/settings/template/{id}`
+
+- summary: updated porting settings
+- operationId: PortingProtectedContoller_updatePortingSettingsTemplate_protected
+- parameters:
+  - `id` (path, required=True, type=number, default=None)
+
+### PATCH `/api/protected/porting/settings/{id}`
+
+- summary: updated porting settings
+- operationId: PortingProtectedContoller_updatePortingSettings_protected
+- parameters:
+  - `id` (path, required=True, type=number, default=None)
+
+### GET `/api/protected/porting/settings/{id}/fields`
+
+- summary: None
+- operationId: PortingProtectedContoller_getPortingSettingsFields_protected
+- parameters:
+  - `id` (path, required=True, type=number, default=None)
+
+### PATCH `/api/protected/porting/settings/{id}/fields`
+
+- summary: None
+- operationId: PortingProtectedContoller_updatePortingSettingsFields_protected
+- parameters:
+  - `id` (path, required=True, type=number, default=None)
+
+### GET `/api/protected/porting/tags`
+
+- summary: porting field tags
+- operationId: PortingProtectedContoller_getTags_protected
+
+### GET `/api/protected/products`
+
+- summary: Products
+- operationId: ProductHttpController_getAllProducts_protected
+- parameters:
+  - `x-from-shop` (header, required=True, type=string, default=None)
+
+### GET `/api/protected/products/short`
+
+- summary: Short products
+- operationId: ProductHttpController_getAllProductsForAdmin_protected
+
+### GET `/api/protected/showcase`
+
+- summary: All showcases
+- operationId: ShowcaseProtectedController_getAllShowcases_protected
+
+### POST `/api/protected/showcase`
+
+- summary: Created showcase
+- operationId: ShowcaseProtectedController_createShowcase_protected
+
+### GET `/api/protected/showcase/cities`
+
+- summary: Cities
+- operationId: ShowcaseProtectedController_getCities_protected
+- parameters:
+  - `countryCode` (query, required=True, type=number, default=None)
+  - `ndcType` (query, required=False, type=number, default=None)
+
+### GET `/api/protected/showcase/countries`
+
+- summary: Countries
+- operationId: ShowcaseProtectedController_getCountries_protected
+
+### GET `/api/protected/showcase/info`
+
+- summary: Showcase info
+- operationId: ShowcaseProtectedController_getShowcaseInfo_protected
+
+### GET `/api/protected/showcase/logo`
+
+- summary: None
+- operationId: ShowcaseProtectedController_getShowcaseLogo_protected
+- parameters:
+  - `orientation` (query, required=False, type=string, default=None)
+
+### GET `/api/protected/showcase/numbers`
+
+- summary: Telephony numbers
+- operationId: ShowcaseProtectedController_getNumbers_protected
+- parameters:
+  - `countryCode` (query, required=True, type=number, default=None)
+  - `cities` (query, required=False, type=array, default=None)
+  - `limitPerPage` (query, required=False, type=number, default=None)
+  - `pageNumber` (query, required=False, type=number, default=None)
+  - `minCost` (query, required=False, type=number, default=None)
+  - `maxCost` (query, required=False, type=number, default=None)
+  - `filterType` (query, required=False, type=string, default=None)
+  - `filterMode` (query, required=False, type=string, default=None)
+  - `number` (query, required=False, type=number, default=None)
+  - `beautyLvl` (query, required=False, type=number, default=None)
+  - `ndcType` (query, required=False, type=number, default=None)
+  - `excludeNdcs` (query, required=False, type=array, default=None)
+
+### GET `/api/protected/showcase/official`
+
+- summary: Showcase
+- operationId: ShowcaseProtectedController_getOfficialShowcases_protected
+
+### GET `/api/protected/showcase/ott-contragents`
+
+- summary: Ott contragents
+- operationId: ShowcaseProtectedController_getOttContragents_protected
+- parameters:
+  - `orgType` (query, required=False, type=string, default=None)
+
+### GET `/api/protected/showcase/regions`
+
+- summary: Regions
+- operationId: ShowcaseProtectedController_getRegions_protected
+
+### GET `/api/protected/showcase/source`
+
+- summary: Get all sources
+- operationId: ShowcaseProtectedController_getNumberSources_protected
+
+### GET `/api/protected/showcase/{id}`
+
+- summary: Showcase
+- operationId: ShowcaseProtectedController_getShowcase_protected
+- parameters:
+  - `id` (path, required=True, type=number, default=None)
+
+### PATCH `/api/protected/showcase/{id}`
+
+- summary: Updated showcase
+- operationId: ShowcaseProtectedController_updateShowcase_protected
+- parameters:
+  - `id` (path, required=True, type=number, default=None)
+
+### DELETE `/api/protected/showcase/{id}`
+
+- summary: Deleted showcase
+- operationId: ShowcaseProtectedController_deleteShowcase_protected
+- parameters:
+  - `id` (path, required=True, type=number, default=None)
+
+### GET `/api/protected/simcard`
+
+- summary: Get simcard list
+- operationId: SimcardHttpController_getAll_protected
+- parameters:
+  - `limit` (query, required=False, type=number, default=None)
+  - `offset` (query, required=False, type=number, default=None)
+  - `filter` (query, required=False, type=array, default=None)
+  - `orderBy` (query, required=False, type=string, default=None)
+  - `sortBy` (query, required=False, type=string, default=None)
+
+### POST `/api/protected/simcard`
+
+- summary: Create simcard
+- operationId: SimcardHttpController_createOne_protected
+
+### DELETE `/api/protected/simcard/bulk`
+
+- summary: Delete multiple simcards
+- operationId: SimcardHttpController_deleteMany_protected
+- parameters:
+  - `ids` (query, required=True, type=array, default=None)
+
+### GET `/api/protected/simcard/{id}`
+
+- summary: Get simcard by id
+- operationId: SimcardHttpController_getById_protected
+- parameters:
+  - `id` (path, required=True, type=number, default=None)
+
+### PATCH `/api/protected/simcard/{id}`
+
+- summary: Update simcard by id
+- operationId: SimcardHttpController_updateOneById_protected
+- parameters:
+  - `id` (path, required=True, type=number, default=None)
+
+### DELETE `/api/protected/simcard/{id}`
+
+- summary: Delete simcard by id
+- operationId: SimcardHttpController_deleteOneById_protected
+- parameters:
+  - `id` (path, required=True, type=number, default=None)
+
+### GET `/api/protected/tariff`
+
+- summary: Get available tariffs for product
+- operationId: TariffController_getStatProductTariffs_protected
+- parameters:
+  - `statProductId` (query, required=True, type=number, default=None)
+  - `tariffId` (query, required=False, type=number, default=None)
+  - `voipNumber` (query, required=False, type=number, default=None)
+  - `countryCode` (query, required=False, type=number, default=None)
+  - `cityId` (query, required=False, type=number, default=None)
+
+### POST `/api/protected/voipgui/get-with-dependents-all`
+
+- summary: None
+- operationId: VoipguiController_getWithDependentsAll_protected
+
+### POST `/api/protected/voipgui/group-internet-min-prices`
+
+- summary: None
+- operationId: VoipguiController_groupInternetMinPrices_protected
+
+## Schemas (selected)
+
+### BuyOttNumbersDto
+- `did`: array
+- `ottContragentId`: number
+- `tariffPeriodId`: number
+
+### CheckoutDefaultTariffsDto
+- `accountId`: number
+- `showcaseId`: number
+
+### CityResponseDto
+- `city_id`: number
+- `city_name`: string
+- `region`: #/components/schemas/RegionResponseDto
+- `free_numbers_count`: number
+- `weight`: number
+- `ndcs`: array
+- `ndc_type_ids`: object
+
+### CountryResponseDto
+- `country_code`: number
+- `country_title`: string
+- `country_rus`: string
+- `country_rus_full`: string
+- `country_lang`: string
+- `country_currency`: string
+- `country_weight`: number
+- `country_prefix`: number
+- `country_alpha_3`: string
+- `country_site`: string
+- `regions`: array
+- `ndc_type_ids`: array
+
+### DefaultTariffResponseDto
+- `name`: string
+- `tariff_period_id`: number
+- `price_setup`: number
+- `price_per_period`: number
+- `price_min`: number
+- `cost_per_period`: number
+- `lines`: number
+- `line_price`: number
+- `call_price_mobile`: number
+- `call_price_local`: number
+
+### GetNumberInfoDto
+- `country_code`: number
+- `country_name_end`: string
+- `country_prefix`: number
+- `operator_id`: number
+- `operator_name`: string
+- `operator_name_translit`: string
+- `region_id`: number
+- `region_name_translit`: string
+- `city_id`: number
+- `city_name_translit`: string
+- `ndc_type_id`: number
+- `ndc_type_name`: string
+- `ndc`: number
+
+### GetNumbersResponseDto
+- `numbers`: array
+- `totalNumbers`: number
+
+### GetRegionsResponseDto
+- `id`: number
+- `key`: string
+- `short_name`: string
+- `code`: number
+- `timezone_name`: string
+- `country`: #/components/schemas/RegionCountryDto
+
+### GetTariffsResponseDto
+- `id`: number
+- `name`: string
+- `currency`: string
+- `periodKey`: string
+- `isCurrent`: boolean
+- `isCancelable`: boolean
+- `chargePeriodId`: number
+- `price`: string
+- `fields`: #/components/schemas/TariffFieldResponseDto
+
+### MappedNumberResponseDto
+- `number`: number
+- `voip_number`: number
+- `beauty_level`: number
+- `price`: number
+- `currency`: string
+- `origin_price`: number
+- `origin_currency`: string
+- `price2`: number
+- `region`: number
+- `city_id`: number
+- `ndc_type_id`: number
+- `country_prefix`: number
+- `ndc`: number
+- `number_subscriber`: string
+- `common_ndc`: string
+- `common_number_subscriber`: string
+- `did_group_id`: number
+- `default_tariff`: #/components/schemas/DefaultTariffResponseDto
+- `calls_per_month`: object
+- `source`: string
+- `hasWord`: boolean
+- `isValidAddress`: boolean
+- `isVerified`: boolean
+- `contragentId`: number
+- `numberAddressCountryRule`: object
+
+### Number
+
+### ProductDefaultTariffDto
+- `id`: number
+- `defaultTariffPeriodId`: number
+- `regions`: array
+- `isSpecial`: boolean
+- `returnUrl`: array
+
+### ProductDefaultTariffReturnUrlDto
+- `name`: string
+- `link`: string
+- `isShowAfterPurchase`: boolean
+
+### RegionCountryDto
+- `id`: number
+- `name`: string
+
+### RegionResponseDto
+- `id`: number
+- `name`: string
+
+### StatAddAccountTariffResponseDto
+
+### TariffFieldResponseDto
+- `label`: string
+- `value`: 
+- `type`: string
+- `pricelinstId`: number
+- `unit`: string
+
+### TariffTagDto
+- `id`: number
+- `name`: string
+</pre></body></html>

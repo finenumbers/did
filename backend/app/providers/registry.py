@@ -8,6 +8,7 @@ from app.providers.runexis import RunexisProvider
 from app.providers.sipout import SipOutProvider
 from app.providers.uis import UisProvider
 from app.providers.voximplant import VoximplantProvider
+from app.providers.mcn import McnProvider
 
 PROVIDER_REGISTRY: dict[ProviderCode, type[AbstractProvider]] = {
     ProviderCode.runexis: RunexisProvider,
@@ -17,6 +18,7 @@ PROVIDER_REGISTRY: dict[ProviderCode, type[AbstractProvider]] = {
     ProviderCode.aurora: AuroraProvider,
     ProviderCode.exolve: ExolveProvider,
     ProviderCode.voximplant: VoximplantProvider,
+    ProviderCode.mcn: McnProvider,
 }
 
 

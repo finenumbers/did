@@ -110,6 +110,12 @@ class ProvidersService:
                 "private_key). JWT RS256 → Management API. Read-only RU Categories/Regions/"
                 "GetNewPhoneNumbers (all free). See voximplant-contract.md. Attach/purchased OOS."
             )
+        elif code == ProviderCode.mcn.value:
+            notice = (
+                "MCN Telecom: api_key = Integrations token from LK. Read-only Витрина "
+                "(shop.mcn.ru) countries/regions/cities/numbers for RU=643. "
+                "See mcn-contract.md. Checkout/NNP/purchased out of scope."
+            )
         else:
             notice = (
                 "Provider integration is based on uploaded documentation contracts "

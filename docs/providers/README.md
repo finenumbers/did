@@ -12,6 +12,7 @@ External provider APIs are documented from uploaded vendor materials:
 - **Aurora Telecom:** see [`aurora/SOURCE.md`](aurora/SOURCE.md), [`aurora-contract.md`](aurora-contract.md), [`aurora-field-mapping.md`](aurora-field-mapping.md); sample CSV under [`aurora/raw/`](aurora/raw/); code in `backend/app/providers/aurora/contract.py`
 - **Exolve (МТС Exolve):** see [`exolve/SOURCE.md`](exolve/SOURCE.md), [`exolve-contract.md`](exolve-contract.md), [`exolve-field-mapping.md`](exolve-field-mapping.md); raw HTML/MD under [`exolve/raw/`](exolve/raw/) (incl. buying-number); code in `backend/app/providers/exolve/contract.py`
 - **Voximplant:** see [`voximplant/SOURCE.md`](voximplant/SOURCE.md), [`voximplant-contract.md`](voximplant-contract.md), [`voximplant-field-mapping.md`](voximplant-field-mapping.md); raw HTML/MD under [`voximplant/raw/`](voximplant/raw/); code in `backend/app/providers/voximplant/contract.py`
+- **MCN Telecom:** see [`mcn/SOURCE.md`](mcn/SOURCE.md), [`mcn-contract.md`](mcn-contract.md), [`mcn-field-mapping.md`](mcn-field-mapping.md); OpenAPI/HTML under [`mcn/raw/`](mcn/raw/) (Витрина = free stock; NNP archived as non-inventory); code in `backend/app/providers/mcn/contract.py`
 
 Derived artifacts (`*-contract.md`, `*-field-mapping.md`, `*-implementation-notes.md`) must not invent methods, fields, or semantics beyond those sources.
 

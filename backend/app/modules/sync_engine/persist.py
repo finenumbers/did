@@ -42,6 +42,7 @@ from app.models.voximplant_raw import (
     VoximplantFreeNumberRaw,
     VoximplantRegionRaw,
 )
+from app.models.mcn_raw import McnCityRaw, McnFreeNumberRaw, McnRegionRaw
 from app.modules.sync_engine.hashing import payload_hash
 from app.modules.sync_engine.staging import (
     cutover_from_staging,
@@ -136,6 +137,10 @@ def wipe_provider_numbers(
         if inventory_kind != InventoryKind.free:
             raise ValueError("Voximplant supports free inventory wipe only")
         wiped_raw = db.execute(delete(VoximplantFreeNumberRaw)).rowcount or 0
+    elif provider_code == ProviderCode.mcn:
+        if inventory_kind != InventoryKind.free:
+            raise ValueError("MCN supports free inventory wipe only")
+        wiped_raw = db.execute(delete(McnFreeNumberRaw)).rowcount or 0
     elif provider_code == ProviderCode.finenumbers:
         wiped_raw = 0
     else:
@@ -192,6 +197,8 @@ def _region_model(provider_code: str):
         return ExolveRegionRaw
     if provider_code == "voximplant":
         return VoximplantRegionRaw
+    if provider_code == "mcn":
+        return McnRegionRaw
     raise ValueError(f"Unsupported provider for regions: {provider_code}")
 
 
@@ -204,7 +211,20 @@ def _city_model(provider_code: str):
         return ExolveCityRaw
     if provider_code == "voximplant":
         return VoximplantCityRaw
+    if provider_code == "mcn":
+        return McnCityRaw
     raise ValueError(f"Unsupported provider for cities: {provider_code}")
+
+
+def _mcn_city_free_count(raw_payload: Any) -> int | None:
+    if not isinstance(raw_payload, dict):
+        return None
+    try:
+        if raw_payload.get("free_numbers_count") is None:
+            return None
+        return int(raw_payload.get("free_numbers_count"))
+    except (TypeError, ValueError):
+        return None
 
 
 def persist_regions(
@@ -258,6 +278,18 @@ def persist_regions(
                 phone_count = None
             phone_price = region.raw_payload.get("phone_price")
             phone_installation_price = region.raw_payload.get("phone_installation_price")
+        parent_id_mcn = None
+        region_code_mcn = None
+        if provider_code == "mcn" and isinstance(region.raw_payload, dict):
+            parent_id_mcn = (
+                str(region.raw_payload.get("parent_region_id"))
+                if region.raw_payload.get("parent_region_id") is not None
+                else None
+            )
+            region_code_mcn = (
+                str(region.raw_payload.get("code") or region.raw_payload.get("key") or "").strip()
+                or None
+            )
         if row and row.payload_hash == ph:
             row.source_loaded_at = loaded
             row.sync_job_id = job_id
@@ -283,6 +315,10 @@ def persist_regions(
                 row.phone_count = phone_count
                 row.phone_price = phone_price
                 row.phone_installation_price = phone_installation_price
+            elif isinstance(row, McnRegionRaw):
+                row.eng_name = region.eng_name
+                row.parent_region_id = parent_id_mcn
+                row.region_code = region_code_mcn
         else:
             kwargs: dict[str, Any] = {
                 "sync_job_id": job_id,
@@ -313,6 +349,12 @@ def persist_regions(
                     phone_count=phone_count,
                     phone_price=phone_price,
                     phone_installation_price=phone_installation_price,
+                )
+            elif provider_code == "mcn":
+                kwargs.update(
+                    eng_name=region.eng_name,
+                    parent_region_id=parent_id_mcn,
+                    region_code=region_code_mcn,
                 )
             db.add(model_cls(**kwargs))
         count += 1
@@ -353,8 +395,10 @@ def persist_cities(
                 row.city_name = city.name
                 row.region_external_id = city.region_external_id
                 row.region_name = city.region_name
-                if isinstance(row, (ExolveCityRaw, VoximplantCityRaw)):
+                if isinstance(row, (ExolveCityRaw, VoximplantCityRaw, McnCityRaw)):
                     row.eng_name = city.eng_name
+                if isinstance(row, McnCityRaw):
+                    row.free_numbers_count = _mcn_city_free_count(city.raw_payload)
         else:
             if provider_code == "sipout":
                 db.add(
@@ -398,6 +442,22 @@ def persist_cities(
                         eng_name=city.eng_name,
                         region_external_id=city.region_external_id,
                         region_name=city.region_name,
+                    )
+                )
+            elif provider_code == "mcn":
+                db.add(
+                    McnCityRaw(
+                        sync_job_id=job_id,
+                        source_loaded_at=loaded,
+                        raw_payload=city.raw_payload,
+                        payload_hash=ph,
+                        external_key=key,
+                        city_external_id=city.city_external_id,
+                        city_name=city.name,
+                        eng_name=city.eng_name,
+                        region_external_id=city.region_external_id,
+                        region_name=city.region_name,
+                        free_numbers_count=_mcn_city_free_count(city.raw_payload),
                     )
                 )
             else:
@@ -1215,6 +1275,12 @@ def build_city_lookup(db: Session, provider_code: str) -> dict[str, tuple[str | 
             if not c.city_external_id:
                 continue
             lookup[c.city_external_id] = (c.city_name, c.region_external_id, c.region_name)
+    elif provider_code == "mcn":
+        cities = db.scalars(select(McnCityRaw)).all()
+        for c in cities:
+            if not c.city_external_id:
+                continue
+            lookup[c.city_external_id] = (c.city_name, c.region_external_id, c.region_name)
     else:
         cities = db.scalars(select(RunexisCityRaw)).all()
         for c in cities:
@@ -1429,6 +1495,123 @@ def persist_voximplant_numbers(
                 db,
                 provider_id=provider_id,
                 provider_code=ProviderCode.voximplant,
+                inventory_kind=inventory_kind,
+            )
+        )
+
+    cutover_from_staging(
+        db,
+        wipe_fn=_wipe,
+        live_raw_table=table_name,
+        stg_raw=stg_raw,
+        live_catalog_table="numbers_catalog_normalized",
+        stg_catalog=stg_cat,
+    )
+    if on_progress:
+        try:
+            on_progress("cutover done", upserted, len(numbers))
+        except Exception:
+            logger.exception("persist on_progress failed")
+    return {
+        "upserted": upserted,
+        "marked_absent": 0,
+        "price_history": 0,
+        "status_history": 0,
+        "deduped_input": len(deduped),
+        "bulk_insert": 1,
+        "staged_cutover": 1,
+        **wipe_holder,
+    }
+
+
+def persist_mcn_numbers(
+    db: Session,
+    *,
+    provider_id: uuid.UUID,
+    job_id: uuid.UUID,
+    inventory_kind: InventoryKind,
+    numbers: list[NormalizedNumber],
+    on_progress: Callable[[str, int | None, int | None], Any] | None = None,
+) -> dict[str, int]:
+    """Stage into TEMP tables, then atomic wipe+cutover (free only)."""
+    if inventory_kind != InventoryKind.free:
+        raise ValueError("MCN persist supports free inventory only")
+
+    deduped: dict[str, NormalizedNumber] = {}
+    for num in numbers:
+        if num.provider_number_key:
+            deduped[num.provider_number_key] = num
+    numbers = list(deduped.values())
+
+    loaded = _now()
+    table_name = "mcn_free_numbers_raw"
+    stg_raw_name = f"{table_name}_stg"
+    stg_cat_name = "numbers_catalog_normalized_stg"
+
+    stg_raw = ensure_temp_staging(db, live_table=table_name, stg_table=stg_raw_name)
+    stg_cat = ensure_temp_staging(
+        db, live_table="numbers_catalog_normalized", stg_table=stg_cat_name
+    )
+
+    raw_rows: list[dict[str, Any]] = []
+    cat_rows: list[dict[str, Any]] = []
+    for num in numbers:
+        raw_id = uuid.uuid4()
+        ph = payload_hash(num.raw_payload)
+        buy = num.buy_price
+        period = num.period_price
+        raw_rows.append(
+            {
+                "id": raw_id,
+                "sync_job_id": job_id,
+                "source_loaded_at": loaded,
+                "raw_payload": num.raw_payload,
+                "payload_hash": ph,
+                "external_key": num.provider_number_key,
+                "phone": num.msisdn or num.provider_number_key,
+                "type_name": num.number_type,
+                "category_name": num.number_class,
+                "region_name": num.region_name or num.city_name,
+                "install_fee": buy,
+                "subscription_fee": period,
+                "created_at": loaded,
+            }
+        )
+        cat_rows.append(
+            _catalog_row(
+                num,
+                provider_id=provider_id,
+                job_id=job_id,
+                inventory_kind=inventory_kind,
+                table_name=table_name,
+                raw_id=raw_id,
+                loaded=loaded,
+            )
+        )
+
+    upserted = insert_staging_batches(
+        db,
+        stg_raw,
+        raw_rows,
+        on_progress=on_progress,
+        progress_label="MCN staging raw",
+    )
+    insert_staging_batches(
+        db,
+        stg_cat,
+        cat_rows,
+        on_progress=on_progress,
+        progress_label="MCN staging catalog",
+    )
+
+    wipe_holder: dict[str, int] = {}
+
+    def _wipe() -> None:
+        wipe_holder.update(
+            wipe_provider_numbers(
+                db,
+                provider_id=provider_id,
+                provider_code=ProviderCode.mcn,
                 inventory_kind=inventory_kind,
             )
         )
