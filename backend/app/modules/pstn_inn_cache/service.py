@@ -24,6 +24,7 @@ from app.providers.finenumbers.client import FinenumbersClient
 
 logger = logging.getLogger(__name__)
 
+# Display name is a UI label only; load/readiness are keyed by INN.
 REQUIRED_OPERATORS: list[tuple[str, str]] = [
     ("ООО «СИПАУТНЭТ»", "5920032027"),
     ("ООО «ИНТЕРНОД»", "7733808377"),
@@ -31,6 +32,8 @@ REQUIRED_OPERATORS: list[tuple[str, str]] = [
     ("ООО «НОВОСИСТЕМ»", "7710311878"),
     ("ООО «Аврора Телеком»", "7810833282"),
     ("АО «ЭР-Телеком Холдинг»", "5902202276"),
+    ("АО «МТТ»", "7705017253"),
+    ("ООО «МСН Телеком»", "7727752084"),
 ]
 REQUIRED_INNS: frozenset[str] = frozenset(inn for _, inn in REQUIRED_OPERATORS)
 
@@ -52,6 +55,7 @@ def validate_inn(inn: str) -> str:
 
 
 def ensure_required_operators(db: Session) -> None:
+    """Upsert required operators by INN only; never overwrite an existing name."""
     existing = {
         row.inn: row
         for row in db.scalars(select(PstnInnCacheOperator)).all()
@@ -70,13 +74,15 @@ def ensure_required_operators(db: Session) -> None:
                 )
             )
             changed = True
-        else:
-            if not row.required or not row.enabled or row.name != name:
-                row.required = True
-                row.enabled = True
-                if not row.name:
-                    row.name = name
-                changed = True
+            continue
+        # Match/load key is INN. Keep whatever display name is already stored.
+        if not row.required or not row.enabled:
+            row.required = True
+            row.enabled = True
+            changed = True
+        if not (row.name or "").strip():
+            row.name = name
+            changed = True
     if changed:
         db.commit()
 
