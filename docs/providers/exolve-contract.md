@@ -34,7 +34,7 @@ Required: `type_id`.
 Optional filters: `region_id`, `category_id`, `mask`, `limit`, `offset`, `random`.
 
 Sync rules (completeness):
-1. `random` must be false / omitted (stable pagination).
+1. Prefer **omitting** `random` (stable pagination). Do not send `random: true` for inventory sync. If a live canary shows `random: false` returns data while omit is empty, fall back to `false`.
 2. Primary fetch = **type × every region_id** from GetList:
    - DEF `1104` × all regions
    - ABC `1105` × all regions

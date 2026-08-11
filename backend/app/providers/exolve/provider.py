@@ -9,6 +9,7 @@ from typing import Any
 from app.models.enums import InventoryKind, ProviderCode
 from app.providers.base import AbstractProvider
 from app.providers.dto.common import ConnectionConfig, DiagnosticsResult, SyncLimitation, SyncResult
+from app.providers.dto.common import RawHttpResult
 from app.providers.errors import ProviderAuthError, ProviderError, ProviderTransportError
 from app.providers.exolve import contract, mapper, parser
 from app.providers.exolve.client import ExolveClient
@@ -42,20 +43,33 @@ class ExolveProvider(AbstractProvider):
             "test_connection": {
                 "supported": True,
                 "source": "documentation_verified",
-                "action": "POST /number/reference/v1/GetList",
+                "action": "POST GetList + GetFree canary probes",
             },
         }
 
-    def _client(self, connection: ConnectionConfig) -> ExolveClient:
-        return ExolveClient(connection)
+    def _client(self, connection: ConnectionConfig, **kwargs: Any) -> ExolveClient:
+        return ExolveClient(connection, **kwargs)
 
     async def test_connection(self, connection: ConnectionConfig) -> DiagnosticsResult:
         client = self._client(connection)
         data, raw = await client.get_reference()
         regions = data.get("regions") if isinstance(data.get("regions"), list) else []
+        probes = await client.probe_get_free()
+        probe_best = max((int(p.get("numbers_len") or 0) for p in probes), default=0)
+        chosen = client.choose_random_mode_from_probes(probes)
+        ok = True
+        message = (
+            f"Exolve GetList OK (regions={len(regions)}); "
+            f"GetFree canary best_numbers={probe_best} random_mode={chosen}"
+        )
+        if probe_best == 0:
+            message += (
+                " — GetFree empty for Moscow DEF / type-only probes "
+                "(check app inventory in Exolve LK)"
+            )
         return DiagnosticsResult(
-            ok=True,
-            message=f"Exolve GetList OK (regions={len(regions)})",
+            ok=ok,
+            message=message,
             checked_at=datetime.now(timezone.utc),
             details={
                 "regions": len(regions),
@@ -65,6 +79,9 @@ class ExolveProvider(AbstractProvider):
                 "categories": len(data.get("categories") or [])
                 if isinstance(data.get("categories"), list)
                 else 0,
+                "get_free_probes": probes,
+                "get_free_best_numbers": probe_best,
+                "recommended_random_mode": chosen,
             },
             raw=raw,
         )
@@ -137,7 +154,26 @@ class ExolveProvider(AbstractProvider):
     async def sync_free_numbers(self, connection: ConnectionConfig, **kwargs: Any) -> SyncResult:
         on_progress = kwargs.get("on_progress")
         city_lookup: dict[str, tuple] = kwargs.get("city_lookup") or {}
-        client = self._client(connection)
+
+        await emit_progress(on_progress, "Exolve: GetFree canary…")
+        probe_client = self._client(connection)
+        probes = await probe_client.probe_get_free()
+        random_mode = probe_client.choose_random_mode_from_probes(probes)
+        logger.warning(
+            "Exolve GetFree canary probes=%s chosen_random_mode=%s",
+            probes,
+            random_mode,
+        )
+        await emit_progress(
+            on_progress,
+            (
+                f"Exolve canary best="
+                f"{max((int(p.get('numbers_len') or 0) for p in probes), default=0)} "
+                f"random_mode={random_mode}"
+            ),
+        )
+
+        client = self._client(connection, random_mode=random_mode)
 
         await emit_progress(on_progress, "Exolve: справочник для списка регионов…")
         data, ref_env = await client.get_reference()
@@ -169,6 +205,16 @@ class ExolveProvider(AbstractProvider):
         slices_empty = 0
         slices_failed = 0
         per_type: dict[str, int] = {n: 0 for n in contract.TYPE_NAMES.values()}
+        first_response_diag: dict[str, Any] | None = None
+
+        def _on_first_raw(raw: RawHttpResult) -> None:
+            nonlocal first_response_diag
+            if first_response_diag is not None:
+                return
+            first_response_diag = parser.summarize_free_payload(
+                raw.status_code, raw.body_json, raw.body_text or ""
+            )
+            logger.warning("Exolve GetFree first sync response %s", first_response_diag)
 
         for idx, (type_id, region_id, label) in enumerate(slices, start=1):
             await emit_progress(
@@ -183,6 +229,7 @@ class ExolveProvider(AbstractProvider):
                     region_id=region_id,
                     on_progress=on_progress,
                     type_label=label,
+                    on_first_raw=_on_first_raw if first_response_diag is None else None,
                 )
                 envelopes.extend(envs)
                 if not page_items:
@@ -212,10 +259,10 @@ class ExolveProvider(AbstractProvider):
         )
         mapped = []
         unmapped_raw: list[dict] = []
-        for raw in all_items:
-            region_id = raw.get("_exolve_region_id")
+        for raw_item in all_items:
+            region_id = raw_item.get("_exolve_region_id")
             parsed = parser.parse_number_item(
-                raw, region_id=int(region_id) if region_id is not None else None
+                raw_item, region_id=int(region_id) if region_id is not None else None
             )
             num = mapper.map_number(
                 parsed, inventory_kind=InventoryKind.free, city_lookup=city_lookup
@@ -223,7 +270,7 @@ class ExolveProvider(AbstractProvider):
             if num:
                 mapped.append(num)
             else:
-                unmapped_raw.append(raw)
+                unmapped_raw.append(raw_item)
 
         integrity = {
             "regions_in_reference": len(region_ids),
@@ -236,8 +283,22 @@ class ExolveProvider(AbstractProvider):
             "map_failed": len(unmapped_raw),
             "per_type_counts": per_type,
             "pagination_truncated": False,
+            "random_mode": random_mode,
+            "canary_probes": probes,
+            "first_response": first_response_diag,
         }
         logger.warning("Exolve free integrity %s", integrity)
+
+        if len(all_items) == 0 and slices_empty == len(slices):
+            raise ProviderError(
+                (
+                    f"Exolve GetFree empty ({slices_empty}/{len(slices)} slices), "
+                    "incl. Moscow/SPb/KDU — check app API key inventory in Exolve LK"
+                ),
+                code="EXOLVE_FREE_EMPTY",
+                details=integrity,
+            )
+
         return SyncResult(
             fetched=len(all_items),
             parsed=len(mapped),
@@ -248,6 +309,7 @@ class ExolveProvider(AbstractProvider):
                 f"slices={len(slices)} empty={slices_empty}",
                 f"fetched_raw={len(all_items)} mapped={len(mapped)}",
                 f"per_type={per_type}",
+                f"random_mode={random_mode}",
             ],
             extra_stats={"integrity": integrity},
         )

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import asyncio
 
-from app.models.enums import InventoryKind
-from app.providers.dto.common import ConnectionConfig
+from app.providers.dto.common import ConnectionConfig, RawHttpResult
+from app.providers.errors import ProviderError
 from app.providers.exolve import contract, mapper, parser
 from app.providers.exolve.client import ExolveClient
 from app.providers.exolve.provider import ExolveProvider
@@ -15,6 +15,17 @@ def _conn() -> ConnectionConfig:
     return ConnectionConfig(
         base_url="https://api.exolve.ru",
         auth_settings={"api_key": "test-key"},
+    )
+
+
+def _raw(body: dict | None = None, text: str = "{}") -> RawHttpResult:
+    return RawHttpResult(
+        status_code=200,
+        body_text=text,
+        body_json=body if body is not None else {},
+        headers={},
+        elapsed_ms=1,
+        request_url="https://api.exolve.ru/number/v1/GetFree",
     )
 
 
@@ -62,6 +73,28 @@ def test_parse_reference_keeps_all_regions_and_leaf_cities():
     assert len(categories) == 1
 
 
+def test_extract_free_numbers_shapes():
+    direct = {"numbers": [{"number_code": "79001111111"}]}
+    assert len(parser.extract_free_numbers(direct)) == 1
+    wrapped = {"result": {"numbers": [{"number_code": "79002222222"}]}}
+    assert parser.extract_free_numbers(wrapped)[0]["number_code"] == "79002222222"
+    data_wrap = {"data": {"Numbers": [{"number_code": "79003333333"}]}}
+    assert len(parser.extract_free_numbers(data_wrap)) == 1
+    assert parser.extract_free_numbers({}) == []
+    assert parser.extract_free_numbers(None) == []
+
+
+def test_summarize_free_payload():
+    summary = parser.summarize_free_payload(
+        200,
+        {"numbers": [{"number_code": "79300655934"}]},
+        '{"numbers":[{"number_code":"79300655934"}]}',
+    )
+    assert summary["numbers_len"] == 1
+    assert summary["sample_number_code"] == "79300655934"
+    assert "numbers" in summary["json_keys"]
+
+
 def test_map_number_prices_and_class():
     item = parser.parse_number_item(
         {
@@ -89,22 +122,49 @@ def test_map_number_prices_and_class():
     assert num.status_raw == contract.STATUS_FREE
 
 
+def test_free_body_omits_random_by_default():
+    client = ExolveClient(_conn())
+    body = client._free_body(type_id=1104, region_id=10230, offset=0, limit=1)
+    assert "random" not in body
+    body_false = client._free_body(
+        type_id=1104, region_id=10230, offset=0, limit=1, random_mode="false"
+    )
+    assert body_false["random"] is False
+    body_type_only = client._free_body(
+        type_id=1104, region_id=None, offset=0, limit=1, random_mode="omit"
+    )
+    assert "region_id" not in body_type_only
+
+
+def test_choose_random_mode_from_probes():
+    client = ExolveClient(_conn())
+    assert (
+        client.choose_random_mode_from_probes(
+            [
+                {"probe": "moscow_def_random_false", "numbers_len": 0},
+                {"probe": "moscow_def_omit_random", "numbers_len": 1},
+            ]
+        )
+        == "omit"
+    )
+    assert (
+        client.choose_random_mode_from_probes(
+            [
+                {"probe": "moscow_def_random_false", "numbers_len": 2},
+                {"probe": "moscow_def_omit_random", "numbers_len": 0},
+            ]
+        )
+        == "false"
+    )
+
+
 def test_iter_free_slice_stops_on_short_page():
     client = ExolveClient(_conn(), page_limit=2)
     calls: list[int] = []
 
-    async def fake_page(*, type_id, region_id, offset, limit=None):
+    async def fake_page(*, type_id, region_id, offset, limit=None, random_mode=None):
         calls.append(offset)
-        from app.providers.dto.common import RawHttpResult
-
-        raw = RawHttpResult(
-            status_code=200,
-            body_text="{}",
-            body_json={},
-            headers={},
-            elapsed_ms=1,
-            request_url="https://api.exolve.ru/number/v1/GetFree",
-        )
+        raw = _raw()
         if offset == 0:
             return [{"number_code": "79001111111"}, {"number_code": "79002222222"}], raw
         return [{"number_code": "79003333333"}], raw
@@ -141,29 +201,30 @@ def test_sync_free_builds_type_region_slices(monkeypatch):
 
     class FakeClient(ExolveClient):
         async def get_reference(self):
-            from app.providers.dto.common import RawHttpResult
+            return ref, _raw(ref)
 
-            return ref, RawHttpResult(
-                status_code=200,
-                body_text="{}",
-                body_json=ref,
-                headers={},
-                elapsed_ms=1,
-                request_url="https://api.exolve.ru/number/reference/v1/GetList",
-            )
+        async def probe_get_free(self):
+            return [
+                {
+                    "probe": "moscow_def_random_false",
+                    "numbers_len": 0,
+                    "http_status": 200,
+                },
+                {
+                    "probe": "moscow_def_omit_random",
+                    "numbers_len": 1,
+                    "http_status": 200,
+                },
+                {"probe": "type_only_def", "numbers_len": 1, "http_status": 200},
+            ]
 
-        async def iter_free_slice(self, *, type_id, region_id, on_progress=None, type_label=""):
+        async def iter_free_slice(
+            self, *, type_id, region_id, on_progress=None, type_label="", on_first_raw=None
+        ):
             seen.append((type_id, region_id))
-            from app.providers.dto.common import RawHttpResult
-
-            raw = RawHttpResult(
-                status_code=200,
-                body_text="{}",
-                body_json={},
-                headers={},
-                elapsed_ms=1,
-                request_url="x",
-            )
+            raw = _raw({"numbers": []})
+            if on_first_raw:
+                on_first_raw(raw)
             if type_id == contract.TYPE_DEF and region_id == 10230:
                 return (
                     [
@@ -180,17 +241,106 @@ def test_sync_free_builds_type_region_slices(monkeypatch):
                 )
             return [], [raw]
 
-    monkeypatch.setattr(provider, "_client", lambda connection: FakeClient(connection))
+    monkeypatch.setattr(provider, "_client", lambda connection, **kw: FakeClient(connection, **kw))
     result = asyncio.run(provider.sync_free_numbers(_conn(), city_lookup={}))
     assert (contract.TYPE_DEF, 10084) in seen
     assert (contract.TYPE_DEF, 10230) in seen
     assert (contract.TYPE_ABC, 10230) in seen
     assert (contract.TYPE_KDU, contract.RUSSIA_REGION_ID) in seen
-    # KDU must not fan out to every city region
     assert (contract.TYPE_KDU, 10230) not in seen
     assert result.parsed == 1
     assert result.extra_stats["integrity"]["regions_in_reference"] == 2
     assert result.extra_stats["integrity"]["slices_planned"] == 5  # 2+2+1
+    assert result.extra_stats["integrity"]["random_mode"] == "omit"
+
+
+def test_sync_free_empty_raises_clear_error(monkeypatch):
+    provider = ExolveProvider()
+    ref = {
+        "regions": [
+            {
+                "region_id": 10230,
+                "parent_region_id": 10084,
+                "description": "Москва",
+                "region_name": "Moscow",
+            },
+            {
+                "region_id": 10084,
+                "parent_region_id": 10084,
+                "description": "Россия",
+                "region_name": "Russia",
+            },
+        ],
+        "categories": [],
+        "types": [],
+    }
+
+    class FakeClient(ExolveClient):
+        async def get_reference(self):
+            return ref, _raw(ref)
+
+        async def probe_get_free(self):
+            return [
+                {"probe": "moscow_def_random_false", "numbers_len": 0},
+                {"probe": "moscow_def_omit_random", "numbers_len": 0},
+                {"probe": "type_only_def", "numbers_len": 0},
+            ]
+
+        async def iter_free_slice(
+            self, *, type_id, region_id, on_progress=None, type_label="", on_first_raw=None
+        ):
+            raw = _raw({"numbers": []})
+            if on_first_raw:
+                on_first_raw(raw)
+            return [], [raw]
+
+    monkeypatch.setattr(provider, "_client", lambda connection, **kw: FakeClient(connection, **kw))
+    try:
+        asyncio.run(provider.sync_free_numbers(_conn(), city_lookup={}))
+        raise AssertionError("expected ProviderError")
+    except ProviderError as exc:
+        assert "Exolve GetFree empty" in str(exc)
+        assert "Exolve LK" in str(exc)
+        assert exc.code == "EXOLVE_FREE_EMPTY"
+
+
+def test_test_connection_includes_get_free_probes(monkeypatch):
+    provider = ExolveProvider()
+    ref = {"regions": [{"region_id": 1}], "types": [], "categories": []}
+
+    class FakeClient(ExolveClient):
+        async def get_reference(self):
+            return ref, _raw(ref)
+
+        async def probe_get_free(self):
+            return [
+                {
+                    "probe": "moscow_def_random_false",
+                    "numbers_len": 0,
+                    "json_keys": ["numbers"],
+                    "http_status": 200,
+                    "body_text_preview": '{"numbers":[]}',
+                },
+                {
+                    "probe": "moscow_def_omit_random",
+                    "numbers_len": 0,
+                    "json_keys": ["numbers"],
+                    "http_status": 200,
+                },
+                {
+                    "probe": "type_only_def",
+                    "numbers_len": 0,
+                    "json_keys": ["numbers"],
+                    "http_status": 200,
+                },
+            ]
+
+    monkeypatch.setattr(provider, "_client", lambda connection, **kw: FakeClient(connection, **kw))
+    result = asyncio.run(provider.test_connection(_conn()))
+    assert result.ok is True
+    assert "GetFree canary" in result.message
+    assert result.details["get_free_best_numbers"] == 0
+    assert len(result.details["get_free_probes"]) == 3
 
 
 def test_purchased_unsupported():

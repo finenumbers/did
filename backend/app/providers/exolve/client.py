@@ -4,17 +4,19 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 
 from app.providers.dto.common import ConnectionConfig, RawHttpResult
 from app.providers.errors import ProviderAuthError, ProviderError, ProviderTransportError
-from app.providers.exolve import contract
+from app.providers.exolve import contract, parser
 from app.providers.progress_emit import ProgressCb, emit_progress
 from app.providers.retry import RetryPolicy, TimeoutConfig, request_with_retries
 
 logger = logging.getLogger(__name__)
+
+RandomMode = Literal["omit", "false", "true"]
 
 
 class ExolveClient:
@@ -25,6 +27,7 @@ class ExolveClient:
         timeout: TimeoutConfig | None = None,
         retry: RetryPolicy | None = None,
         page_limit: int | None = None,
+        random_mode: RandomMode | None = None,
     ):
         self.connection = connection
         self.timeout = timeout or TimeoutConfig(read_timeout=90.0, total_timeout=120.0)
@@ -32,6 +35,9 @@ class ExolveClient:
         raw_base = (connection.base_url or "").strip() or contract.EXAMPLE_BASE_URL
         self.base_url = raw_base.rstrip("/")
         self.page_limit = int(page_limit or contract.DEFAULT_PAGE_LIMIT)
+        # Default omit: docs examples use random=true; sending false correlated with
+        # empty inventory in production — omit keeps stable pagination without the flag.
+        self.random_mode: RandomMode = random_mode or "omit"
         auth = connection.auth_settings or {}
         self._api_key = (auth.get(contract.AUTH_API_KEY) or "").strip() or None
         if not self._api_key:
@@ -95,33 +101,120 @@ class ExolveClient:
         data = raw.body_json if isinstance(raw.body_json, dict) else {}
         return data, raw
 
+    def _free_body(
+        self,
+        *,
+        type_id: int,
+        region_id: int | None,
+        offset: int,
+        limit: int,
+        random_mode: RandomMode | None = None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {
+            "type_id": int(type_id),
+            "limit": int(limit),
+            "offset": int(offset),
+        }
+        if region_id is not None:
+            body["region_id"] = int(region_id)
+        mode = random_mode if random_mode is not None else self.random_mode
+        if mode == "false":
+            body["random"] = False
+        elif mode == "true":
+            body["random"] = True
+        # omit → do not send random
+        return body
+
     async def get_free_page(
         self,
         *,
         type_id: int,
-        region_id: int,
+        region_id: int | None,
         offset: int,
         limit: int | None = None,
+        random_mode: RandomMode | None = None,
     ) -> tuple[list[dict[str, Any]], RawHttpResult]:
-        body: dict[str, Any] = {
-            "type_id": int(type_id),
-            "region_id": int(region_id),
-            "limit": int(limit if limit is not None else self.page_limit),
-            "offset": int(offset),
-            "random": False,
-        }
+        body = self._free_body(
+            type_id=type_id,
+            region_id=region_id,
+            offset=offset,
+            limit=int(limit if limit is not None else self.page_limit),
+            random_mode=random_mode,
+        )
         raw = await self._post(contract.PATH_GET_FREE, body)
-        data = raw.body_json if isinstance(raw.body_json, dict) else {}
-        numbers = data.get("numbers")
-        if numbers is None:
-            numbers = []
-        if not isinstance(numbers, list):
+        try:
+            items = parser.extract_free_numbers(raw.body_json)
+        except TypeError as exc:
             raise ProviderError(
-                "Exolve GetFree: numbers is not a list",
+                str(exc),
                 code="EXOLVE_BAD_RESPONSE",
-            )
-        items = [n for n in numbers if isinstance(n, dict)]
+            ) from exc
         return items, raw
+
+    async def probe_get_free(self) -> list[dict[str, Any]]:
+        """Canary variants for Settings test_connection / sync diagnostics."""
+        probes: list[tuple[str, dict[str, Any]]] = [
+            (
+                "moscow_def_random_false",
+                {
+                    "type_id": contract.TYPE_DEF,
+                    "region_id": 10230,
+                    "random_mode": "false",
+                },
+            ),
+            (
+                "moscow_def_omit_random",
+                {
+                    "type_id": contract.TYPE_DEF,
+                    "region_id": 10230,
+                    "random_mode": "omit",
+                },
+            ),
+            (
+                "type_only_def",
+                {
+                    "type_id": contract.TYPE_DEF,
+                    "region_id": None,
+                    "random_mode": "omit",
+                },
+            ),
+        ]
+        out: list[dict[str, Any]] = []
+        for name, kwargs in probes:
+            items, raw = await self.get_free_page(
+                type_id=int(kwargs["type_id"]),
+                region_id=kwargs["region_id"],  # type: ignore[arg-type]
+                offset=0,
+                limit=1,
+                random_mode=kwargs["random_mode"],  # type: ignore[arg-type]
+            )
+            summary = parser.summarize_free_payload(
+                raw.status_code, raw.body_json, raw.body_text or ""
+            )
+            summary["probe"] = name
+            summary["request"] = {
+                "type_id": kwargs["type_id"],
+                "region_id": kwargs["region_id"],
+                "random_mode": kwargs["random_mode"],
+                "limit": 1,
+                "offset": 0,
+            }
+            summary["parsed_len"] = len(items)
+            out.append(summary)
+        return out
+
+    def choose_random_mode_from_probes(self, probes: list[dict[str, Any]]) -> RandomMode:
+        """Prefer omit when random=false is empty but omit returns numbers."""
+        by_name = {p.get("probe"): p for p in probes}
+        false_p = by_name.get("moscow_def_random_false") or {}
+        omit_p = by_name.get("moscow_def_omit_random") or {}
+        false_n = int(false_p.get("numbers_len") or 0)
+        omit_n = int(omit_p.get("numbers_len") or 0)
+        if omit_n > 0 and false_n == 0:
+            return "omit"
+        if false_n > 0:
+            return "false"
+        return "omit"
 
     async def iter_free_slice(
         self,
@@ -130,12 +223,14 @@ class ExolveClient:
         region_id: int,
         on_progress: ProgressCb | None = None,
         type_label: str = "",
+        on_first_raw: Any | None = None,
     ) -> tuple[list[dict[str, Any]], list[RawHttpResult]]:
         """Paginate one (type_id, region_id) slice until short/empty page."""
         items: list[dict[str, Any]] = []
         envelopes: list[RawHttpResult] = []
         offset = 0
         page_limit = self.page_limit
+        first_logged = False
         while offset <= contract.MAX_OFFSET:
             await emit_progress(
                 on_progress,
@@ -147,6 +242,9 @@ class ExolveClient:
                 type_id=type_id, region_id=region_id, offset=offset, limit=page_limit
             )
             envelopes.append(raw)
+            if not first_logged and on_first_raw is not None:
+                first_logged = True
+                on_first_raw(raw)
             if not page:
                 break
             items.extend(page)

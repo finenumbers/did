@@ -28,6 +28,9 @@ RUSSIA_REGION_ID = 10084
 DEFAULT_PAGE_LIMIT = 100
 MAX_OFFSET = 5_000_000
 
+# OPERATIONAL — omit random by default (docs examples use true; false seen empty in prod)
+DEFAULT_RANDOM_MODE = "omit"
+
 STATUS_FREE = "free"
 
 DOC_REFS_FREE = [

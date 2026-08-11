@@ -80,6 +80,61 @@ def parse_reference(
     return regions, cities, categories
 
 
+def extract_free_numbers(payload: Any) -> list[dict[str, Any]]:
+    """Extract NumberElement dicts from a GetFree JSON body (tolerant of wrappers)."""
+    if payload is None:
+        return []
+    if isinstance(payload, list):
+        return [n for n in payload if isinstance(n, dict)]
+    if not isinstance(payload, dict):
+        return []
+
+    candidates: list[Any] = [
+        payload.get("numbers"),
+        payload.get("Numbers"),
+    ]
+    for wrap_key in ("result", "data", "response", "payload"):
+        wrap = payload.get(wrap_key)
+        if isinstance(wrap, dict):
+            candidates.append(wrap.get("numbers"))
+            candidates.append(wrap.get("Numbers"))
+        elif isinstance(wrap, list):
+            candidates.append(wrap)
+
+    for numbers in candidates:
+        if numbers is None:
+            continue
+        if not isinstance(numbers, list):
+            raise TypeError("Exolve GetFree: numbers is not a list")
+        return [n for n in numbers if isinstance(n, dict)]
+    return []
+
+
+def summarize_free_payload(raw_status: int, body_json: Any, body_text: str) -> dict[str, Any]:
+    """Compact diagnostics for logs / test_connection (no secrets)."""
+    keys: list[str] = []
+    if isinstance(body_json, dict):
+        keys = sorted(str(k) for k in body_json.keys())
+    try:
+        numbers = extract_free_numbers(body_json)
+        extract_error = None
+    except TypeError as exc:
+        numbers = []
+        extract_error = str(exc)
+    sample_code = None
+    if numbers:
+        sample_code = numbers[0].get("number_code")
+    return {
+        "http_status": raw_status,
+        "json_keys": keys,
+        "json_parsed": body_json is not None,
+        "numbers_len": len(numbers),
+        "sample_number_code": sample_code,
+        "extract_error": extract_error,
+        "body_text_preview": (body_text or "")[:500],
+    }
+
+
 def parse_number_item(
     item: dict[str, Any],
     *,
