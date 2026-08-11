@@ -7,7 +7,7 @@ import { HighlightText } from "@/components/numbers/HighlightText";
 import { ColumnFilterDropdown } from "@/components/numbers/ColumnFilterDropdown";
 import { InfiniteScrollSentinel } from "@/components/table/InfiniteScrollSentinel";
 import { formatCount, formatPoints, formatPrice } from "@/lib/format";
-import { apiDownload, apiUrl } from "@/lib/api/client";
+import { apiDownload, apiFetch } from "@/lib/api/client";
 import { useInfinitePage } from "@/lib/hooks/useInfinitePage";
 import { displayProviderCode, encodeFilters } from "@/lib/numbers/filters";
 
@@ -203,6 +203,7 @@ export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
   const [openColumn, setOpenColumn] = useState<string | null>(null);
   const [scrollRoot, setScrollRoot] = useState<HTMLElement | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -265,39 +266,67 @@ export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
   const exportXlsx = () => {
     setExporting(true);
     setExportError(null);
-    const params = new URLSearchParams({
-      sort_by: sortBy,
-      sort_dir: sortDir,
-    });
-    if (filtersKey) params.set("filters", filtersKey);
-    if (numberLocalQ) params.set("number_local_q", numberLocalQ);
-    const path = `/api/v1/numbers/${kind}/export.xlsx?${params}`;
-
-    // Prefer Authorization header download; iframe+query-token only for huge exports.
-    if (total > 50_000) {
-      const iframe = document.createElement("iframe");
-      iframe.style.display = "none";
-      iframe.setAttribute("aria-hidden", "true");
-      iframe.src = apiUrl(path);
-      document.body.appendChild(iframe);
-      const waitMs = total > 200_000 ? 120_000 : 75_000;
-      window.setTimeout(() => setExporting(false), waitMs);
-      window.setTimeout(() => iframe.remove(), waitMs + 180_000);
-      return;
-    }
+    setExportProgress(total > 0 ? `0 / ${formatCount(total)}` : "запуск…");
 
     void (async () => {
       try {
-        const blob = await apiDownload(path);
+        type ExportJob = {
+          id: string;
+          status: string;
+          rows_done: number;
+          rows_total: number | null;
+          from_snapshot?: boolean;
+          error?: string | null;
+          filename?: string;
+        };
+        const job = await apiFetch<ExportJob>(`/api/v1/numbers/${kind}/export-jobs`, {
+          method: "POST",
+          body: JSON.stringify({
+            sort_by: sortBy,
+            sort_dir: sortDir,
+            filters: filtersKey || null,
+            number_local_q: numberLocalQ || null,
+          }),
+        });
+
+        let current = job;
+        const started = Date.now();
+        const maxWaitMs = 30 * 60 * 1000;
+        while (current.status === "queued" || current.status === "running") {
+          if (Date.now() - started > maxWaitMs) {
+            throw new Error("Экспорт превысил 30 минут ожидания");
+          }
+          const done = formatCount(current.rows_done || 0);
+          const tot =
+            current.rows_total != null ? formatCount(current.rows_total) : formatCount(total);
+          setExportProgress(`${done} / ${tot}`);
+          await new Promise((r) => setTimeout(r, 1500));
+          current = await apiFetch<ExportJob>(`/api/v1/numbers/export-jobs/${job.id}`);
+        }
+
+        if (current.status === "failed") {
+          throw new Error(current.error || "Ошибка экспорта");
+        }
+        if (current.status !== "ready") {
+          throw new Error(`Неожиданный статус экспорта: ${current.status}`);
+        }
+
+        setExportProgress(
+          current.from_snapshot
+            ? "скачивание готового файла…"
+            : `скачивание ${formatCount(current.rows_done || total)} строк…`,
+        );
+        const blob = await apiDownload(`/api/v1/numbers/export-jobs/${job.id}/download`);
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `${kind}-numbers.xlsx`;
+        a.download = current.filename || `${kind}-numbers.xlsx`;
         a.click();
         URL.revokeObjectURL(a.href);
       } catch (e) {
         setExportError(e instanceof Error ? e.message : "Ошибка экспорта");
       } finally {
         setExporting(false);
+        setExportProgress(null);
       }
     })();
   };
@@ -342,9 +371,8 @@ export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
       {exporting && (
         <div className="export-banner" role="status">
           Формируется XLSX
-          {total > 0 ? ` по ${formatCount(total)} строкам` : ""} —
-          дождитесь начала загрузки в браузере
-          {total > 50_000 ? " (полная свободная нумерация ~1 мин)" : ""}.
+          {total > 0 ? ` по ${formatCount(total)} строкам` : ""}
+          {exportProgress ? ` — ${exportProgress}` : ""} — дождитесь скачивания в браузере.
         </div>
       )}
       {exportError && <div className="state error">{exportError}</div>}

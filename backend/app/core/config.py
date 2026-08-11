@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     sync_dropped_xlsx_path: str = "/data/sync/sync_dropped_latest.xlsx"
     # Latest-only detailed sync debug log (truncated at each new unified sync)
     sync_debug_log_path: str = "/data/sync/sync_latest.log"
+    # Catalog XLSX export jobs + full-catalog snapshots
+    numbers_export_dir: str = "/data/exports"
 
     @property
     def cors_origins_list(self) -> list[str]:

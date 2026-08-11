@@ -1,16 +1,14 @@
-"""XLSX export of filtered numbers catalog (Unicode / openpyxl)."""
+"""XLSX export of filtered numbers catalog (xlsxwriter, constant_memory)."""
 
 from __future__ import annotations
 
 from datetime import datetime
-from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
-from openpyxl import Workbook
-from openpyxl.cell import WriteOnlyCell
-from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-from openpyxl.utils import get_column_letter
+import xlsxwriter
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.db import SessionLocal
@@ -81,16 +79,11 @@ COLUMN_WIDTHS: dict[str, float] = {
     "last_seen_at": 20,
 }
 
-_THIN = Border(
-    left=Side(style="thin"),
-    right=Side(style="thin"),
-    top=Side(style="thin"),
-    bottom=Side(style="thin"),
-)
-_HEADER_FONT = Font(bold=True)
-_HEADER_FILL = PatternFill("solid", fgColor="D9E2EC")
-_HEADER_ALIGN = Alignment(horizontal="center", vertical="center", wrap_text=True)
 _BATCH = 5_000
+DEFAULT_SORT_BY = "abc_code"
+DEFAULT_SORT_DIR = "asc"
+
+ProgressCb = Callable[[int, int | None], None]
 
 
 def _format_price(value: Any) -> str:
@@ -141,19 +134,56 @@ def _cell_value(key: str, row: NumbersCatalogNormalized, provider_code: str) -> 
     return "" if val is None else val
 
 
-def _header_cell(ws: Any, value: str) -> WriteOnlyCell:
-    cell = WriteOnlyCell(ws, value=value)
-    cell.border = _THIN
-    cell.font = _HEADER_FONT
-    cell.fill = _HEADER_FILL
-    cell.alignment = _HEADER_ALIGN
-    return cell
+def is_default_export_query(
+    *,
+    filters: dict[str, list[str]] | None,
+    number_local_q: str | None,
+    sort_by: str | None,
+    sort_dir: str,
+) -> bool:
+    if filters:
+        return False
+    if (number_local_q or "").strip():
+        return False
+    sb = (sort_by or DEFAULT_SORT_BY).strip() or DEFAULT_SORT_BY
+    sd = (sort_dir or DEFAULT_SORT_DIR).strip().lower() or DEFAULT_SORT_DIR
+    return sb == DEFAULT_SORT_BY and sd == DEFAULT_SORT_DIR
+
+
+def catalog_fingerprint(db: Session, inventory_kind: InventoryKind) -> dict[str, Any]:
+    count, max_seen = db.execute(
+        select(
+            func.count(),
+            func.max(NumbersCatalogNormalized.last_seen_at),
+        ).where(
+            NumbersCatalogNormalized.inventory_kind == inventory_kind,
+            NumbersCatalogNormalized.is_currently_present.is_(True),
+        )
+    ).one()
+    max_iso = max_seen.isoformat() if isinstance(max_seen, datetime) else None
+    return {"count": int(count or 0), "max_last_seen_at": max_iso}
 
 
 class NumbersExportService:
     def __init__(self, db: Session):
         self.db = db
         self.numbers = NumbersService(db)
+
+    def count_filtered(
+        self,
+        *,
+        inventory_kind: InventoryKind,
+        filters: dict[str, list[str]] | None = None,
+        number_local_q: str | None = None,
+    ) -> int:
+        stmt = self.numbers._base_stmt(inventory_kind, is_currently_present=True)
+        stmt = self.numbers.apply_catalog_filters(
+            stmt,
+            filters=filters,
+            number_local_q=number_local_q,
+        )
+        count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
+        return int(self.db.scalar(count_stmt) or 0)
 
     def export_xlsx(
         self,
@@ -164,6 +194,8 @@ class NumbersExportService:
         number_local_q: str | None = None,
         sort_by: str | None = None,
         sort_dir: str = "asc",
+        on_progress: ProgressCb | None = None,
+        rows_total: int | None = None,
     ) -> int:
         """Write filtered catalog to path. Returns data row count (excluding header)."""
         stmt = self.numbers._base_stmt(inventory_kind, is_currently_present=True)
@@ -174,27 +206,54 @@ class NumbersExportService:
         )
         stmt = stmt.order_by(*self.numbers.order_by_clauses(sort_by, sort_dir))
 
+        if rows_total is None:
+            rows_total = self.count_filtered(
+                inventory_kind=inventory_kind,
+                filters=filters,
+                number_local_q=number_local_q,
+            )
+
         sheet_title = "Свободные" if inventory_kind == InventoryKind.free else "Купленные"
-        wb = Workbook(write_only=True)
-        ws = wb.create_sheet(title=sheet_title)
+        out = Path(path)
+        out.parent.mkdir(parents=True, exist_ok=True)
 
-        for idx, (key, _) in enumerate(EXPORT_COLUMNS, start=1):
-            ws.column_dimensions[get_column_letter(idx)].width = COLUMN_WIDTHS.get(key, 14)
-
-        # Header: bold + fill + borders. Data rows are plain values for speed
-        # (bordering ~370k×33 cells made free export appear to hang in the browser).
-        ws.append([_header_cell(ws, header) for _, header in EXPORT_COLUMNS])
+        workbook = xlsxwriter.Workbook(
+            str(out),
+            {"constant_memory": True, "strings_to_urls": False},
+        )
+        ws = workbook.add_worksheet(sheet_title[:31])
+        header_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "bg_color": "#D9E2EC",
+                "border": 1,
+                "align": "center",
+                "valign": "vcenter",
+                "text_wrap": True,
+            }
+        )
 
         keys = [key for key, _ in EXPORT_COLUMNS]
+        for col_idx, (key, header) in enumerate(EXPORT_COLUMNS):
+            ws.write(0, col_idx, header, header_fmt)
+            ws.set_column(col_idx, col_idx, COLUMN_WIDTHS.get(key, 14))
+
         row_count = 0
         result = self.db.execute(stmt.execution_options(yield_per=_BATCH))
-        for row, code in result:
-            provider_code = code.value if hasattr(code, "value") else str(code)
-            ws.append([_cell_value(key, row, provider_code) for key in keys])
-            row_count += 1
+        try:
+            for row, code in result:
+                provider_code = code.value if hasattr(code, "value") else str(code)
+                excel_row = row_count + 1
+                for col_idx, key in enumerate(keys):
+                    ws.write(excel_row, col_idx, _cell_value(key, row, provider_code))
+                row_count += 1
+                if on_progress and row_count % _BATCH == 0:
+                    on_progress(row_count, rows_total)
+        finally:
+            workbook.close()
 
-        wb.save(path)
-        wb.close()
+        if on_progress:
+            on_progress(row_count, rows_total)
         return row_count
 
 
@@ -206,8 +265,10 @@ def export_xlsx_job(
     number_local_q: str | None,
     sort_by: str | None,
     sort_dir: str,
+    on_progress: ProgressCb | None = None,
+    rows_total: int | None = None,
 ) -> int:
-    """Run export in a dedicated DB session (safe for asyncio.to_thread)."""
+    """Run export in a dedicated DB session (safe for worker threads)."""
     db = SessionLocal()
     try:
         return NumbersExportService(db).export_xlsx(
@@ -217,6 +278,8 @@ def export_xlsx_job(
             number_local_q=number_local_q,
             sort_by=sort_by,
             sort_dir=sort_dir,
+            on_progress=on_progress,
+            rows_total=rows_total,
         )
     finally:
         db.close()

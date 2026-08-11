@@ -26,6 +26,7 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
       ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-changeme-session-secret}
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
+      NUMBERS_EXPORT_DIR: ${NUMBERS_EXPORT_DIR:-/tmp/did-exports}
     ports:
       - "8000:8000"
     volumes:

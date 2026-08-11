@@ -355,6 +355,20 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
             f"Unified sync finished status={status.value}",
             summary,
         )
+        # Rebuild full-catalog XLSX snapshots for fast unfiltered export downloads.
+        if status in (SyncJobStatus.success, SyncJobStatus.partial) and provider_ok > 0:
+            try:
+                from app.services.numbers_export_jobs import schedule_snapshot_rebuild
+
+                schedule_snapshot_rebuild()
+                log_run(
+                    db,
+                    run.id,
+                    SyncLogLevel.info,
+                    "Scheduled catalog XLSX snapshot rebuild",
+                )
+            except Exception:
+                logger.exception("Failed to schedule catalog XLSX snapshot rebuild")
     finally:
         if not dropped_written:
             try:

@@ -48,8 +48,10 @@ services:
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
       SYNC_DROPPED_XLSX_PATH: /data/sync/sync_dropped_latest.xlsx
       SYNC_DEBUG_LOG_PATH: /data/sync/sync_latest.log
+      NUMBERS_EXPORT_DIR: /data/exports
     volumes:
       - did_sync_data:/data/sync
+      - did_exports_data:/data/exports
     networks:
       - did_internal
       - proxy
@@ -87,3 +89,5 @@ volumes:
     name: did_pgdata
   did_sync_data:
     name: did_sync_data
+  did_exports_data:
+    name: did_exports_data

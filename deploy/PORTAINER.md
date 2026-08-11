@@ -102,3 +102,7 @@ Backend writes the latest unmapped/duplicate numbers report to `/data/sync/sync_
 ## 8b. Sync debug log
 
 Backend writes a detailed sync debug log to `/data/sync/sync_latest.log` on the same volume. The file is **truncated at the start of every new sync** and flushed after each stage / progress line (partial download is valid while a sync is running). Download from **Синхронизация → Скачать лог**.
+
+## 8c. Numbers XLSX export volume
+
+Backend stores async export jobs and full-catalog snapshots under `/data/exports` (volume `did_exports_data`, env `NUMBERS_EXPORT_DIR`). After a successful/partial sync, free/purchased `*_latest.xlsx` snapshots are rebuilt in the background. Unfiltered **Экспорт XLSX** uses the snapshot when fresh (fast download); filtered exports run as a background job with UI progress polling. No NPM idle-timeout change is required for the job/snapshot path.

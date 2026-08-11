@@ -11,8 +11,14 @@ from starlette.background import BackgroundTask
 from app.core.db import get_db
 from app.models.enums import InventoryKind
 from app.schemas.common import Page
+from app.schemas.export_jobs import ExportJobCreate, ExportJobOut
 from app.schemas.numbers import FacetResponse, NumberItem
 from app.services.numbers_export import export_xlsx_job
+from app.services.numbers_export_jobs import (
+    copy_job_file_for_download,
+    create_export_job,
+    get_job,
+)
 from app.services.numbers_service import NumbersService
 
 router = APIRouter(prefix="/numbers", tags=["Numbers"])
@@ -224,10 +230,80 @@ async def _export_xlsx(
     )
 
 
+def _start_export_job(kind: InventoryKind, body: ExportJobCreate) -> ExportJobOut:
+    try:
+        job = create_export_job(
+            inventory_kind=kind,
+            filters=_parse_filters_param(body.filters),
+            number_local_q=body.number_local_q,
+            sort_by=body.sort_by,
+            sort_dir=body.sort_dir,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return ExportJobOut.model_validate(job.to_public())
+
+
+@router.post(
+    "/free/export-jobs",
+    response_model=ExportJobOut,
+    summary="Start free-numbers XLSX export job",
+)
+def start_free_export_job(body: ExportJobCreate) -> ExportJobOut:
+    return _start_export_job(InventoryKind.free, body)
+
+
+@router.post(
+    "/purchased/export-jobs",
+    response_model=ExportJobOut,
+    summary="Start purchased-numbers XLSX export job",
+)
+def start_purchased_export_job(body: ExportJobCreate) -> ExportJobOut:
+    return _start_export_job(InventoryKind.purchased, body)
+
+
+@router.get(
+    "/export-jobs/{job_id}",
+    response_model=ExportJobOut,
+    summary="Export job status",
+)
+def get_export_job(job_id: str) -> ExportJobOut:
+    job = get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Export job not found")
+    return ExportJobOut.model_validate(job.to_public())
+
+
+@router.get(
+    "/export-jobs/{job_id}/download",
+    summary="Download completed export XLSX",
+    response_class=FileResponse,
+)
+def download_export_job(job_id: str) -> FileResponse:
+    job = get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Export job not found")
+    if job.status != "ready":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Export job is not ready (status={job.status})",
+        )
+    path = copy_job_file_for_download(job)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Export file missing")
+    # Do not delete after send — snapshots are shared; job files expire via TTL.
+    return FileResponse(
+        path,
+        media_type=_XLSX_MEDIA,
+        filename=job.filename,
+    )
+
+
 @router.get(
     "/free/export.xlsx",
-    summary="Export free numbers to XLSX",
+    summary="Export free numbers to XLSX (legacy sync)",
     response_class=FileResponse,
+    deprecated=True,
 )
 async def export_free_xlsx(
     sort_by: str | None = Query("abc_code"),
@@ -247,8 +323,9 @@ async def export_free_xlsx(
 
 @router.get(
     "/purchased/export.xlsx",
-    summary="Export purchased numbers to XLSX",
+    summary="Export purchased numbers to XLSX (legacy sync)",
     response_class=FileResponse,
+    deprecated=True,
 )
 async def export_purchased_xlsx(
     sort_by: str | None = Query("abc_code"),
