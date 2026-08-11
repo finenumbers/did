@@ -106,3 +106,13 @@ Backend writes a detailed sync debug log to `/data/sync/sync_latest.log` on the 
 ## 8c. Numbers XLSX export volume
 
 Backend stores async export jobs and full-catalog snapshots under `/data/exports` (volume `did_exports_data`, env `NUMBERS_EXPORT_DIR`). After a successful/partial sync, free/purchased `*_latest.xlsx` snapshots are rebuilt in the background. Unfiltered **Экспорт XLSX** uses the snapshot when fresh (fast download); filtered exports run as a background job with UI progress polling. No NPM idle-timeout change is required for the job/snapshot path.
+
+## 8d. Post-deploy sync integrity checklist
+
+After deploying a release that touches sync/export (e.g. v0.1.29+):
+
+1. Run a **full sync** and wait for status `success` (or `partial` only if enrich failed).
+2. Download **Скачать лог** and confirm a `Catalog checksum` line: `sum_free` + `sum_purchased` = `sum_total`, and `enrich_matches_catalog=true` when enrich ran.
+3. For Runexis free: confirm `Free integrity` / warnings include `raw_fetched`, `free_kept`, `dropped_non_free_status`, `map_failed`, `sequential_verify`, `final_short_page_offset`, and `count_hint_gap` (**info only** — gap vs API count is not a fetch failure).
+4. Snapshot exports: after sync finishes, unfiltered **Экспорт XLSX** for free/purchased should match UI «Стало» per provider (and free total = checksum `sum_free`).
+5. Dropped XLSX: `unmapped=0` expected; `duplicates` only from known sources (UIS same-phone / Aurora Crimea∩Simferopol).

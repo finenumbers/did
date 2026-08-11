@@ -53,3 +53,5 @@ class SyncResult:
     unmapped_raw: list[dict[str, Any]] = field(default_factory=list)
     raw_envelopes: list[RawHttpResult] = field(default_factory=list)
     diagnostics: DiagnosticsResult | None = None
+    # Provider-specific stats merged into job category block (e.g. Runexis integrity).
+    extra_stats: dict[str, Any] = field(default_factory=dict)

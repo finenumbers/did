@@ -21,6 +21,14 @@ type InventorySummaryRow = {
   limited?: boolean;
 };
 
+type CatalogChecksum = {
+  sum_free?: number;
+  sum_purchased?: number;
+  sum_total?: number;
+  enrich_rows_scanned?: number | null;
+  enrich_matches_catalog?: boolean | null;
+};
+
 /** Thousands with regular spaces: 31771 → "31 771". */
 function formatCount(value: number | string): string {
   const n = typeof value === "number" ? value : Number(String(value).replace(/\s/g, ""));
@@ -168,6 +176,7 @@ export default function SyncPage() {
   const canStart = cacheReady === true && !starting && !isActive;
   const droppedExport = (run?.stats?.dropped_export || null) as DroppedExportMeta | null;
   const inventorySummary = (run?.stats?.inventory_summary || []) as InventorySummaryRow[];
+  const catalogChecksum = (run?.stats?.catalog_checksum || null) as CatalogChecksum | null;
   const canDownloadDropped =
     !isActive && Boolean(droppedExport?.available) && !downloadingDropped;
   const canDownloadDebugLog = Boolean(run) && !downloadingDebugLog;
@@ -466,6 +475,23 @@ export default function SyncPage() {
                   </tbody>
                 </table>
               </div>
+              {catalogChecksum ? (
+                <p style={{ marginBottom: 0, marginTop: "0.75rem", fontSize: "0.85rem", color: "var(--muted)" }}>
+                  Контрольная сумма: свободные{" "}
+                  {formatCount(Number(catalogChecksum.sum_free || 0))} + купленные{" "}
+                  {formatCount(Number(catalogChecksum.sum_purchased || 0))} ={" "}
+                  {formatCount(Number(catalogChecksum.sum_total || 0))}
+                  {catalogChecksum.enrich_rows_scanned != null
+                    ? `; PSTN rows_scanned=${formatCount(Number(catalogChecksum.enrich_rows_scanned))}${
+                        catalogChecksum.enrich_matches_catalog === true
+                          ? " ✓"
+                          : catalogChecksum.enrich_matches_catalog === false
+                            ? " ≠"
+                            : ""
+                      }`
+                    : ""}
+                </p>
+              ) : null}
             </div>
           )}
 

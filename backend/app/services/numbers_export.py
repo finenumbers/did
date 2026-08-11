@@ -7,7 +7,6 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any, Callable
 
-import xlsxwriter
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -15,6 +14,7 @@ from app.core.db import SessionLocal
 from app.models.catalog import NumbersCatalogNormalized
 from app.models.enums import InventoryKind
 from app.services.numbers_service import NumbersService
+from app.services.xlsx_style import StyledSheetWriter, open_styled_workbook
 
 # UI column order / Russian headers (matches NumbersTable)
 EXPORT_COLUMNS: list[tuple[str, str]] = [
@@ -52,32 +52,6 @@ EXPORT_COLUMNS: list[tuple[str, str]] = [
     ("mapping_confidence", "confidence"),
     ("last_seen_at", "Обновлено"),
 ]
-
-COLUMN_WIDTHS: dict[str, float] = {
-    "provider_code": 12,
-    "abc_code": 8,
-    "number_category": 16,
-    "number_local": 12,
-    "status_raw": 12,
-    "region_name": 28,
-    "city_name": 22,
-    "buy_price": 12,
-    "period_price": 12,
-    "mask": 14,
-    "display_mask": 16,
-    "book_date": 14,
-    "number_type": 10,
-    "points": 10,
-    "notes": 24,
-    "tariff": 16,
-    "class": 14,
-    "operator": 16,
-    "partner": 16,
-    "project": 16,
-    "equipment": 16,
-    "mapping_confidence": 12,
-    "last_seen_at": 20,
-}
 
 _BATCH = 5_000
 DEFAULT_SORT_BY = "abc_code"
@@ -217,38 +191,24 @@ class NumbersExportService:
         out = Path(path)
         out.parent.mkdir(parents=True, exist_ok=True)
 
-        workbook = xlsxwriter.Workbook(
-            str(out),
-            {"constant_memory": True, "strings_to_urls": False},
-        )
+        workbook = open_styled_workbook(str(out), constant_memory=True)
         ws = workbook.add_worksheet(sheet_title[:31])
-        header_fmt = workbook.add_format(
-            {
-                "bold": True,
-                "bg_color": "#D9E2EC",
-                "border": 1,
-                "align": "center",
-                "valign": "vcenter",
-                "text_wrap": True,
-            }
-        )
-
+        headers = [header for _, header in EXPORT_COLUMNS]
         keys = [key for key, _ in EXPORT_COLUMNS]
-        for col_idx, (key, header) in enumerate(EXPORT_COLUMNS):
-            ws.write(0, col_idx, header, header_fmt)
-            ws.set_column(col_idx, col_idx, COLUMN_WIDTHS.get(key, 14))
+        writer = StyledSheetWriter(workbook, ws, headers)
 
         row_count = 0
         result = self.db.execute(stmt.execution_options(yield_per=_BATCH))
         try:
             for row, code in result:
                 provider_code = code.value if hasattr(code, "value") else str(code)
-                excel_row = row_count + 1
-                for col_idx, key in enumerate(keys):
-                    ws.write(excel_row, col_idx, _cell_value(key, row, provider_code))
+                writer.write_row(
+                    [_cell_value(key, row, provider_code) for key in keys]
+                )
                 row_count += 1
                 if on_progress and row_count % _BATCH == 0:
                     on_progress(row_count, rows_total)
+            writer.finalize()
         finally:
             workbook.close()
 

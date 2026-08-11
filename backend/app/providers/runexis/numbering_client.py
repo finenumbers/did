@@ -282,6 +282,28 @@ class RunexisNumberingClient:
         elapsed_ms = round((time.perf_counter() - t0) * 1000)
         return offset, chunk, raw, elapsed_ms
 
+    @staticmethod
+    def _page_meta(
+        *,
+        count_hint: int,
+        raw_fetched: int,
+        sequential_verify: bool,
+        final_short_page_offset: int | None,
+        page_limit: int,
+        concurrency_requested: int,
+    ) -> dict[str, Any]:
+        gap = max(0, int(count_hint) - int(raw_fetched)) if count_hint else 0
+        return {
+            "count_hint": int(count_hint or 0),
+            "raw_fetched": int(raw_fetched),
+            "sequential_verify": bool(sequential_verify),
+            "final_short_page_offset": final_short_page_offset,
+            "count_hint_gap": gap,
+            "page_limit": int(page_limit),
+            "concurrency_requested": int(concurrency_requested),
+            "count_is_progress_hint": True,
+        }
+
     async def _page_all(
         self,
         filters: dict[str, Any],
@@ -290,7 +312,7 @@ class RunexisNumberingClient:
         limit: int | None = None,
         concurrency: int | None = None,
         count_hint: int | None = None,
-    ) -> tuple[list[Any], list[RawHttpResult], int]:
+    ) -> tuple[list[Any], list[RawHttpResult], dict[str, Any]]:
         """
         Paginate search_numbers until a verified short/empty page.
 
@@ -314,7 +336,7 @@ class RunexisNumberingClient:
             total_hint,
         )
         limit = int(limit if limit is not None else contract.NUMBERING_PAGE_LIMIT)
-        concurrency = max(
+        concurrency_requested = max(
             1,
             int(
                 concurrency
@@ -322,6 +344,7 @@ class RunexisNumberingClient:
                 else contract.NUMBERING_FETCH_CONCURRENCY
             ),
         )
+        concurrency = concurrency_requested
 
         offset0, chunk0, raw0, ms0 = await self._fetch_page(filters, offset=0, limit=limit)
         pages: dict[int, list[Any]] = {0: chunk0}
@@ -349,12 +372,24 @@ class RunexisNumberingClient:
         )
 
         if not chunk0 or len(chunk0) < limit:
-            return chunk0, [last_env], count_hint
+            return (
+                chunk0,
+                [last_env],
+                self._page_meta(
+                    count_hint=count_hint,
+                    raw_fetched=len(chunk0),
+                    sequential_verify=False,
+                    final_short_page_offset=0,
+                    page_limit=limit,
+                    concurrency_requested=concurrency_requested,
+                ),
+            )
 
         next_offset = limit
         page_num = 1
         # Parallel waves can truncate early; verify once with sequential re-fetch.
         sequential_resume_used = concurrency <= 1
+        final_short_page_offset: int | None = None
 
         while next_offset <= 5_000_000:
             sem = asyncio.Semaphore(concurrency)
@@ -444,6 +479,7 @@ class RunexisNumberingClient:
                 )
 
             if seen_end:
+                final_short_page_offset = first_short
                 if not sequential_resume_used and first_short is not None:
                     total_fetched = sum(len(c) for c in pages.values())
                     logger.warning(
@@ -463,11 +499,25 @@ class RunexisNumberingClient:
         for off in sorted(pages.keys()):
             chunk = pages[off]
             if not chunk:
+                if final_short_page_offset is None:
+                    final_short_page_offset = off
                 break
             items.extend(chunk)
             if len(chunk) < limit:
+                final_short_page_offset = off
                 break
-        return items, [last_env], count_hint
+        return (
+            items,
+            [last_env],
+            self._page_meta(
+                count_hint=count_hint,
+                raw_fetched=len(items),
+                sequential_verify=sequential_resume_used and concurrency_requested > 1,
+                final_short_page_offset=final_short_page_offset,
+                page_limit=limit,
+                concurrency_requested=concurrency_requested,
+            ),
+        )
 
     async def list_all_free_numbers(
         self,
@@ -493,24 +543,27 @@ class RunexisNumberingClient:
             "concurrency": contract.NUMBERING_FETCH_CONCURRENCY,
             "count_is_progress_hint": True,
         }
-        count_hint = 0
 
         try:
             try:
-                items, envelopes, count_hint = await self._page_all(
+                items, envelopes, page_meta = await self._page_all(
                     used_filter, on_progress=on_progress
                 )
             except (ProviderAuthError, ProviderTransportError) as primary_exc:
                 used_filter = dict(contract.NUMBERING_FREE_FILTER_FALLBACK)
                 meta["filter"] = used_filter
                 meta["primary_filter_error"] = str(primary_exc)
-                items, envelopes, count_hint = await self._page_all(
+                items, envelopes, page_meta = await self._page_all(
                     used_filter, on_progress=on_progress
                 )
 
+            count_hint = int(page_meta.get("count_hint") or 0)
+            meta.update(page_meta)
             meta["expected_count"] = count_hint
-            meta["count_hint"] = count_hint
             meta["fetched"] = len(items)
+            # Keep gap aligned with actual assembled list length.
+            meta["raw_fetched"] = len(items)
+            meta["count_hint_gap"] = max(0, count_hint - len(items)) if count_hint else 0
 
             if not items:
                 raise ProviderError(
@@ -521,9 +574,13 @@ class RunexisNumberingClient:
             if count_hint > 0 and len(items) < count_hint:
                 logger.warning(
                     "Runexis Numbering free list fetched=%s < count_hint=%s "
+                    "count_hint_gap=%s sequential_verify=%s final_short_page_offset=%s "
                     "(count is API total / progress, not free-only size); accepting",
                     len(items),
                     count_hint,
+                    meta.get("count_hint_gap"),
+                    meta.get("sequential_verify"),
+                    meta.get("final_short_page_offset"),
                 )
 
             await emit_progress(

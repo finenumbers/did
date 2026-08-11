@@ -31,7 +31,7 @@ from app.modules.sync_engine.progress import (
 )
 from app.modules.sync_engine.run_file_log import begin_sync_debug_log, end_sync_debug_log
 from app.modules.sync_engine.run_logging import log_run
-from app.modules.sync_engine.safety import build_inventory_summary
+from app.modules.sync_engine.safety import build_catalog_checksum, build_inventory_summary
 from app.modules.sync_engine.service import SyncService
 from app.providers.dto.common import ConnectionConfig
 from app.providers.errors import ProviderCapabilityLimitedError, ProviderError
@@ -315,15 +315,31 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
             dropped_meta = {"available": False, "error": "write_failed"}
 
         inventory_summary = build_inventory_summary(category_stats)
+        catalog_checksum = build_catalog_checksum(category_stats)
         summary = {
             "providers_ok": provider_ok,
             "providers_failed": provider_failures,
             "categories": category_stats,
             "inventory_summary": inventory_summary,
+            "catalog_checksum": catalog_checksum,
             "dropped_export": dropped_meta,
         }
         run.stats = summary
         db.commit()
+        log_run(
+            db,
+            run.id,
+            SyncLogLevel.info,
+            (
+                "Catalog checksum "
+                f"sum_free={catalog_checksum.get('sum_free')} "
+                f"sum_purchased={catalog_checksum.get('sum_purchased')} "
+                f"sum_total={catalog_checksum.get('sum_total')} "
+                f"enrich_rows_scanned={catalog_checksum.get('enrich_rows_scanned')} "
+                f"enrich_matches_catalog={catalog_checksum.get('enrich_matches_catalog')}"
+            ),
+            catalog_checksum,
+        )
         tracker.end(
             "finalize",
             f"ok={provider_ok}, failed={len(provider_failures)}",

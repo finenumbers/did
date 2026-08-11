@@ -83,3 +83,46 @@ def build_inventory_summary(category_stats: dict[str, Any]) -> list[dict[str, An
                 }
             )
     return rows
+
+
+def build_catalog_checksum(category_stats: dict[str, Any]) -> dict[str, Any]:
+    """
+    Post-sync catalog totals for quick log/UI reconcile.
+
+    Uses per-provider upserted counts (= UI «Стало») and compares their sum
+    with PSTN enrich ``rows_scanned`` when present.
+    """
+    inventory = build_inventory_summary(category_stats)
+    by_provider_kind: list[dict[str, Any]] = []
+    sum_free = 0
+    sum_purchased = 0
+    for row in inventory:
+        if row.get("refused_wipe"):
+            continue
+        count = int(row.get("current") or 0)
+        by_provider_kind.append(
+            {
+                "provider": row["provider"],
+                "kind": row["kind"],
+                "count": count,
+            }
+        )
+        if row["kind"] == "free":
+            sum_free += count
+        elif row["kind"] == "purchased":
+            sum_purchased += count
+    sum_total = sum_free + sum_purchased
+    enrich = (category_stats or {}).get("operator_enrichment") or {}
+    rows_scanned = enrich.get("rows_scanned")
+    if rows_scanned is None:
+        enrich_matches = None
+    else:
+        enrich_matches = int(rows_scanned) == sum_total
+    return {
+        "by_provider_kind": by_provider_kind,
+        "sum_free": sum_free,
+        "sum_purchased": sum_purchased,
+        "sum_total": sum_total,
+        "enrich_rows_scanned": rows_scanned,
+        "enrich_matches_catalog": enrich_matches,
+    }

@@ -1,0 +1,56 @@
+"""Shared XLSX export styling (Calibri 11, no fills, autofit, autofilter)."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from openpyxl import load_workbook
+
+from app.services.xlsx_style import (
+    FONT_NAME,
+    FONT_SIZE,
+    StyledSheetWriter,
+    excel_col_width,
+    open_styled_workbook,
+)
+
+
+def test_styled_sheet_writer_format(tmp_path: Path):
+    path = tmp_path / "styled.xlsx"
+    wb = open_styled_workbook(str(path), constant_memory=True)
+    try:
+        ws = wb.add_worksheet("data")
+        writer = StyledSheetWriter(wb, ws, ["Name", "City"])
+        writer.write_row(["Alice", "Moscow"])
+        writer.write_row(["Bob", "Saint Petersburg"])
+        writer.finalize()
+    finally:
+        wb.close()
+
+    loaded = load_workbook(path)
+    try:
+        sheet = loaded.active
+        assert sheet["A1"].value == "Name"
+        assert sheet["A1"].font.bold is True
+        assert sheet["A1"].font.name == FONT_NAME
+        assert sheet["A1"].font.size == FONT_SIZE
+        assert sheet["A1"].alignment.horizontal == "center"
+        assert sheet["B2"].value == "Moscow"
+        assert sheet["B2"].font.name == FONT_NAME
+        assert sheet["B2"].font.size == FONT_SIZE
+        # No colored pattern fills on header/data cells.
+        for cell in (sheet["A1"], sheet["B1"], sheet["A2"], sheet["B2"]):
+            fill = cell.fill
+            assert getattr(fill, "patternType", None) in (None, "none")
+            assert getattr(fill, "fgColor", None) is None or fill.fgColor.rgb in (
+                None,
+                "00000000",
+                "0",
+            )
+        assert sheet.auto_filter.ref == "A1:B3"
+        # Wider of header "City"(4) vs "Saint Petersburg"(16) → padded width.
+        expected = excel_col_width(len("Saint Petersburg"))
+        assert sheet.column_dimensions["B"].width >= expected - 1
+        assert sheet.column_dimensions["B"].width <= expected + 2
+    finally:
+        loaded.close()

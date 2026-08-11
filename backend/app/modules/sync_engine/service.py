@@ -469,12 +469,15 @@ class SyncService:
                     persist_stats = {}
                 parsed = int(result.parsed) if result.parsed else len(numbers)
                 fetched = int(result.fetched)
-                stats["categories"]["free_numbers"] = _number_reload_stats(
+                free_block = _number_reload_stats(
                     fetched=fetched,
                     parsed=parsed,
                     persist_stats=persist_stats,
                     previous=previous,
                 )
+                if result.extra_stats:
+                    free_block.update(result.extra_stats)
+                stats["categories"]["free_numbers"] = free_block
                 await _free_progress(
                     f"Записано {persist_stats.get('upserted', 0)}",
                     persist_stats.get("upserted"),
@@ -486,6 +489,14 @@ class SyncService:
                     upserted=int(persist_stats.get("upserted") or 0),
                 )
                 log_job(self.db, job.id, SyncLogLevel.info, f"Free numbers {free_detail}")
+                if isinstance(result.extra_stats.get("integrity"), dict):
+                    log_job(
+                        self.db,
+                        job.id,
+                        SyncLogLevel.info,
+                        f"Free integrity {result.extra_stats['integrity']}",
+                        result.extra_stats["integrity"],
+                    )
                 self.db.commit()
                 await _hook("free", "end", free_detail)
             else:

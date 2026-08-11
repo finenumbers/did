@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+from collections import Counter
 from datetime import datetime, timezone
 from typing import Any
 
@@ -13,6 +15,8 @@ from app.providers.errors import ProviderAuthError, ProviderError, ProviderTrans
 from app.providers.runexis import contract, mapper, parser
 from app.providers.runexis.client import RunexisClient
 from app.providers.runexis.numbering_client import RunexisNumberingClient
+
+logger = logging.getLogger(__name__)
 
 
 class RunexisProvider(AbstractProvider):
@@ -219,6 +223,12 @@ class RunexisProvider(AbstractProvider):
         await emit_progress(
             on_progress, "Runexis: разбор и маппинг…", len(raw_items), len(raw_items)
         )
+        access_state_distribution = Counter()
+        for raw in raw_items:
+            if isinstance(raw, dict):
+                state = raw.get("access_state")
+                access_state_distribution[str(state if state is not None else "")] += 1
+
         parsed = parser.parse_numbering_search_items(raw_items)
         free_parsed = []
         dropped_non_free = 0
@@ -233,22 +243,44 @@ class RunexisProvider(AbstractProvider):
         mapped, unmapped_raw = self._map_items(
             free_parsed, inventory_kind=InventoryKind.free, city_lookup=city_lookup
         )
+        raw_fetched = int(meta.get("raw_fetched") or meta.get("fetched") or len(raw_items))
+        count_hint = int(meta.get("count_hint") or meta.get("expected_count") or 0)
+        count_hint_gap = int(
+            meta.get("count_hint_gap")
+            if meta.get("count_hint_gap") is not None
+            else max(0, count_hint - raw_fetched)
+        )
+        integrity = {
+            "raw_fetched": raw_fetched,
+            "free_kept": len(free_parsed),
+            "dropped_non_free_status": dropped_non_free,
+            "map_failed": len(unmapped_raw),
+            "access_state_distribution": dict(access_state_distribution),
+            "sequential_verify": bool(meta.get("sequential_verify")),
+            "final_short_page_offset": meta.get("final_short_page_offset"),
+            "count_hint": count_hint,
+            "count_hint_gap": count_hint_gap,
+            "count_is_progress_hint": True,
+            "filter": meta.get("filter"),
+        }
         warnings = [
             "Free catalog via Numbering API search_numbers (separate numbering_* credentials)",
             f"filter_used={meta.get('filter')}",
-            f"count_hint={meta.get('count_hint') or meta.get('expected_count')}",
-            f"raw_fetched={meta.get('fetched')}",
+            f"count_hint={count_hint}",
+            f"raw_fetched={raw_fetched}",
             f"free_kept={len(free_parsed)}",
+            f"dropped_non_free_status={dropped_non_free}",
+            f"map_failed={len(unmapped_raw)}",
+            f"count_hint_gap={count_hint_gap} (info; count is progress hint, not fail)",
+            f"sequential_verify={meta.get('sequential_verify')}",
+            f"final_short_page_offset={meta.get('final_short_page_offset')}",
+            f"access_state_distribution={dict(access_state_distribution)}",
         ]
-        if dropped_non_free:
-            warnings.append(
-                f"dropped_non_free_status={dropped_non_free} "
-                "(only access_state free/0 enter Свободные; purchased is DIDAPI)"
-            )
         if meta.get("primary_filter_error"):
             warnings.append(
                 f"primary filter failed, used fallback: {meta.get('primary_filter_error')}"
             )
+        logger.warning("Runexis free integrity %s", integrity)
         return SyncResult(
             fetched=len(free_parsed),
             parsed=len(mapped),
@@ -256,6 +288,7 @@ class RunexisProvider(AbstractProvider):
             unmapped_raw=unmapped_raw,
             raw_envelopes=envelopes,
             warnings=warnings,
+            extra_stats={"integrity": integrity},
         )
 
     async def sync_purchased_numbers(self, connection: ConnectionConfig, **kwargs: Any) -> SyncResult:

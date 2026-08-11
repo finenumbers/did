@@ -2,6 +2,7 @@
 
 from app.models.enums import InventoryKind, MappingConfidence
 from app.modules.sync_engine.safety import (
+    build_catalog_checksum,
     build_inventory_summary,
     count_unique_provider_keys,
     reload_allowed,
@@ -83,3 +84,23 @@ def test_build_inventory_summary_was_became():
     assert by_label["SipOut · свободные"]["current"] == 120
     assert by_label["SipOut · купленные"]["delta"] == -2
     assert len(rows) == 3
+
+
+def test_build_catalog_checksum_matches_enrich_rows():
+    stats = {
+        "aurora": {"free_numbers": {"previous": 1, "upserted": 10}},
+        "sipout": {
+            "free_numbers": {"previous": 1, "upserted": 20},
+            "purchased_numbers": {"previous": 1, "upserted": 3},
+        },
+        "operator_enrichment": {"rows_scanned": 33, "updated": 2},
+    }
+    checksum = build_catalog_checksum(stats)
+    assert checksum["sum_free"] == 30
+    assert checksum["sum_purchased"] == 3
+    assert checksum["sum_total"] == 33
+    assert checksum["enrich_rows_scanned"] == 33
+    assert checksum["enrich_matches_catalog"] is True
+    assert {"provider": "sipout", "kind": "purchased", "count": 3} in checksum[
+        "by_provider_kind"
+    ]

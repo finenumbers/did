@@ -67,10 +67,13 @@ def test_page_all_resumes_sequentially_when_parallel_stops_early():
         100: [[]],
     }
     client = ScriptedNumberingClient(scripts, count_hint=500)
-    items, _envs, hint = asyncio.run(
+    items, _envs, meta = asyncio.run(
         client._page_all({}, limit=20, concurrency=4, count_hint=500)
     )
-    assert hint == 500
+    assert meta["count_hint"] == 500
+    assert meta["sequential_verify"] is True
+    assert meta["final_short_page_offset"] == 100
+    assert meta["count_hint_gap"] == 400
     assert len(items) == 100
     assert [row["n"] for row in items] == list(range(100))
     assert client.fetch_log.count((60, 20)) >= 2
@@ -86,10 +89,13 @@ def test_page_all_accepts_free_list_below_count_hint():
         60: [[]],
     }
     client = ScriptedNumberingClient(scripts, count_hint=200)
-    items, _envs, hint = asyncio.run(
+    items, _envs, meta = asyncio.run(
         client._page_all({}, limit=20, concurrency=1, count_hint=200)
     )
-    assert hint == 200
+    assert meta["count_hint"] == 200
+    assert meta["count_hint_gap"] == 155
+    assert meta["sequential_verify"] is False
+    assert meta["final_short_page_offset"] == 40
     assert len(items) == 45
 
 
@@ -102,10 +108,13 @@ def test_page_all_emits_pending_progress_before_slow_calls():
 
     scripts = {0: [[{"n": 1}] * 5]}
     client = ScriptedNumberingClient(scripts, count_hint=42)
-    items, _envs, hint = asyncio.run(
+    items, _envs, meta = asyncio.run(
         client._page_all({}, limit=20, concurrency=1, on_progress=on_progress)
     )
-    assert hint == 42
+    assert meta["count_hint"] == 42
+    assert meta["count_hint_gap"] == 37
+    assert meta["sequential_verify"] is False
+    assert meta["final_short_page_offset"] == 0
     assert len(items) == 5
     details = [e[0] for e in events]
     assert "Numbering: запрос count…" in details

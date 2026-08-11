@@ -11,10 +11,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from openpyxl import Workbook, load_workbook
+from openpyxl import load_workbook
 
 from app.core.config import get_settings
 from app.providers.dto.numbers import NormalizedNumber
+from app.services.xlsx_style import StyledSheetWriter, open_styled_workbook
 
 logger = logging.getLogger(__name__)
 
@@ -196,34 +197,35 @@ def write_dropped_xlsx() -> dict[str, Any]:
             "generated_at": mtime,
         }
 
-    wb = Workbook(write_only=True)
-    ws_u = wb.create_sheet("unmapped")
-    ws_d = wb.create_sheet("duplicates")
-
     headers = ["provider", "inventory_kind", "provider_number_key", "outcome", "raw_payload"]
-    ws_u.append(headers)
-    ws_d.append(headers)
-
-    unmapped_n = 0
-    duplicates_n = 0
-    for row in collector.rows:
-        payload = json.dumps(row.raw_payload, ensure_ascii=False, default=str)
-        values = [
-            row.provider,
-            row.inventory_kind,
-            row.provider_number_key or "",
-            "dropped",
-            payload,
-        ]
-        if row.reason == "unmapped":
-            ws_u.append(values)
-            unmapped_n += 1
-        else:
-            ws_d.append(values)
-            duplicates_n += 1
-
     tmp_path = path.with_name(path.name + ".tmp")
-    wb.save(tmp_path)
+    wb = open_styled_workbook(str(tmp_path), constant_memory=True)
+    try:
+        writer_u = StyledSheetWriter(wb, wb.add_worksheet("unmapped"), headers)
+        writer_d = StyledSheetWriter(wb, wb.add_worksheet("duplicates"), headers)
+
+        unmapped_n = 0
+        duplicates_n = 0
+        for row in collector.rows:
+            payload = json.dumps(row.raw_payload, ensure_ascii=False, default=str)
+            values = [
+                row.provider,
+                row.inventory_kind,
+                row.provider_number_key or "",
+                "dropped",
+                payload,
+            ]
+            if row.reason == "unmapped":
+                writer_u.write_row(values)
+                unmapped_n += 1
+            else:
+                writer_d.write_row(values)
+                duplicates_n += 1
+
+        writer_u.finalize()
+        writer_d.finalize()
+    finally:
+        wb.close()
     os.replace(tmp_path, path)
     generated_at = datetime.now(UTC).isoformat()
     meta = {
