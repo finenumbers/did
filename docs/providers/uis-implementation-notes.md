@@ -14,7 +14,7 @@ Product does **not** call `login.user`; session-via-password is unused. Vendor d
 1. **IP whitelist**: add Docker/host egress IP in UIS ЛК → API security, or `0.0.0.0/0` for lab.
 2. Use host `dataapi.uiscom.ru` with UIS credentials (not Comagic).
 3. Page size default 1000 (docs default); max 10000 — client uses 1000 unless overridden.
-4. If `metadata.total_items` exceeds what pagination can fetch within vendor `offset` max (100_000), sync **fails** (`UIS_PAGINATION_TRUNCATED`) — never silently persist a truncated catalog.
+4. Pagination: do not stop on short page while `offset < total_items`. `UIS_PAGINATION_TRUNCATED` only when hit `MAX_OFFSET` with `fetched < total_items`. Empty page inside the window with shortfall → `total_items_mismatch` warning, sync continues (no fail).
 5. Blank/whitespace `base_url` falls back to `https://dataapi.uiscom.ru/v2.0`.
 6. Phone normalize: strip non-digits; `8XXXXXXXXXX` → `7…`; 10-digit national → prefix `7`.
 7. Empty free/purchased fetch must not wipe (existing wipe-guard).

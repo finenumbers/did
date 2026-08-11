@@ -44,6 +44,41 @@ def _category_ids_by_type(categories: list[dict[str, Any]]) -> dict[int, list[in
     return by_type
 
 
+def _normalize_categories_list(raw: Any) -> list[dict[str, Any]]:
+    """Normalize GetList categories[] for diagnostics (sorted by type_id, category_id)."""
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for row in raw:
+        if not isinstance(row, dict):
+            continue
+        try:
+            cid = int(row.get("category_id"))
+            tid = int(row.get("type_id"))
+        except (TypeError, ValueError):
+            continue
+        type_name = row.get("type_name")
+        category_name = row.get("category_name")
+        out.append(
+            {
+                "category_id": cid,
+                "type_id": tid,
+                "type_name": str(type_name) if type_name is not None else None,
+                "category_name": str(category_name) if category_name is not None else None,
+            }
+        )
+    out.sort(key=lambda r: (r["type_id"], r["category_id"]))
+    return out
+
+
+def _categories_by_type_counts(categories_list: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in categories_list:
+        key = row.get("type_name") or str(row.get("type_id"))
+        counts[key] = counts.get(key, 0) + 1
+    return dict(sorted(counts.items(), key=lambda kv: kv[0]))
+
+
 def _build_free_slices(
     *,
     region_ids: list[int],
@@ -111,12 +146,16 @@ class ExolveProvider(AbstractProvider):
         client = self._client(connection)
         data, raw = await client.get_reference()
         regions = data.get("regions") if isinstance(data.get("regions"), list) else []
+        categories_list = _normalize_categories_list(data.get("categories"))
+        categories_by_type = _categories_by_type_counts(categories_list)
+        by_type_msg = ",".join(f"{k}:{v}" for k, v in categories_by_type.items())
         probes = await client.probe_get_free()
         totals = client.probe_number_totals(probes)
         chosen_random = client.choose_random_mode_from_probes(probes)
         sync_mode = client.choose_sync_mode_from_probes(probes)
         message = (
             f"Exolve GetList OK (regions={len(regions)}); "
+            f"categories={len(categories_list)} by_type={{{by_type_msg}}}; "
             f"GetFree doc_example_numbers={totals['doc_example_numbers']} "
             f"no_category_numbers={totals['no_category_numbers']} "
             f"sync_mode={sync_mode} random_mode={chosen_random}"
@@ -137,9 +176,9 @@ class ExolveProvider(AbstractProvider):
                 "types": len(data.get("types") or [])
                 if isinstance(data.get("types"), list)
                 else 0,
-                "categories": len(data.get("categories") or [])
-                if isinstance(data.get("categories"), list)
-                else 0,
+                "categories": len(categories_list),
+                "categories_list": categories_list,
+                "categories_by_type": categories_by_type,
                 "get_free_probes": probes,
                 "get_free_best_numbers": totals["best_numbers"],
                 "doc_example_numbers": totals["doc_example_numbers"],

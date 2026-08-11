@@ -125,10 +125,16 @@ class UisClient:
         method: str,
         *,
         on_progress: Any | None = None,
-    ) -> tuple[list[dict[str, Any]], list[RawHttpResult]]:
-        """Paginate until offset >= total_items or short page.
+    ) -> tuple[list[dict[str, Any]], list[RawHttpResult], dict[str, Any]]:
+        """Paginate until offset >= total_items, empty page, or MAX_OFFSET.
 
-        Fail closed if API reports more rows than we can fetch within MAX_OFFSET.
+        Short page is not an early stop when ``total_items`` is known and
+        ``offset < total`` (UIS may return a short page before the final rows).
+
+        Fail closed with ``UIS_PAGINATION_TRUNCATED`` only when the MAX_OFFSET
+        window is exhausted and ``fetched < total_items``. If pagination ends on
+        an empty page inside the window with a shortfall, treat ``total_items``
+        as a hint (log warning; do not fail the sync).
         """
         from app.providers.progress_emit import emit_progress
         from app.providers.uis.parser import parse_list_page
@@ -137,8 +143,14 @@ class UisClient:
         envelopes: list[RawHttpResult] = []
         offset = 0
         total: int | None = None
+        stopped_at_max_offset = False
+        stop_reason = "unknown"
         await emit_progress(on_progress, f"UIS: {method}…")
-        while offset <= contract.MAX_OFFSET:
+        while True:
+            if offset > contract.MAX_OFFSET:
+                stopped_at_max_offset = True
+                stop_reason = "max_offset"
+                break
             raw = await self.get_page(method, offset=offset, limit=self.page_limit)
             envelopes.append(raw)
             page_items, page_total = parse_list_page(raw)
@@ -152,25 +164,55 @@ class UisClient:
                 total,
             )
             if not page_items:
+                stop_reason = "empty_page"
                 break
             offset += len(page_items)
             if total is not None and offset >= total:
+                stop_reason = "reached_total"
                 break
             if len(page_items) < self.page_limit:
-                break
+                # Short page: only stop if total is unknown or already satisfied.
+                if total is None or offset >= total:
+                    stop_reason = "short_page"
+                    break
+                # else continue — fetch remaining rows until empty/total/MAX_OFFSET
             if offset > contract.MAX_OFFSET:
+                stopped_at_max_offset = True
+                stop_reason = "max_offset"
                 break
 
+        integrity: dict[str, Any] = {
+            "method": method,
+            "fetched": len(items),
+            "total_items": total,
+            "stop_reason": stop_reason,
+            "stopped_at_max_offset": stopped_at_max_offset,
+            "total_items_mismatch": bool(
+                total is not None and len(items) < total and not stopped_at_max_offset
+            ),
+        }
+
         if total is not None and len(items) < total:
-            raise ProviderError(
-                f"UIS {method} truncated: fetched {len(items)} of {total} "
-                f"(MAX_OFFSET={contract.MAX_OFFSET})",
-                code="UIS_PAGINATION_TRUNCATED",
-                details={
-                    "method": method,
-                    "fetched": len(items),
-                    "total_items": total,
-                    "max_offset": contract.MAX_OFFSET,
-                },
+            if stopped_at_max_offset:
+                raise ProviderError(
+                    f"UIS {method} truncated: fetched {len(items)} of {total} "
+                    f"(hit MAX_OFFSET={contract.MAX_OFFSET})",
+                    code="UIS_PAGINATION_TRUNCATED",
+                    details={
+                        "method": method,
+                        "fetched": len(items),
+                        "total_items": total,
+                        "max_offset": contract.MAX_OFFSET,
+                        "stop_reason": stop_reason,
+                    },
+                )
+            logger.warning(
+                "UIS %s total_items mismatch: fetched=%s total_items=%s "
+                "stop_reason=%s (continuing without fail)",
+                method,
+                len(items),
+                total,
+                stop_reason,
             )
-        return items, envelopes
+
+        return items, envelopes, integrity

@@ -88,7 +88,7 @@ class UisProvider(AbstractProvider):
 
         client = self._client(connection)
         on_progress = kwargs.get("on_progress")
-        items, envelopes = await client.iter_all(
+        items, envelopes, page_integrity = await client.iter_all(
             contract.METHOD_AVAILABLE_VIRTUAL_NUMBERS,
             on_progress=on_progress,
         )
@@ -104,12 +104,21 @@ class UisProvider(AbstractProvider):
                 mapped.append(mapped_item)
             else:
                 unmapped_raw.append(item)
+        warnings: list[str] = []
+        if page_integrity.get("total_items_mismatch"):
+            warnings.append(
+                "UIS total_items mismatch: "
+                f"fetched={page_integrity.get('fetched')} "
+                f"total_items={page_integrity.get('total_items')}"
+            )
         return SyncResult(
             fetched=len(items),
             parsed=len(mapped),
             items=mapped,
             unmapped_raw=unmapped_raw,
             raw_envelopes=envelopes,
+            warnings=warnings,
+            extra_stats={"integrity": page_integrity},
         )
 
     async def sync_purchased_numbers(
@@ -119,7 +128,7 @@ class UisProvider(AbstractProvider):
 
         client = self._client(connection)
         on_progress = kwargs.get("on_progress")
-        items, envelopes = await client.iter_all(
+        items, envelopes, page_integrity = await client.iter_all(
             contract.METHOD_VIRTUAL_NUMBERS,
             on_progress=on_progress,
         )
@@ -135,10 +144,19 @@ class UisProvider(AbstractProvider):
                 mapped.append(mapped_item)
             else:
                 unmapped_raw.append(item)
+        warnings: list[str] = []
+        if page_integrity.get("total_items_mismatch"):
+            warnings.append(
+                "UIS total_items mismatch: "
+                f"fetched={page_integrity.get('fetched')} "
+                f"total_items={page_integrity.get('total_items')}"
+            )
         return SyncResult(
             fetched=len(items),
             parsed=len(mapped),
             items=mapped,
             unmapped_raw=unmapped_raw,
             raw_envelopes=envelopes,
+            warnings=warnings,
+            extra_stats={"integrity": page_integrity},
         )

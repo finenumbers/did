@@ -455,7 +455,30 @@ def test_sync_free_empty_raises_clear_error(monkeypatch):
 
 def test_test_connection_reports_doc_vs_no_category(monkeypatch):
     provider = ExolveProvider()
-    ref = {"regions": [{"region_id": 1}], "types": [], "categories": []}
+    ref = {
+        "regions": [{"region_id": 1}],
+        "types": [{"type_id": 1104, "type_name": "DEF"}],
+        "categories": [
+            {
+                "category_id": 10003,
+                "type_id": 1107,
+                "type_name": "CEN",
+                "category_name": "REGULAR",
+            },
+            {
+                "category_id": 10000,
+                "type_id": 1104,
+                "type_name": "DEF",
+                "category_name": "REGULAR",
+            },
+            {
+                "category_id": 10010,
+                "type_id": 1104,
+                "type_name": "DEF",
+                "category_name": "BRONZE",
+            },
+        ],
+    }
 
     class FakeClient(ExolveClient):
         async def get_reference(self):
@@ -481,7 +504,37 @@ def test_test_connection_reports_doc_vs_no_category(monkeypatch):
     assert "doc_example_numbers=2" in result.message
     assert "no_category_numbers=0" in result.message
     assert "type_region_category" in result.message
+    assert "categories=3" in result.message
+    assert "by_type={CEN:1,DEF:2}" in result.message
     assert result.details["recommended_sync_mode"] == contract.SYNC_MODE_TYPE_REGION_CATEGORY
+    assert result.details["categories"] == 3
+    assert result.details["categories_by_type"] == {"CEN": 1, "DEF": 2}
+    assert result.details["categories_list"] == [
+        {
+            "category_id": 10000,
+            "type_id": 1104,
+            "type_name": "DEF",
+            "category_name": "REGULAR",
+        },
+        {
+            "category_id": 10010,
+            "type_id": 1104,
+            "type_name": "DEF",
+            "category_name": "BRONZE",
+        },
+        {
+            "category_id": 10003,
+            "type_id": 1107,
+            "type_name": "CEN",
+            "category_name": "REGULAR",
+        },
+    ]
+
+
+def test_default_page_limit_is_500():
+    assert contract.DEFAULT_PAGE_LIMIT == 500
+    client = ExolveClient(_conn())
+    assert client.page_limit == 500
 
 
 def test_purchased_unsupported():

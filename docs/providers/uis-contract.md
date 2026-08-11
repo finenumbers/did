@@ -50,6 +50,13 @@ By default API access is denied until the caller IP is added under ЛК security
 
 Metadata includes total count (see Data API «Мета-параметры» / limits).
 
+### Product pagination rules (operational)
+
+- Stop when `offset >= total_items`, empty page, or `offset` exceeds `MAX_OFFSET`.
+- A **short page** (`len < limit`) is **not** an early stop while `total_items` is known and `offset < total_items` (UIS may return a short page before the final rows; historically caused false `UIS_PAGINATION_TRUNCATED` at N−1 of N).
+- `UIS_PAGINATION_TRUNCATED` only when the sync **hit `MAX_OFFSET`** and `fetched < total_items`.
+- If pagination ends on an empty page inside the window with `fetched < total_items`, treat `total_items` as a hint: log warning / `total_items_mismatch`, **do not fail** the sync.
+
 ## Methods used by DID (read-only)
 
 ### Free catalog — `get.available_virtual_numbers` — VERIFIED

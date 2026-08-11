@@ -550,8 +550,15 @@ def _fail_remaining_provider_stages(
         if not sid:
             continue
         st = stage_status(progress, sid)
-        if st in {"pending", "running"}:
-            tracker.fail(sid, message)
+        if st not in {"pending", "running"}:
+            continue
+        # Pending stages never ran — don't imply they called the failing endpoint.
+        detail = (
+            f"skipped after {provider_code} failed: {message}"
+            if st == "pending"
+            else message
+        )
+        tracker.fail(sid, detail[:400])
 
 
 async def _run_operator_enrichment(

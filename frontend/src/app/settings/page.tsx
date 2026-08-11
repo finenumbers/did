@@ -11,6 +11,19 @@ import type {
 
 type ProviderCode = "sipout" | "runexis" | "uis" | "aurora" | "finenumbers" | "exolve";
 
+type ExolveCategoryRow = {
+  category_id: number;
+  type_id: number;
+  type_name: string | null;
+  category_name: string | null;
+};
+
+type TestConnectionDetails = {
+  categories_list?: ExolveCategoryRow[];
+  categories_by_type?: Record<string, number>;
+  [key: string]: unknown;
+};
+
 type Draft = {
   baseUrl: string;
   apiKey: string;
@@ -25,6 +38,7 @@ type Draft = {
   error: string | null;
   saving: boolean;
   testing: boolean;
+  testDetails: TestConnectionDetails | null;
 };
 
 const EMPTY_DRAFT: Draft = {
@@ -41,6 +55,7 @@ const EMPTY_DRAFT: Draft = {
   error: null,
   saving: false,
   testing: false,
+  testDetails: null,
 };
 
 const PROVIDERS: { code: ProviderCode; title: string }[] = [
@@ -185,16 +200,18 @@ export default function SettingsPage() {
   };
 
   const test = async (code: ProviderCode) => {
-    setDraft(code, { testing: true, error: null, message: null });
+    setDraft(code, { testing: true, error: null, message: null, testDetails: null });
     try {
-      const r = await apiFetch<{ ok: boolean; message: string }>(
-        `/api/v1/providers/${code}/test-connection`,
-        { method: "POST" },
-      );
+      const r = await apiFetch<{
+        ok: boolean;
+        message: string;
+        details?: TestConnectionDetails;
+      }>(`/api/v1/providers/${code}/test-connection`, { method: "POST" });
       const s = await apiFetch<ProviderSettings>(`/api/v1/providers/${code}/settings`);
       setDraft(code, {
         ...draftFromSettings(code, s),
         message: r.ok ? `OK: ${r.message}` : `FAIL: ${r.message}`,
+        testDetails: r.details ?? null,
         testing: false,
       });
     } catch (e) {
@@ -638,6 +655,41 @@ export default function SettingsPage() {
                       {d.settings.last_test_status}
                     </span>{" "}
                     {d.settings.last_test_message}
+                  </div>
+                )}
+
+                {code === "exolve" && d.testDetails?.categories_list && (
+                  <div style={{ marginTop: "0.75rem" }}>
+                    <div style={{ fontSize: "0.85rem", color: "var(--muted)", marginBottom: "0.35rem" }}>
+                      GetList categories ({d.testDetails.categories_list.length})
+                      {d.testDetails.categories_by_type
+                        ? ` — ${Object.entries(d.testDetails.categories_by_type)
+                            .map(([k, v]) => `${k}:${v}`)
+                            .join(", ")}`
+                        : ""}
+                    </div>
+                    <div style={{ maxHeight: 280, overflow: "auto" }}>
+                      <table style={{ width: "100%", fontSize: "0.85rem", borderCollapse: "collapse" }}>
+                        <thead>
+                          <tr>
+                            <th style={{ textAlign: "left", padding: "0.2rem 0.4rem" }}>type_name</th>
+                            <th style={{ textAlign: "left", padding: "0.2rem 0.4rem" }}>type_id</th>
+                            <th style={{ textAlign: "left", padding: "0.2rem 0.4rem" }}>category_name</th>
+                            <th style={{ textAlign: "left", padding: "0.2rem 0.4rem" }}>category_id</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {d.testDetails.categories_list.map((row) => (
+                            <tr key={`${row.type_id}-${row.category_id}`}>
+                              <td style={{ padding: "0.15rem 0.4rem" }}>{row.type_name ?? "—"}</td>
+                              <td style={{ padding: "0.15rem 0.4rem" }}>{row.type_id}</td>
+                              <td style={{ padding: "0.15rem 0.4rem" }}>{row.category_name ?? "—"}</td>
+                              <td style={{ padding: "0.15rem 0.4rem" }}>{row.category_id}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>
