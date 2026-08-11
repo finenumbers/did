@@ -250,10 +250,10 @@ def test_page_all_emits_pending_progress_before_slow_calls():
     assert meta["final_short_page_offset"] == 0
     assert len(items) == 5
     details = [e[0] for e in events]
-    assert "Numbering: запрос count…" in details
-    assert "Numbering: загрузка страницы 1…" in details
+    assert "Numbering: запрос count" in details
+    assert "Numbering: загрузка страницы 1" in details
     # Pending page1 shows 0 / total before the first page returns
-    pending = next(e for e in events if e[0] == "Numbering: загрузка страницы 1…")
+    pending = next(e for e in events if e[0] == "Numbering: загрузка страницы 1")
     assert pending[1] == 0 and pending[2] == 42
     assert any(d.startswith("Numbering: страница 1") for d in details)
 
@@ -278,7 +278,7 @@ def test_list_all_free_emits_session_progress():
 
     items, _envs, meta = asyncio.run(client.list_all_free_numbers(on_progress=on_progress))
     assert len(items) == 2
-    assert events[0] == "Numbering: подключение…"
+    assert events[0] == "Numbering: подключение"
     assert "Numbering: сессия" in events
-    assert "Numbering: запрос count…" in events
-    assert "Numbering: загрузка страницы 1…" in events
+    assert "Numbering: запрос count" in events
+    assert "Numbering: загрузка страницы 1" in events

@@ -69,7 +69,7 @@ class SipOutProvider(AbstractProvider):
         from app.providers.progress_emit import emit_progress
 
         on_progress = kwargs.get("on_progress")
-        await emit_progress(on_progress, "SipOut: get_cities…")
+        await emit_progress(on_progress, "SipOut: get_cities")
         client = self._client(connection)
         raw = await client.get_cities()
         regions, cities = parser.parse_geo(raw)
@@ -91,11 +91,11 @@ class SipOutProvider(AbstractProvider):
         from app.providers.progress_emit import emit_progress
 
         on_progress = kwargs.get("on_progress")
-        await emit_progress(on_progress, "SipOut: free_list…")
+        await emit_progress(on_progress, "SipOut: free_list")
         client = self._client(connection)
         mask = kwargs.get("mask")
         raw = await client.free_list(mask=mask)
-        await emit_progress(on_progress, "SipOut: разбор и маппинг…")
+        await emit_progress(on_progress, "SipOut: разбор и маппинг")
         parsed = parser.parse_number_list(raw)
         city_lookup: dict[str, tuple] = kwargs.get("city_lookup") or {}
         mapped = []
@@ -132,10 +132,10 @@ class SipOutProvider(AbstractProvider):
         from app.providers.progress_emit import emit_progress
 
         on_progress = kwargs.get("on_progress")
-        await emit_progress(on_progress, "SipOut: connected_list…")
+        await emit_progress(on_progress, "SipOut: connected_list")
         client = self._client(connection)
         raw = await client.connected_list()
-        await emit_progress(on_progress, "SipOut: разбор и маппинг…")
+        await emit_progress(on_progress, "SipOut: разбор и маппинг")
         parsed = parser.parse_number_list(raw)
         city_lookup: dict[str, tuple] = kwargs.get("city_lookup") or {}
         mapped = []

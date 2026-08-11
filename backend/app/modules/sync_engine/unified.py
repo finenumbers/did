@@ -521,7 +521,7 @@ async def _sync_provider(
         return False
     except Exception as exc:
         log_run(db, run.id, SyncLogLevel.error, f"{code.value}: {exc}")
-        _fail_remaining_provider_stages(db, tracker, code.value, str(exc)[:400])
+        _fail_remaining_provider_stages(db, tracker, code.value, str(exc))
         return False
 
     db.refresh(run)
@@ -580,7 +580,7 @@ def _fail_remaining_provider_stages(
             if st == "pending"
             else message
         )
-        tracker.fail(sid, detail[:400])
+        tracker.fail(sid, detail)
 
 
 async def _run_operator_enrichment(
@@ -642,4 +642,4 @@ async def _run_operator_enrichment(
         )
     except Exception as exc:
         log_run(db, run.id, SyncLogLevel.error, f"Operator enrichment failed: {exc}")
-        tracker.fail("operator_enrichment", str(exc)[:400])
+        tracker.fail("operator_enrichment", str(exc))

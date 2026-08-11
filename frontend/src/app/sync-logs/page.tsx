@@ -54,15 +54,29 @@ function renderStageDetail(s: SyncStage): ReactNode {
   if (s.substage && s.substage !== s.detail) parts.push(s.substage);
   const cur = s.progress?.current;
   const tot = s.progress?.total;
+  const running = s.status === "running";
   // Keep raw integers here — formatCount runs once in the token pass below.
   // Pre-formatting would insert spaces, then /\d+/ would split "100 000" into
   // "100" + "000" → "100 0".
-  if (cur != null && tot != null) {
-    parts.push(
-      `${cur} / ${tot}${s.progress?.unit ? ` ${s.progress.unit}` : ""}`,
-    );
-  } else if (cur != null) {
-    parts.push(String(cur));
+  // Only while running: finished stages already have a full final detail and
+  // must not append a second shortened counter line.
+  if (running && cur != null && tot != null) {
+    const alreadyInDetail =
+      s.detail?.includes(`${cur}/${tot}`) ||
+      s.detail?.includes(`${cur} / ${tot}`) ||
+      s.substage?.includes(`${cur}/${tot}`) ||
+      s.substage?.includes(`${cur} / ${tot}`);
+    if (!alreadyInDetail) {
+      parts.push(
+        `${cur} / ${tot}${s.progress?.unit ? ` ${s.progress.unit}` : ""}`,
+      );
+    }
+  } else if (running && cur != null) {
+    const alreadyInDetail =
+      s.detail?.includes(String(cur)) || s.substage?.includes(String(cur));
+    if (!alreadyInDetail) {
+      parts.push(String(cur));
+    }
   }
   const raw = parts.filter(Boolean).join(" · ");
   if (!raw) return "—";
@@ -399,7 +413,7 @@ export default function SyncPage() {
                 >
                   {group}
                 </div>
-                <table>
+                <table className="sync-stages-table">
                   <thead>
                     <tr>
                       <th>Этап</th>
@@ -423,7 +437,7 @@ export default function SyncPage() {
                             {statusLabel(s.status)}
                           </span>
                         </td>
-                        <td style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+                        <td className="sync-stage-detail">
                           {renderStageDetail(s)}
                         </td>
                       </tr>

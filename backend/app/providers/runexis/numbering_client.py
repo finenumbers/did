@@ -320,7 +320,7 @@ class RunexisNumberingClient:
         not the free-list size — never fail because fetched < count.
         """
         if count_hint is None:
-            await emit_progress(on_progress, "Numbering: запрос count…")
+            await emit_progress(on_progress, "Numbering: запрос count")
             count_hint = await self.search_numbers_count(filters)
         logger.warning(
             "Runexis Numbering search_numbers_count filter=%s count_hint=%s "
@@ -331,7 +331,7 @@ class RunexisNumberingClient:
         total_hint = count_hint if count_hint > 0 else None
         await emit_progress(
             on_progress,
-            "Numbering: загрузка страницы 1…",
+            "Numbering: загрузка страницы 1",
             0,
             total_hint,
         )
@@ -638,7 +638,7 @@ class RunexisNumberingClient:
         Always opens a fresh session for bulk sync (stale sessions can return tiny pages).
         search_numbers_count is treated as a progress hint only.
         """
-        await emit_progress(on_progress, "Numbering: подключение…")
+        await emit_progress(on_progress, "Numbering: подключение")
         await self.connect()
         await emit_progress(on_progress, "Numbering: сессия")
 

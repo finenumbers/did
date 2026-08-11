@@ -122,7 +122,7 @@ class RunexisProvider(AbstractProvider):
                     "method": contract.NUMBERING_METHOD_CONNECT,
                     "ok": True,
                     "base_url": nclient.base_url,
-                    "session_preview": f"…{session[-4:]}" if len(session) > 4 else "****",
+                    "session_preview": f"{session[-4:]}" if len(session) > 4 else "****",
                 }
                 messages.append("Numbering connect OK")
             except Exception as exc:
@@ -147,7 +147,7 @@ class RunexisProvider(AbstractProvider):
         # VERIFIED: GET api/v1/regions
         from app.providers.progress_emit import emit_progress
 
-        await emit_progress(kwargs.get("on_progress"), "Runexis: regions…")
+        await emit_progress(kwargs.get("on_progress"), "Runexis: regions")
         client = self._didapi_client(connection)
         raw = await client.get_regions()
         regions = parser.parse_regions(raw)
@@ -162,7 +162,7 @@ class RunexisProvider(AbstractProvider):
         # VERIFIED: GET api/v1/regions/cities
         from app.providers.progress_emit import emit_progress
 
-        await emit_progress(kwargs.get("on_progress"), "Runexis: cities…")
+        await emit_progress(kwargs.get("on_progress"), "Runexis: cities")
         client = self._didapi_client(connection)
         raw = await client.get_cities()
         cities = parser.parse_cities(raw)
@@ -221,7 +221,7 @@ class RunexisProvider(AbstractProvider):
         except (ProviderAuthError, ProviderTransportError, ProviderError):
             raise
         await emit_progress(
-            on_progress, "Runexis: разбор и маппинг…", len(raw_items), len(raw_items)
+            on_progress, "Runexis: разбор и маппинг", len(raw_items), len(raw_items)
         )
         access_state_distribution = Counter()
         for raw in raw_items:
@@ -308,7 +308,7 @@ class RunexisProvider(AbstractProvider):
             on_progress=on_progress
         )
         await emit_progress(
-            on_progress, "Runexis: разбор и маппинг…", len(_raw_items), len(_raw_items)
+            on_progress, "Runexis: разбор и маппинг", len(_raw_items), len(_raw_items)
         )
         parsed = [
             p

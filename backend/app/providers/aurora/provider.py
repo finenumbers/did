@@ -128,9 +128,9 @@ class AuroraProvider(AbstractProvider):
         file_names = [contract.csv_filename(u) for u in urls]
         await emit_progress(
             on_progress,
-            f"Aurora: {total_files} CSV ({file_names[0]}…{file_names[-1]})…",
+            f"Aurora: {total_files} CSV ({', '.join(file_names)})",
             0,
-            None,
+            total_files,
         )
 
         all_parsed: list[Any] = []
@@ -143,14 +143,14 @@ class AuroraProvider(AbstractProvider):
             fname = contract.csv_filename(url)
             await emit_progress(
                 on_progress,
-                f"Aurora: скачивание {idx}/{total_files} {fname}…",
+                f"Aurora: скачивание {idx}/{total_files} {fname}",
                 idx - 1,
                 total_files,
             )
             raw = await client.fetch_csv(url)
             await emit_progress(
                 on_progress,
-                f"Aurora: разбор {idx}/{total_files} {fname}…",
+                f"Aurora: разбор {idx}/{total_files} {fname}",
                 idx - 1,
                 total_files,
             )

@@ -177,6 +177,20 @@ th, td {
 }
 th { color: var(--muted); font-weight: 600; font-size: 0.8rem; }
 
+/* Sync stage details must show full words/numbers — never clip with nowrap. */
+.sync-stages-table {
+  width: 100%;
+  max-width: 100%;
+}
+.sync-stages-table td.sync-stage-detail {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font-size: 0.85rem;
+  color: var(--muted);
+  max-width: min(56rem, 100%);
+}
+
 .state { color: var(--muted); padding: 2rem; text-align: center; }
 .state.error { color: var(--danger); }
 

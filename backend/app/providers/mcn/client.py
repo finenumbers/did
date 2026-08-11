@@ -219,7 +219,7 @@ class McnClient:
         page = 1
         total: int | None = None
         limit = self.page_limit
-        await emit_progress(on_progress, f"MCN free {label}…")
+        await emit_progress(on_progress, f"MCN free {label}")
         while page <= contract.MAX_PAGE_NUMBER:
             page_items, page_total, raw = await self.get_numbers_page(
                 page_number=page,

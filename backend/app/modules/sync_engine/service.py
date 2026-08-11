@@ -349,7 +349,7 @@ class SyncService:
                             else []
                         )
                         categories = []
-                    await _dict_progress("Запись справочников…")
+                    await _dict_progress("Запись справочников")
                     rc = persist_regions(
                         self.db,
                         provider_code=provider.code.value,
@@ -397,7 +397,7 @@ class SyncService:
                     )
                     self.db.commit()
                     stats["_fatal_error"] = summary
-                    await _hook("dictionaries", "fail", summary[:300])
+                    await _hook("dictionaries", "fail", summary)
                     stats["limitations"] = limitations
                     return stats
 
@@ -472,7 +472,7 @@ class SyncService:
                     provider_code=provider.code.value,
                     phase="free",
                 )
-                await _free_progress("Буфер → каталог…", 0, unique_incoming)
+                await _free_progress("Буфер → каталог", 0, unique_incoming)
                 log_job(
                     self.db,
                     job.id,
@@ -684,7 +684,7 @@ class SyncService:
                     provider_code=provider.code.value,
                     phase="purchased",
                 )
-                await _purchased_progress("Буфер → каталог…", 0, unique_incoming)
+                await _purchased_progress("Буфер → каталог", 0, unique_incoming)
                 log_job(
                     self.db,
                     job.id,

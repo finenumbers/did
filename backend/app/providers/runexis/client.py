@@ -213,7 +213,7 @@ class RunexisClient:
         limit = contract.MANAGEMENT_PAGE_LIMIT
         items: list[dict[str, Any]] = []
         envelopes: list[RawHttpResult] = []
-        await emit_progress(on_progress, "Runexis: management…")
+        await emit_progress(on_progress, "Runexis: management")
         while True:
             params: dict[str, Any] = {"page": page, "limit": limit}
             if extra_params:

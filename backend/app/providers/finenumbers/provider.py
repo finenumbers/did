@@ -86,7 +86,7 @@ class FinenumbersProvider(AbstractProvider):
         client = self._client(connection)
         ranges, envelopes = await client.iter_all_ranges_by_inn(on_progress=on_progress)
         await emit_progress(
-            on_progress, f"Finenumbers: раскрытие диапазонов… ({len(ranges)})"
+            on_progress, f"Finenumbers: раскрытие диапазонов ({len(ranges)})"
         )
         numbers = mapper.expand_ranges(ranges)
         await emit_progress(

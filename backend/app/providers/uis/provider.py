@@ -93,7 +93,7 @@ class UisProvider(AbstractProvider):
             on_progress=on_progress,
         )
         await emit_progress(
-            on_progress, "UIS: разбор и маппинг…", 0, len(items) or None
+            on_progress, "UIS: разбор и маппинг", 0, len(items) or None
         )
         mapped = []
         unmapped_raw: list[dict] = []
@@ -133,7 +133,7 @@ class UisProvider(AbstractProvider):
             on_progress=on_progress,
         )
         await emit_progress(
-            on_progress, "UIS: разбор и маппинг…", 0, len(items) or None
+            on_progress, "UIS: разбор и маппинг", 0, len(items) or None
         )
         mapped = []
         unmapped_raw: list[dict] = []

@@ -211,6 +211,10 @@ class SyncProgressTracker:
         stage["finished_at"] = _now_iso()
         if detail:
             stage["detail"] = detail
+        # Finished stages keep a single final detail — drop in-flight counters so the
+        # UI does not append a stale "current / total" next to the summary.
+        stage["substage"] = ""
+        stage["progress"] = {"current": None, "total": None, "unit": ""}
         run.progress = deepcopy(run.progress)
         self._save(run)
         fl = get_sync_debug_log()

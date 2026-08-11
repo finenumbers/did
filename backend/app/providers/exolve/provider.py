@@ -140,7 +140,7 @@ class ExolveProvider(AbstractProvider):
         self, connection: ConnectionConfig, **kwargs: Any
     ) -> tuple[list, list, list[dict[str, Any]], list]:
         on_progress = kwargs.get("on_progress")
-        await emit_progress(on_progress, "Exolve: справочник GetList…")
+        await emit_progress(on_progress, "Exolve: справочник GetList")
         client = self._client(connection)
         data, envelope = await client.get_reference()
         regions, cities, categories = parser.parse_reference(data)
@@ -203,7 +203,7 @@ class ExolveProvider(AbstractProvider):
         on_progress = kwargs.get("on_progress")
         city_lookup: dict[str, tuple] = kwargs.get("city_lookup") or {}
 
-        await emit_progress(on_progress, "Exolve: GetFree canary…")
+        await emit_progress(on_progress, "Exolve: GetFree canary")
         probe_client = self._client(connection)
         probes = await probe_client.probe_get_free()
         totals = probe_client.probe_number_totals(probes)
@@ -219,15 +219,15 @@ class ExolveProvider(AbstractProvider):
         await emit_progress(
             on_progress,
             (
-                f"Exolve canary doc={totals['doc_example_numbers']} "
-                f"no_cat={totals['no_category_numbers']} "
+                f"Exolve canary doc_example_numbers={totals['doc_example_numbers']} "
+                f"no_category_numbers={totals['no_category_numbers']} "
                 f"sync_mode={sync_mode} random_mode={random_mode}"
             ),
         )
 
         client = self._client(connection, random_mode=random_mode)
 
-        await emit_progress(on_progress, "Exolve: справочник для списка регионов…")
+        await emit_progress(on_progress, "Exolve: справочник для списка регионов")
         data, ref_env = await client.get_reference()
         regions, _cities, categories_raw = parser.parse_reference(data)
         region_ids = sorted(
@@ -281,11 +281,13 @@ class ExolveProvider(AbstractProvider):
             cat_part = f" cat={category_id}" if category_id is not None else ""
             async with sem:
                 try:
+                    # No per-page on_progress under fan-out: it would overwrite the
+                    # slice counter (done/total) with in-slice item counts.
                     page_items, envs = await client.iter_free_slice(
                         type_id=type_id,
                         region_id=region_id,
                         category_id=category_id,
-                        on_progress=on_progress,
+                        on_progress=None,
                         type_label=label,
                         on_first_raw=_on_first_raw,
                     )
@@ -329,7 +331,7 @@ class ExolveProvider(AbstractProvider):
                 await emit_progress(
                     on_progress,
                     (
-                        f"Exolve slices done {done}/{len(slices)} "
+                        f"Exolve: срезы {done}/{len(slices)} "
                         f"{label} region={region_id}{cat_part}"
                     ),
                     done,
@@ -358,7 +360,7 @@ class ExolveProvider(AbstractProvider):
             await client.aclose()
 
         await emit_progress(
-            on_progress, "Exolve: разбор и маппинг…", len(all_items), len(all_items)
+            on_progress, "Exolve: разбор и маппинг", len(all_items), len(all_items)
         )
         mapped = []
         unmapped_raw: list[dict] = []

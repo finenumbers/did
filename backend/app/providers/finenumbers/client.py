@@ -152,7 +152,7 @@ class FinenumbersClient:
         ranges: list[dict[str, Any]] = []
         envelopes: list[RawHttpResult] = []
         page = 1
-        await emit_progress(on_progress, "Finenumbers: by-inn…")
+        await emit_progress(on_progress, "Finenumbers: by-inn")
         while True:
             raw = await self.lookup_by_inn(inn=inn, page=page, page_size=page_size)
             envelopes.append(raw)

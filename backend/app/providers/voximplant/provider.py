@@ -91,9 +91,9 @@ class VoximplantProvider(AbstractProvider):
     ) -> tuple[list, list, list[dict[str, Any]], list, dict[str, Any]]:
         on_progress = kwargs.get("on_progress")
         client = self._client(connection)
-        await emit_progress(on_progress, "Voximplant: GetAccountInfo…")
+        await emit_progress(on_progress, "Voximplant: GetAccountInfo")
         account, acc_env = await client.get_account_info()
-        await emit_progress(on_progress, "Voximplant: GetPhoneNumberCategories RU…")
+        await emit_progress(on_progress, "Voximplant: GetPhoneNumberCategories RU")
         categories, cat_env = await client.get_ru_categories()
         if not categories:
             raise ProviderError(
@@ -171,7 +171,7 @@ class VoximplantProvider(AbstractProvider):
         on_progress = kwargs.get("on_progress")
         client = self._client(connection)
 
-        await emit_progress(on_progress, "Voximplant: dictionaries for free plan…")
+        await emit_progress(on_progress, "Voximplant: справочники для плана free")
         account, acc_env = await client.get_account_info()
         categories, cat_env = await client.get_ru_categories()
         if not categories:
@@ -216,7 +216,10 @@ class VoximplantProvider(AbstractProvider):
 
         await emit_progress(
             on_progress,
-            f"Voximplant free slices={len(slices)} categories={len(categories)}",
+            (
+                f"Voximplant free: срезов={len(slices)} "
+                f"categories={len(categories)}"
+            ),
             0,
             len(slices),
         )
@@ -237,11 +240,12 @@ class VoximplantProvider(AbstractProvider):
             nonlocal done
             category, region_id, region_name, phone_count = slice_row
             async with sem:
+                # Fan-out: suppress per-page details so slice counter stays coherent.
                 items, envs, meta = await client.iter_free_slice(
                     category=category,
                     region_id=region_id,
                     region_name=region_name,
-                    on_progress=on_progress,
+                    on_progress=None,
                     expected_phone_count=phone_count,
                 )
             async with lock:
@@ -251,7 +255,10 @@ class VoximplantProvider(AbstractProvider):
                 done += 1
                 await emit_progress(
                     on_progress,
-                    f"Voximplant free slices done {done}/{len(slices)}",
+                    (
+                        f"Voximplant free: срезы {done}/{len(slices)} "
+                        f"{category} region={region_id}"
+                    ),
                     done,
                     len(slices),
                 )
@@ -272,7 +279,7 @@ class VoximplantProvider(AbstractProvider):
             if m.get("total_count") is not None
         )
         await emit_progress(
-            on_progress, "Voximplant: разбор и маппинг…", len(all_items), len(all_items)
+            on_progress, "Voximplant: разбор и маппинг", len(all_items), len(all_items)
         )
         mapped = []
         unmapped_raw: list[dict] = []

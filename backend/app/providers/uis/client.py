@@ -145,7 +145,7 @@ class UisClient:
         total: int | None = None
         stopped_at_max_offset = False
         stop_reason = "unknown"
-        await emit_progress(on_progress, f"UIS: {method}…")
+        await emit_progress(on_progress, f"UIS: {method}")
         while True:
             if offset > contract.MAX_OFFSET:
                 stopped_at_max_offset = True

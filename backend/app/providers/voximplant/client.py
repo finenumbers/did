@@ -188,7 +188,7 @@ class VoximplantClient:
         total_count: int | None = None
         await emit_progress(
             on_progress,
-            f"Voximplant free {category} region={region_id}…",
+            f"Voximplant free {category} region={region_id}",
         )
         while offset <= contract.MAX_OFFSET:
             page, total, returned, raw = await self.get_new_phones_page(

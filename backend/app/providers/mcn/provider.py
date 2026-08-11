@@ -96,17 +96,17 @@ class McnProvider(AbstractProvider):
             connection.auth_settings[contract.AUTH_HEADER_MODE] = mode
             client.auth_header_mode = mode
 
-        await emit_progress(on_progress, "MCN: countries…")
+        await emit_progress(on_progress, "MCN: countries")
         countries_body, env_c = await client.get_countries()
         if not parser.has_ru_country(countries_body):
             raise ProviderError(
                 "MCN: RU countryCode=643 missing from showcase/countries",
                 code="MCN_NO_RU",
             )
-        await emit_progress(on_progress, "MCN: regions…")
+        await emit_progress(on_progress, "MCN: regions")
         regions_body, env_r = await client.get_regions()
         regions = parser.parse_regions(regions_body)
-        await emit_progress(on_progress, "MCN: cities RU…")
+        await emit_progress(on_progress, "MCN: cities RU")
         cities_body, env_cities = await client.get_cities()
         cities = parser.parse_cities(cities_body)
         if not cities:
@@ -181,11 +181,11 @@ class McnProvider(AbstractProvider):
             connection.auth_settings[contract.AUTH_HEADER_MODE] = mode
             client.auth_header_mode = mode
 
-        await emit_progress(on_progress, "MCN: probe page size…")
+        await emit_progress(on_progress, "MCN: probe page size")
         page_limit = await client.probe_page_limit()
         await emit_progress(on_progress, f"MCN: limitPerPage={page_limit}")
 
-        await emit_progress(on_progress, "MCN: cities for free plan…")
+        await emit_progress(on_progress, "MCN: cities for free plan")
         cities_body, env_cities = await client.get_cities()
         cities_raw = parser.extract_list_payload(cities_body)
         if isinstance(cities_body, dict) and isinstance(cities_body.get("cities"), list):
@@ -284,7 +284,7 @@ class McnProvider(AbstractProvider):
                     ) from exc
 
         await emit_progress(
-            on_progress, "MCN: разбор и маппинг…", len(all_items), len(all_items)
+            on_progress, "MCN: разбор и маппинг", len(all_items), len(all_items)
         )
         mapped = []
         unmapped_raw: list[dict] = []
