@@ -29,6 +29,12 @@ from app.models.sipout_raw import (
     SipoutRegionRaw,
 )
 from app.models.aurora_raw import AuroraFreeNumberRaw
+from app.models.exolve_raw import (
+    ExolveCategoryRaw,
+    ExolveCityRaw,
+    ExolveFreeNumberRaw,
+    ExolveRegionRaw,
+)
 from app.models.uis_raw import UisFreeNumberRaw, UisPurchasedNumberRaw
 from app.modules.sync_engine.hashing import payload_hash
 from app.modules.sync_engine.staging import (
@@ -116,6 +122,10 @@ def wipe_provider_numbers(
         if inventory_kind != InventoryKind.free:
             raise ValueError("Aurora supports free inventory wipe only")
         wiped_raw = db.execute(delete(AuroraFreeNumberRaw)).rowcount or 0
+    elif provider_code == ProviderCode.exolve:
+        if inventory_kind != InventoryKind.free:
+            raise ValueError("Exolve supports free inventory wipe only")
+        wiped_raw = db.execute(delete(ExolveFreeNumberRaw)).rowcount or 0
     elif provider_code == ProviderCode.finenumbers:
         wiped_raw = 0
     else:
@@ -163,6 +173,26 @@ def _catalog_extra_fields(num: NormalizedNumber) -> dict[str, Any]:
     }
 
 
+def _region_model(provider_code: str):
+    if provider_code == "sipout":
+        return SipoutRegionRaw
+    if provider_code == "runexis":
+        return RunexisRegionRaw
+    if provider_code == "exolve":
+        return ExolveRegionRaw
+    raise ValueError(f"Unsupported provider for regions: {provider_code}")
+
+
+def _city_model(provider_code: str):
+    if provider_code == "sipout":
+        return SipoutCityRaw
+    if provider_code == "runexis":
+        return RunexisCityRaw
+    if provider_code == "exolve":
+        return ExolveCityRaw
+    raise ValueError(f"Unsupported provider for cities: {provider_code}")
+
+
 def persist_regions(
     db: Session,
     *,
@@ -172,13 +202,26 @@ def persist_regions(
 ) -> int:
     count = 0
     loaded = _now()
+    model_cls = _region_model(provider_code)
     for region in regions:
         key = region.region_external_id
         ph = payload_hash(region.raw_payload)
-        model_cls = SipoutRegionRaw if provider_code == "sipout" else RunexisRegionRaw
         row = None
         if key:
             row = db.scalar(select(model_cls).where(model_cls.external_key == key))
+        parent_id = None
+        region_code = None
+        if provider_code == "exolve" and isinstance(region.raw_payload, dict):
+            parent_id = (
+                str(region.raw_payload.get("parent_region_id"))
+                if region.raw_payload.get("parent_region_id") is not None
+                else None
+            )
+            region_code = (
+                str(region.raw_payload.get("region_code")).strip()
+                if region.raw_payload.get("region_code") is not None
+                else None
+            )
         if row and row.payload_hash == ph:
             row.source_loaded_at = loaded
             row.sync_job_id = job_id
@@ -193,6 +236,10 @@ def persist_regions(
                 row.eng_name = region.eng_name
                 row.capital_city = region.capital_city
                 row.gmt = region.gmt
+            elif isinstance(row, ExolveRegionRaw):
+                row.eng_name = region.eng_name
+                row.parent_region_id = parent_id
+                row.region_code = region_code
         else:
             kwargs: dict[str, Any] = {
                 "sync_job_id": job_id,
@@ -209,6 +256,12 @@ def persist_regions(
                     capital_city=region.capital_city,
                     gmt=region.gmt,
                 )
+            elif provider_code == "exolve":
+                kwargs.update(
+                    eng_name=region.eng_name,
+                    parent_region_id=parent_id,
+                    region_code=region_code,
+                )
             db.add(model_cls(**kwargs))
         count += 1
     db.flush()
@@ -224,10 +277,10 @@ def persist_cities(
 ) -> int:
     count = 0
     loaded = _now()
+    model_cls = _city_model(provider_code)
     for city in cities:
         key = city.city_external_id
         ph = payload_hash(city.raw_payload)
-        model_cls = SipoutCityRaw if provider_code == "sipout" else RunexisCityRaw
         row = None
         if key:
             row = db.scalar(select(model_cls).where(model_cls.external_key == key))
@@ -248,6 +301,8 @@ def persist_cities(
                 row.city_name = city.name
                 row.region_external_id = city.region_external_id
                 row.region_name = city.region_name
+                if isinstance(row, ExolveCityRaw):
+                    row.eng_name = city.eng_name
         else:
             if provider_code == "sipout":
                 db.add(
@@ -261,6 +316,21 @@ def persist_cities(
                         name=city.name,
                         eng_name=city.eng_name,
                         region_external_id=city.region_external_id,
+                    )
+                )
+            elif provider_code == "exolve":
+                db.add(
+                    ExolveCityRaw(
+                        sync_job_id=job_id,
+                        source_loaded_at=loaded,
+                        raw_payload=city.raw_payload,
+                        payload_hash=ph,
+                        external_key=key,
+                        city_external_id=city.city_external_id,
+                        city_name=city.name,
+                        eng_name=city.eng_name,
+                        region_external_id=city.region_external_id,
+                        region_name=city.region_name,
                     )
                 )
             else:
@@ -277,6 +347,52 @@ def persist_cities(
                         region_name=city.region_name,
                     )
                 )
+        count += 1
+    db.flush()
+    return count
+
+
+def persist_exolve_categories(
+    db: Session,
+    *,
+    job_id: uuid.UUID,
+    categories: list[dict[str, Any]],
+) -> int:
+    """Replace-style upsert for Exolve GetList categories (by category_id)."""
+    loaded = _now()
+    count = 0
+    for item in categories:
+        key = item.get("category_external_id")
+        if not key:
+            continue
+        raw = item.get("raw_payload") if isinstance(item.get("raw_payload"), dict) else item
+        ph = payload_hash(raw)
+        row = db.scalar(
+            select(ExolveCategoryRaw).where(ExolveCategoryRaw.external_key == str(key))
+        )
+        if row is None:
+            db.add(
+                ExolveCategoryRaw(
+                    sync_job_id=job_id,
+                    source_loaded_at=loaded,
+                    raw_payload=raw,
+                    payload_hash=ph,
+                    external_key=str(key),
+                    category_external_id=str(key),
+                    category_name=item.get("category_name"),
+                    type_id=item.get("type_id"),
+                    type_name=item.get("type_name"),
+                )
+            )
+        else:
+            row.sync_job_id = job_id
+            row.source_loaded_at = loaded
+            row.raw_payload = raw
+            row.payload_hash = ph
+            row.category_external_id = str(key)
+            row.category_name = item.get("category_name")
+            row.type_id = item.get("type_id")
+            row.type_name = item.get("type_name")
         count += 1
     db.flush()
     return count
@@ -972,6 +1088,12 @@ def build_city_lookup(db: Session, provider_code: str) -> dict[str, tuple[str | 
                 c.region_external_id,
                 regions.get(c.region_external_id) if c.region_external_id else None,
             )
+    elif provider_code == "exolve":
+        cities = db.scalars(select(ExolveCityRaw)).all()
+        for c in cities:
+            if not c.city_external_id:
+                continue
+            lookup[c.city_external_id] = (c.city_name, c.region_external_id, c.region_name)
     else:
         cities = db.scalars(select(RunexisCityRaw)).all()
         for c in cities:
@@ -979,3 +1101,120 @@ def build_city_lookup(db: Session, provider_code: str) -> dict[str, tuple[str | 
                 continue
             lookup[c.city_external_id] = (c.city_name, c.region_external_id, c.region_name)
     return lookup
+
+
+def persist_exolve_numbers(
+    db: Session,
+    *,
+    provider_id: uuid.UUID,
+    job_id: uuid.UUID,
+    inventory_kind: InventoryKind,
+    numbers: list[NormalizedNumber],
+    on_progress: Callable[[str, int | None, int | None], Any] | None = None,
+) -> dict[str, int]:
+    """Stage into UNLOGGED tables, then atomic wipe+cutover (free only)."""
+    if inventory_kind != InventoryKind.free:
+        raise ValueError("Exolve persist supports free inventory only")
+
+    deduped: dict[str, NormalizedNumber] = {}
+    for num in numbers:
+        if num.provider_number_key:
+            deduped[num.provider_number_key] = num
+    numbers = list(deduped.values())
+
+    loaded = _now()
+    table_name = "exolve_free_numbers_raw"
+    stg_raw_name = f"{table_name}_stg"
+    stg_cat_name = "numbers_catalog_normalized_stg"
+
+    stg_raw = ensure_temp_staging(db, live_table=table_name, stg_table=stg_raw_name)
+    stg_cat = ensure_temp_staging(
+        db, live_table="numbers_catalog_normalized", stg_table=stg_cat_name
+    )
+
+    raw_rows: list[dict[str, Any]] = []
+    cat_rows: list[dict[str, Any]] = []
+    for num in numbers:
+        raw_id = uuid.uuid4()
+        ph = payload_hash(num.raw_payload)
+        buy = num.buy_price
+        period = num.period_price
+        raw_rows.append(
+            {
+                "id": raw_id,
+                "sync_job_id": job_id,
+                "source_loaded_at": loaded,
+                "raw_payload": num.raw_payload,
+                "payload_hash": ph,
+                "external_key": num.provider_number_key,
+                "phone": num.msisdn or num.provider_number_key,
+                "type_name": num.number_type,
+                "category_name": num.number_class,
+                "region_name": num.region_name or num.city_name,
+                "install_fee": buy,
+                "subscription_fee": period,
+                "created_at": loaded,
+            }
+        )
+        cat_rows.append(
+            _catalog_row(
+                num,
+                provider_id=provider_id,
+                job_id=job_id,
+                inventory_kind=inventory_kind,
+                table_name=table_name,
+                raw_id=raw_id,
+                loaded=loaded,
+            )
+        )
+
+    upserted = insert_staging_batches(
+        db,
+        stg_raw,
+        raw_rows,
+        on_progress=on_progress,
+        progress_label="Exolve staging raw",
+    )
+    insert_staging_batches(
+        db,
+        stg_cat,
+        cat_rows,
+        on_progress=on_progress,
+        progress_label="Exolve staging catalog",
+    )
+
+    wipe_holder: dict[str, int] = {}
+
+    def _wipe() -> None:
+        wipe_holder.update(
+            wipe_provider_numbers(
+                db,
+                provider_id=provider_id,
+                provider_code=ProviderCode.exolve,
+                inventory_kind=inventory_kind,
+            )
+        )
+
+    cutover_from_staging(
+        db,
+        wipe_fn=_wipe,
+        live_raw_table=table_name,
+        stg_raw=stg_raw,
+        live_catalog_table="numbers_catalog_normalized",
+        stg_catalog=stg_cat,
+    )
+    if on_progress:
+        try:
+            on_progress("cutover done", upserted, len(numbers))
+        except Exception:
+            logger.exception("persist on_progress failed")
+    return {
+        "upserted": upserted,
+        "marked_absent": 0,
+        "price_history": 0,
+        "status_history": 0,
+        "deduped_input": len(deduped),
+        "bulk_insert": 1,
+        "staged_cutover": 1,
+        **wipe_holder,
+    }

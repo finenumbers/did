@@ -97,6 +97,11 @@ class ProvidersService:
                 "Aurora Telecom: public free CSV over HTTP (no auth). "
                 "base_url is the full CSV URL. See aurora-contract.md. Free inventory only."
             )
+        elif code == ProviderCode.exolve.value:
+            notice = (
+                "Exolve: Bearer api_key from Settings. Read-only GetList + GetFree "
+                "(type×all regions). See exolve-contract.md. Purchased/Lock/Buy out of scope."
+            )
         else:
             notice = (
                 "Provider integration is based on uploaded documentation contracts "

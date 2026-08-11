@@ -20,10 +20,20 @@ from app.models.sipout_raw import (
 )
 from app.models.sync import SyncJob, SyncJobLog, SyncRun, SyncRunLog
 from app.models.aurora_raw import AuroraFreeNumberRaw
+from app.models.exolve_raw import (
+    ExolveCategoryRaw,
+    ExolveCityRaw,
+    ExolveFreeNumberRaw,
+    ExolveRegionRaw,
+)
 from app.models.uis_raw import UisFreeNumberRaw, UisPurchasedNumberRaw
 
 __all__ = [
     "AuroraFreeNumberRaw",
+    "ExolveCategoryRaw",
+    "ExolveCityRaw",
+    "ExolveFreeNumberRaw",
+    "ExolveRegionRaw",
     "Base",
     "NumberPriceHistory",
     "NumberStatusHistory",

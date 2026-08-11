@@ -9,7 +9,7 @@ import type {
   SyncSchedule,
 } from "@/lib/types/api";
 
-type ProviderCode = "sipout" | "runexis" | "uis" | "aurora" | "finenumbers";
+type ProviderCode = "sipout" | "runexis" | "uis" | "aurora" | "finenumbers" | "exolve";
 
 type Draft = {
   baseUrl: string;
@@ -48,6 +48,7 @@ const PROVIDERS: { code: ProviderCode; title: string }[] = [
   { code: "runexis", title: "Runexis" },
   { code: "uis", title: "UIS" },
   { code: "aurora", title: "Aurora Telecom" },
+  { code: "exolve", title: "Exolve" },
   { code: "finenumbers", title: "Finenumbers" },
 ];
 
@@ -69,6 +70,7 @@ export default function SettingsPage() {
     runexis: { ...EMPTY_DRAFT },
     uis: { ...EMPTY_DRAFT },
     aurora: { ...EMPTY_DRAFT },
+    exolve: { ...EMPTY_DRAFT },
     finenumbers: { ...EMPTY_DRAFT },
   });
   const [pageError, setPageError] = useState<string | null>(null);
@@ -113,6 +115,7 @@ export default function SettingsPage() {
       runexis: { ...EMPTY_DRAFT },
       uis: { ...EMPTY_DRAFT },
       aurora: { ...EMPTY_DRAFT },
+      exolve: { ...EMPTY_DRAFT },
       finenumbers: { ...EMPTY_DRAFT },
     };
     for (const { code } of PROVIDERS) {
@@ -145,6 +148,8 @@ export default function SettingsPage() {
     let auth_settings: Record<string, string> | undefined;
     if (code === "sipout" || code === "finenumbers") {
       auth_settings = d.apiKey ? { key: d.apiKey } : undefined;
+    } else if (code === "exolve") {
+      auth_settings = d.apiKey ? { api_key: d.apiKey } : undefined;
     } else if (code === "uis") {
       auth_settings = d.accessToken ? { access_token: d.accessToken } : undefined;
     } else if (code === "aurora") {
@@ -428,7 +433,9 @@ export default function SettingsPage() {
                         ? "(Data API)"
                         : code === "aurora"
                           ? "(CSV directory)"
-                          : ""}
+                          : code === "exolve"
+                            ? "(Numbering API)"
+                            : ""}
                   <input
                     value={d.baseUrl}
                     onChange={(e) => setDraft(code, { baseUrl: e.target.value })}
@@ -442,7 +449,9 @@ export default function SettingsPage() {
                             ? "https://dataapi.uiscom.ru/v2.0"
                             : code === "aurora"
                               ? "http://bill.auroratelecom.ru:8080/bgbilling/numbers/"
-                              : undefined
+                              : code === "exolve"
+                                ? "https://api.exolve.ru"
+                                : undefined
                     }
                   />
                 </label>
@@ -454,6 +463,31 @@ export default function SettingsPage() {
                     каталог (или legacy путь к .csv → берётся родительская папка). Auth не
                     требуется. Купленные и справочники не поддерживаются.
                   </div>
+                ) : code === "exolve" ? (
+                  <>
+                    <label>
+                      API-ключ
+                      <input
+                        type="password"
+                        placeholder={
+                          d.settings?.auth_settings_masked?.api_key
+                            ? `текущее: ${String(d.settings.auth_settings_masked.api_key)}`
+                            : "API-ключ приложения из ЛК Exolve"
+                        }
+                        value={d.apiKey}
+                        onChange={(e) => setDraft(code, { apiKey: e.target.value })}
+                        style={{ width: "100%" }}
+                      />
+                    </label>
+                    <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
+                      Bearer API-ключ приложения (ЛК Exolve → Приложения → API-ключи). Read-only:
+                      GetList (справочник) и GetFree (свободные). Купленные / Lock / Buy не
+                      вызываются.
+                      {d.settings?.auth_settings_masked?.api_key
+                        ? " Ключ сохранён."
+                        : " Ключ ещё не задан."}
+                    </div>
+                  </>
                 ) : code === "sipout" || code === "finenumbers" ? (
                   <label>
                     {code === "finenumbers" ? "API Bearer key" : "API key"}

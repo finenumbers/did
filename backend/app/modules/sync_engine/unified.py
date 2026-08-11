@@ -47,6 +47,7 @@ PROVIDER_ORDER = (
     ProviderCode.runexis,
     ProviderCode.uis,
     ProviderCode.aurora,
+    ProviderCode.exolve,
     ProviderCode.finenumbers,
 )
 ACTIVE_STATUSES = (SyncJobStatus.pending, SyncJobStatus.running)

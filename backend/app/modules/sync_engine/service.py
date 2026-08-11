@@ -22,6 +22,8 @@ from app.modules.sync_engine.persist import (
     count_present_numbers,
     persist_aurora_numbers,
     persist_cities,
+    persist_exolve_categories,
+    persist_exolve_numbers,
     persist_finenumbers_numbers,
     persist_regions,
     persist_runexis_numbers,
@@ -274,6 +276,7 @@ class SyncService:
                 try:
                     regions: list = []
                     cities: list = []
+                    categories: list = []
                     if provider.code == ProviderCode.sipout:
                         geo = await adapter.sync_cities(
                             connection, on_progress=_dict_progress
@@ -285,6 +288,25 @@ class SyncService:
                         )
                         cities = (
                             (geo.items or {}).get("cities")
+                            if isinstance(geo.items, dict)
+                            else []
+                        )
+                    elif provider.code == ProviderCode.exolve:
+                        geo = await adapter.sync_regions(
+                            connection, on_progress=_dict_progress
+                        )
+                        regions = (
+                            (geo.items or {}).get("regions")
+                            if isinstance(geo.items, dict)
+                            else []
+                        )
+                        cities = (
+                            (geo.items or {}).get("cities")
+                            if isinstance(geo.items, dict)
+                            else []
+                        )
+                        categories = (
+                            (geo.items or {}).get("categories")
                             if isinstance(geo.items, dict)
                             else []
                         )
@@ -305,6 +327,7 @@ class SyncService:
                             if isinstance(cit.items, dict)
                             else []
                         )
+                        categories = []
                     await _dict_progress("Запись справочников…")
                     rc = persist_regions(
                         self.db,
@@ -318,7 +341,16 @@ class SyncService:
                         job_id=job.id,
                         cities=cities or [],
                     )
-                    stats["categories"]["dictionaries"] = {"regions": rc, "cities": cc}
+                    cat_n = 0
+                    if provider.code == ProviderCode.exolve and categories:
+                        cat_n = persist_exolve_categories(
+                            self.db, job_id=job.id, categories=categories
+                        )
+                    stats["categories"]["dictionaries"] = {
+                        "regions": rc,
+                        "cities": cc,
+                        **({"categories": cat_n} if cat_n else {}),
+                    }
                     city_lookup = build_city_lookup(self.db, provider.code.value)
                     log_job(
                         self.db,
@@ -449,6 +481,15 @@ class SyncService:
                     )
                 elif provider.code == ProviderCode.aurora:
                     persist_stats = persist_aurora_numbers(
+                        self.db,
+                        provider_id=provider.id,
+                        job_id=job.id,
+                        inventory_kind=InventoryKind.free,
+                        numbers=numbers,
+                        on_progress=persist_progress,
+                    )
+                elif provider.code == ProviderCode.exolve:
+                    persist_stats = persist_exolve_numbers(
                         self.db,
                         provider_id=provider.id,
                         job_id=job.id,

@@ -7,6 +7,7 @@ class ProviderCode(str, enum.Enum):
     finenumbers = "finenumbers"
     uis = "uis"
     aurora = "aurora"
+    exolve = "exolve"
 
 
 class InventoryKind(str, enum.Enum):
