@@ -294,6 +294,26 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
                     db, run.id, SyncLogLevel.info, f"Provider {code.value}: skipped (disabled)"
                 )
                 continue
+            # MCN without API key: skip cleanly (no key yet) — not a partial failure.
+            if code == ProviderCode.mcn:
+                auth = (
+                    dict(provider.connection.auth_settings or {})
+                    if provider.connection is not None
+                    else {}
+                )
+                mcn_key = (auth.get("api_key") or "").strip()
+                if not mcn_key:
+                    for phase in ("dictionaries", "free", "purchased"):
+                        sid = stage_for_provider_phase(code.value, phase)
+                        if sid:
+                            tracker.skip(sid, "нет API-ключа MCN")
+                    log_run(
+                        db,
+                        run.id,
+                        SyncLogLevel.info,
+                        "Provider mcn: skipped (нет API-ключа)",
+                    )
+                    continue
             ok = await _sync_provider(
                 db,
                 run=run,

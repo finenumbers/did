@@ -28,7 +28,7 @@ NUMBERING_FREE_STATUS_VALUES = frozenset({"free", "0"})
 # Live: ~40s/page regardless of size; 20k ≈ 17–22 pages for free list
 NUMBERING_PAGE_LIMIT = 20_000
 # Parallel search_numbers pages (all-or-nothing; lower if API rate-limits)
-NUMBERING_FETCH_CONCURRENCY = 4
+NUMBERING_FETCH_CONCURRENCY = 6
 # search_numbers_count is a progress upper bound (API total), not free-list size
 NUMBERING_SOURCE_ENDPOINT = "numbering-api:search_numbers"
 # Numbering search is slow; defaults in TimeoutConfig are too short

@@ -82,8 +82,9 @@ function renderStageDetail(s: SyncStage): ReactNode {
   if (!raw) return "—";
 
   // Tokenize known metrics / «Записано» so we can style them; format other digits once.
+  // Highlight upserted / unmapped_dropped / duplicates_dropped only when value ≠ 0.
   const tokenRe =
-    /(unmapped_dropped=\d+|duplicates_dropped=\d+|Записано\s+\d+|\d+)/g;
+    /(upserted=\d+|unmapped_dropped=\d+|duplicates_dropped=\d+|Записано\s+\d+|\d+)/g;
   const nodes: ReactNode[] = [];
   let last = 0;
   let match: RegExpExecArray | null;
@@ -93,7 +94,22 @@ function renderStageDetail(s: SyncStage): ReactNode {
       nodes.push(raw.slice(last, match.index));
     }
     const tok = match[0];
-    if (tok.startsWith("unmapped_dropped=")) {
+    if (tok.startsWith("upserted=")) {
+      const n = Number(tok.split("=")[1]);
+      const label = `upserted=${formatCount(n)}`;
+      nodes.push(
+        n !== 0 ? (
+          <span
+            key={key++}
+            style={{ color: "#2e7d32", fontWeight: 700, textDecoration: "underline" }}
+          >
+            {label}
+          </span>
+        ) : (
+          <span key={key++}>{label}</span>
+        ),
+      );
+    } else if (tok.startsWith("unmapped_dropped=")) {
       const n = Number(tok.split("=")[1]);
       const label = `unmapped_dropped=${formatCount(n)}`;
       nodes.push(
@@ -110,7 +126,7 @@ function renderStageDetail(s: SyncStage): ReactNode {
       const label = `duplicates_dropped=${formatCount(n)}`;
       nodes.push(
         n !== 0 ? (
-          <span key={key++} style={{ color: "#c62828", fontWeight: 700 }}>
+          <span key={key++} style={{ color: "#1565c0", fontWeight: 700 }}>
             {label}
           </span>
         ) : (
@@ -402,7 +418,7 @@ export default function SyncPage() {
               </div>
             )}
             {groups.map(({ group, stages }) => (
-              <div key={group} style={{ marginBottom: "1rem" }}>
+              <div key={group} className="sync-stages-group" style={{ marginBottom: "1rem" }}>
                 <div
                   style={{
                     fontWeight: 600,
