@@ -9,10 +9,12 @@ AUTH_API_KEY = "api_key"
 PATH_REFERENCE = "/number/reference/v1/GetList"
 PATH_GET_FREE = "/number/v1/GetFree"
 
-# VERIFIED docs: type_id values
+# VERIFIED docs: type_id values (GetFree article table)
 TYPE_DEF = 1104
 TYPE_ABC = 1105
 TYPE_KDU = 1106
+# Fallback when GetList categories/types are empty. Live sync uses ALL type_ids
+# from GetList (DEF/ABC/KDU plus CEN, ITFS, Local, National, TollFree, UAN, UIFN, …).
 SYNC_TYPE_IDS: tuple[int, ...] = (TYPE_DEF, TYPE_ABC, TYPE_KDU)
 
 TYPE_NAMES: dict[int, str] = {

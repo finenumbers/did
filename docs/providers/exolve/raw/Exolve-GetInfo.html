@@ -35,17 +35,17 @@
 
   <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="title" content="Метод GetFree | Numbering API | документация Exolve">
-<meta name="description" content="API-метод GetFree для получения списка номеров, доступных для покупки">
+<meta name="title" content="Метод GetInfo (купленный номер) | Numbering API | документация Exolve">
+<meta name="description" content="API-метод GetInfo для получения информации о купленном номере">
 <meta name="theme-color" content="#FFFFFF">
-<meta name="color-scheme" content="light dark"><meta property="og:url" content="/docs/ru/api-reference/numbering-api/getting-free-numbers/">
+<meta name="color-scheme" content="light dark"><meta property="og:url" content="/docs/ru/api-reference/numbering-api/purchased-number/">
   <meta property="og:site_name" content="Exolve">
-  <meta property="og:title" content="GetFree">
-  <meta property="og:description" content="API-метод GetFree для получения списка номеров, доступных для покупки">
+  <meta property="og:title" content="GetInfo (купленный номер)">
+  <meta property="og:description" content="API-метод GetInfo для получения информации о купленном номере">
   <meta property="og:locale" content="en_us">
   <meta property="og:type" content="article">
     <meta property="article:section" content="docs">
-<title>Метод GetFree | Numbering API | документация Exolve</title>
+<title>Метод GetInfo (купленный номер) | Numbering API | документация Exolve</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
 <link rel="stylesheet" href="/book.min.dcf21648d454fcee6d36309fb42dad2f1c2c380f61a864ca4cb72b9330ba7910.css" >
@@ -223,7 +223,7 @@ https://github.com/alex-shpak/hugo-book
         <li class="breadcrumbs__item"><a href="/docs/ru/">Документация</a></li>
         <li class="breadcrumbs__item"><a href="/docs/ru/api-reference/">API Reference</a></li>
         <li class="breadcrumbs__item"><a href="/docs/ru/api-reference/numbering-api/">Numbering API</a></li>
-    <li class="breadcrumbs__item"><a href="/docs/ru/api-reference/numbering-api/getting-free-numbers/">GetFree</a></li>
+    <li class="breadcrumbs__item"><a href="/docs/ru/api-reference/numbering-api/purchased-number/">GetInfo (купленный номер)</a></li>
 </ul>
 
 <style>
@@ -298,15 +298,15 @@ https://github.com/alex-shpak/hugo-book
     background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cg clip-path='url(%23clip0_2272_61916)'%3E%3Cpath d='M6.16406 3.75196C6.16406 3.08338 6.97192 2.74855 7.44439 3.22131L9.20307 4.98106C10.6253 6.40416 11.3364 7.11571 11.3364 7.9999C11.3364 8.8841 10.6253 9.59565 9.20306 11.0187L7.44439 12.7785C6.97192 13.2513 6.16406 12.9164 6.16406 12.2478C6.16406 12.0488 6.24308 11.8579 6.38373 11.7172L8.1424 9.95743C8.8835 9.21588 9.33037 8.76423 9.61053 8.39681C9.73984 8.22723 9.79494 8.12363 9.81862 8.0668C9.83652 8.02386 9.83644 8.0087 9.8364 8.00091L9.8364 7.9999L9.8364 7.9989C9.83644 7.99111 9.83652 7.97594 9.81862 7.93301C9.79494 7.87617 9.73984 7.77258 9.61053 7.603C9.33037 7.23558 8.8835 6.78393 8.14241 6.04237L6.38373 4.28262C6.24308 4.14188 6.16406 3.951 6.16406 3.75196Z' fill='%23626C77'/%3E%3C/g%3E%3Cdefs%3E%3CclipPath id='clip0_2272_61916'%3E%3Crect width='16' height='16' fill='white'/%3E%3C/clipPath%3E%3C/defs%3E%3C/svg%3E%0A")
 }
 </style>
-            <h1 class="document-page__title">GetFree</h1>
+            <h1 class="document-page__title">GetInfo (купленный номер)</h1>
             
-            <div><h2 id="метод-getfree">
-  Метод GetFree
+            <div><h2 id="метод-getinfo">
+  Метод GetInfo
 </h2>
-<p>Примените метод GetFree для получения списка номеров, доступных для покупки</p>
+<p>Примените метод GetInfo для получения информации о купленном номере.</p>
 <p><strong>Точка подключения</strong>:
 Выполните POST-запрос с входными параметрами к точке подключения:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-html" data-lang="html"><span style="display:flex;"><span>POST: https://api.exolve.ru/number/v1/GetFree
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-html" data-lang="html"><span style="display:flex;"><span>POST: https://api.exolve.ru/number/customer/v1/GetInfo
 </span></span></code></pre></div><h3 id="авторизация">
   Авторизация
 </h3>
@@ -341,229 +341,9 @@ https://github.com/alex-shpak/hugo-book
 </thead>
 <tbody>
 <tr>
-<td><strong>type_id</strong></td>
-<td style="text-align:center">uint32</td>
-<td><a href="#%d1%81%d0%bf%d0%b8%d1%81%d0%be%d0%ba-%d1%82%d0%b8%d0%bf%d0%be%d0%b2-%d0%bd%d0%be%d0%bc%d0%b5%d1%80%d0%be%d0%b2-type_id">тип номера</a></td>
-</tr>
-<tr>
-<td>region_id</td>
-<td style="text-align:center">uint32</td>
-<td><a href="#%d1%81%d0%bf%d0%b8%d1%81%d0%be%d0%ba-%d1%80%d0%b5%d0%b3%d0%b8%d0%be%d0%bd%d0%be%d0%b2-region_id">регион номера</a></td>
-</tr>
-<tr>
-<td>category_id</td>
-<td style="text-align:center">uint32</td>
-<td><a href="#%d1%81%d0%bf%d0%b8%d1%81%d0%be%d0%ba-%d0%ba%d0%b0%d1%82%d0%b5%d0%b3%d0%be%d1%80%d0%b8%d0%b9-%d0%bd%d0%be%d0%bc%d0%b5%d1%80%d0%be%d0%b2-category_id">категория номера</a></td>
-</tr>
-<tr>
-<td>random</td>
-<td style="text-align:center">boolean</td>
-<td><code>True</code> вернёт номера в случайном порядке</td>
-</tr>
-<tr>
-<td>mask</td>
-<td style="text-align:center">string</td>
-<td><a href="#%d0%bc%d0%b0%d1%81%d0%ba%d0%b0">маска</a></td>
-</tr>
-<tr>
-<td>limit</td>
-<td style="text-align:center">uint32</td>
-<td>лимит выводимых строк</td>
-</tr>
-<tr>
-<td>offset</td>
-<td style="text-align:center">uint32</td>
-<td>номер строки, с которой начинать выборку (начинается с 0)</td>
-</tr>
-</tbody>
-</table>
-<h4 id="список-типов-номеров-type_id">
-  Список типов номеров (type_id)
-</h4>
-<table>
-<thead>
-<tr>
-<th>Параметр</th>
-<th style="text-align:center">ID типа</th>
-<th style="text-align:right">Описание</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>DEF</td>
-<td style="text-align:center">1104</td>
-<td style="text-align:right">Мобильный</td>
-</tr>
-<tr>
-<td>ABC</td>
-<td style="text-align:center">1105</td>
-<td style="text-align:right">Городской</td>
-</tr>
-<tr>
-<td>KDU</td>
-<td style="text-align:center">1106</td>
-<td style="text-align:right">Федеральный 8-800 (использовать только с <a href="#%d1%81%d0%bf%d0%b8%d1%81%d0%be%d0%ba-%d1%80%d0%b5%d0%b3%d0%b8%d0%be%d0%bd%d0%be%d0%b2-region_id">регионом Россия</a>)</td>
-</tr>
-</tbody>
-</table>
-<h4 id="список-категорий-номеров-category_id">
-  Список категорий номеров (category_id)
-</h4>
-<table>
-<thead>
-<tr>
-<th>Название</th>
-<th style="text-align:center">ID категории номера для типа <strong>мобильный</strong></th>
-<th style="text-align:center">ID категории номера для типа <strong>городской</strong></th>
-<th style="text-align:center">ID категории номера для типа <strong>7-800</strong></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Обычный</td>
-<td style="text-align:center">10000</td>
-<td style="text-align:center">10001</td>
-<td style="text-align:center">10002</td>
-</tr>
-<tr>
-<td>Бронзовый</td>
-<td style="text-align:center">10010</td>
-<td style="text-align:center">10011</td>
-<td style="text-align:center">10012</td>
-</tr>
-<tr>
-<td>Серебряный</td>
-<td style="text-align:center">10020</td>
-<td style="text-align:center">10021</td>
-<td style="text-align:center">10022</td>
-</tr>
-<tr>
-<td>Золотой</td>
-<td style="text-align:center">10030</td>
-<td style="text-align:center">10031</td>
-<td style="text-align:center">10032</td>
-</tr>
-<tr>
-<td>Платиновый</td>
-<td style="text-align:center">10040</td>
-<td style="text-align:center">10041</td>
-<td style="text-align:center">10042</td>
-</tr>
-<tr>
-<td>Эксклюзивный</td>
-<td style="text-align:center">10050</td>
-<td style="text-align:center">10051</td>
-<td style="text-align:center">10052</td>
-</tr>
-</tbody>
-</table>
-<h4 id="список-регионов-region_id">
-  Список регионов (region_id)
-</h4>
-<table>
-<thead>
-<tr>
-<th>Название</th>
-<th style="text-align:center">ID типа номера</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Россия</td>
-<td style="text-align:center">10084</td>
-</tr>
-<tr>
-<td>Магнитогорск</td>
-<td style="text-align:center">10186</td>
-</tr>
-<tr>
-<td>Пермь</td>
-<td style="text-align:center">10181</td>
-</tr>
-<tr>
-<td>Санкт-Петербург</td>
-<td style="text-align:center">10182</td>
-</tr>
-<tr>
-<td>Москва</td>
-<td style="text-align:center">10230</td>
-</tr>
-<tr>
-<td>Ростов-на-Дону</td>
-<td style="text-align:center">10231</td>
-</tr>
-<tr>
-<td>Омск</td>
-<td style="text-align:center">10196</td>
-</tr>
-<tr>
-<td>Новороссийск</td>
-<td style="text-align:center">10221</td>
-</tr>
-<tr>
-<td>Екатеринбург</td>
-<td style="text-align:center">10190</td>
-</tr>
-<tr>
-<td>Казань</td>
-<td style="text-align:center">10195</td>
-</tr>
-<tr>
-<td>Сочи</td>
-<td style="text-align:center">10153</td>
-</tr>
-<tr>
-<td>Самара</td>
-<td style="text-align:center">10192</td>
-</tr>
-<tr>
-<td>Краснодар</td>
-<td style="text-align:center">10184</td>
-</tr>
-<tr>
-<td>Нижний Новгород</td>
-<td style="text-align:center">10189</td>
-</tr>
-<tr>
-<td>Новосибирск</td>
-<td style="text-align:center">10183</td>
-</tr>
-<tr>
-<td>Красноярск</td>
-<td style="text-align:center">10191</td>
-</tr>
-<tr>
-<td>Челябинск</td>
-<td style="text-align:center">10229</td>
-</tr>
-<tr>
-<td>Тольятти</td>
-<td style="text-align:center">10227</td>
-</tr>
-<tr>
-<td>Воронеж</td>
-<td style="text-align:center">10193</td>
-</tr>
-</tbody>
-</table>
-<h4 id="маска">
-  Маска
-</h4>
-<table>
-<thead>
-<tr>
-<th>Символ</th>
-<th>Назначение</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Точка ( . ) / Подчёркивание ( _ )</td>
-<td>пропускает один символ параметра <code>number_code</code> в поиске</td>
-</tr>
-<tr>
-<td>Звёздочка ( * ) / Знак процента ( % )</td>
-<td>пропускает несколько символов параметра <code>number_code</code> в поиске</td>
+<td><strong>number_code</strong></td>
+<td style="text-align:center">uint64</td>
+<td>купленный номер</td>
 </tr>
 </tbody>
 </table>
@@ -580,43 +360,24 @@ https://github.com/alex-shpak/hugo-book
 </thead>
 <tbody>
 <tr>
-<td>numbers</td>
-<td style="text-align:center">array <a href="#numberelement">NumberElement</a></td>
-<td>список номеров с информацией по ним</td>
+<td>number_name</td>
+<td style="text-align:center">string</td>
+<td>номер</td>
 </tr>
-</tbody>
-</table>
-<h4 id="numberelement">
-  NumberElement
-</h4>
-<table>
-<thead>
-<tr>
-<th>Параметр</th>
-<th style="text-align:center">Тип</th>
-<th>Описание</th>
-</tr>
-</thead>
-<tbody>
 <tr>
 <td>type_name</td>
 <td style="text-align:center">string</td>
-<td>наименование типа номера</td>
+<td>тип номера</td>
 </tr>
 <tr>
 <td>region_name</td>
 <td style="text-align:center">string</td>
-<td>имя региона</td>
+<td>региона</td>
 </tr>
 <tr>
-<td>category_name</td>
+<td>application_name</td>
 <td style="text-align:center">string</td>
-<td>имя категории номера</td>
-</tr>
-<tr>
-<td>number_code</td>
-<td style="text-align:center">uint64</td>
-<td>код номера</td>
+<td>название приложения, в котором куплен номер</td>
 </tr>
 <tr>
 <td>subscription_fee</td>
@@ -627,6 +388,21 @@ https://github.com/alex-shpak/hugo-book
 <td>install_fee</td>
 <td style="text-align:center">float</td>
 <td>единоразовая плата за подключение</td>
+</tr>
+<tr>
+<td>create_date</td>
+<td style="text-align:center">string</td>
+<td>дата покупки номера в формате <a href="https://datatracker.ietf.org/doc/html/rfc3339">RFC-3339 / ISO-8601</a></td>
+</tr>
+<tr>
+<td>application_uuid</td>
+<td style="text-align:center">string</td>
+<td>идентификатор приложения</td>
+</tr>
+<tr>
+<td>category_name</td>
+<td style="text-align:center">string</td>
+<td>наименование категории</td>
 </tr>
 <tr>
 <td>number_options</td>
@@ -672,119 +448,31 @@ https://github.com/alex-shpak/hugo-book
 <h3 id="примеры">
   Примеры
 </h3>
-<p>Пример получения свободных номеров для региона «Москва», категории «Обычный», тип «Мобильный»:</p>
 <p>Входные параметры:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;type_id&#34;</span>: <span style="color:#ae81ff">1104</span>,
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;region_id&#34;</span>: <span style="color:#ae81ff">10230</span>,
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;category_id&#34;</span>: <span style="color:#ae81ff">10000</span>,
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;random&#34;</span>: <span style="color:#66d9ef">true</span>,
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;limit&#34;</span>: <span style="color:#ae81ff">1</span>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{  
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;number_code&#34;</span>: <span style="color:#ae81ff">79011550006</span>
 </span></span><span style="display:flex;"><span>}
 </span></span></code></pre></div><p>Выходные параметры:</p>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;numbers&#34;</span>: [
-</span></span><span style="display:flex;"><span>        {
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;number_code&#34;</span>: <span style="color:#e6db74">&#34;79300655934&#34;</span>,
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;type_name&#34;</span>: <span style="color:#e6db74">&#34;DEF&#34;</span>,
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;region_name&#34;</span>: <span style="color:#e6db74">&#34;Moscow&#34;</span>,
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;category_name&#34;</span>: <span style="color:#e6db74">&#34;REGULAR&#34;</span>,
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;subscription_fee&#34;</span>: <span style="color:#ae81ff">150</span>,
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;install_fee&#34;</span>: <span style="color:#ae81ff">590</span>,
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;number_options&#34;</span>: {
-</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;incoming_calls&#34;</span>: <span style="color:#66d9ef">true</span>,
-</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;outgoing_calls&#34;</span>: <span style="color:#66d9ef">true</span>,
-</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;incoming_sms&#34;</span>: <span style="color:#66d9ef">true</span>,
-</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;outgoing_sms&#34;</span>: <span style="color:#66d9ef">true</span>
-</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;number&#34;</span>: {
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;number_name&#34;</span>: <span style="color:#e6db74">&#34;79991234455&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;type_name&#34;</span>: <span style="color:#e6db74">&#34;DEF&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;region_name&#34;</span>: <span style="color:#e6db74">&#34;Moscow&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;application_name&#34;</span>: <span style="color:#e6db74">&#34;FLOWERSHOP24/7&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;subscription_fee&#34;</span>: <span style="color:#ae81ff">150</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;install_fee&#34;</span>: <span style="color:#ae81ff">590</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;create_date&#34;</span>: <span style="color:#e6db74">&#34;2025-06-11T07:50:31.807946Z&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;application_uuid&#34;</span>: <span style="color:#e6db74">&#34;c9c5031b-ad9b-4453-b6f8-bd5b14455790&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;category_name&#34;</span>: <span style="color:#e6db74">&#34;REGULAR&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;number_options&#34;</span>: {
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;incoming_calls&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;outgoing_calls&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;incoming_sms&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;outgoing_sms&#34;</span>: <span style="color:#66d9ef">true</span>
 </span></span><span style="display:flex;"><span>        }
-</span></span><span style="display:flex;"><span>    ]
+</span></span><span style="display:flex;"><span>    }
 </span></span><span style="display:flex;"><span>}
-</span></span></code></pre></div><p>Пример получения свободных номеров для региона «Санкт-Петербург», категории «Бронзовый», тип «Городской»:</p>
-<p>Входные параметры:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;type_id&#34;</span>: <span style="color:#ae81ff">1105</span>,
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;region_id&#34;</span>: <span style="color:#ae81ff">10182</span>,
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;category_id&#34;</span>: <span style="color:#ae81ff">10011</span>,
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;random&#34;</span>: <span style="color:#66d9ef">true</span>,
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;mask&#34;</span>: <span style="color:#e6db74">&#34;781221*&#34;</span>,
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;limit&#34;</span>: <span style="color:#ae81ff">1</span>
-</span></span><span style="display:flex;"><span>}
-</span></span></code></pre></div><p>Выходные параметры:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;numbers&#34;</span>: [
-</span></span><span style="display:flex;"><span>        {
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;number_code&#34;</span>: <span style="color:#e6db74">&#34;78122135222&#34;</span>,
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;type_name&#34;</span>: <span style="color:#e6db74">&#34;ABC&#34;</span>,
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;region_name&#34;</span>: <span style="color:#e6db74">&#34;St. Petersburg&#34;</span>,
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;category_name&#34;</span>: <span style="color:#e6db74">&#34;BRONZE&#34;</span>,
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;subscription_fee&#34;</span>: <span style="color:#ae81ff">200</span>,
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;install_fee&#34;</span>: <span style="color:#ae81ff">1000</span>,
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;number_options&#34;</span>: {
-</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;incoming_calls&#34;</span>: <span style="color:#66d9ef">true</span>,
-</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;outgoing_calls&#34;</span>: <span style="color:#66d9ef">true</span>,
-</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;incoming_sms&#34;</span>: <span style="color:#66d9ef">false</span>,
-</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;outgoing_sms&#34;</span>: <span style="color:#66d9ef">false</span>
-</span></span><span style="display:flex;"><span>            }
-</span></span><span style="display:flex;"><span>        }
-</span></span><span style="display:flex;"><span>    ]
-</span></span><span style="display:flex;"><span>}
-</span></span></code></pre></div><p>Пример получения свободных номеров для региона «Россия», категории «Серебряный», тип «Федеральный»:</p>
-<p>Входные параметры:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;type_id&#34;</span>: <span style="color:#ae81ff">1106</span>,
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;region_id&#34;</span>: <span style="color:#ae81ff">10084</span>,
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;category_id&#34;</span>: <span style="color:#ae81ff">10022</span>,
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;random&#34;</span>: <span style="color:#66d9ef">true</span>,
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;limit&#34;</span>: <span style="color:#ae81ff">1</span>
-</span></span><span style="display:flex;"><span>}
-</span></span></code></pre></div><p>Входные параметры:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;numbers&#34;</span>: [
-</span></span><span style="display:flex;"><span>        {
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;number_code&#34;</span>: <span style="color:#e6db74">&#34;78003333729&#34;</span>,
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;type_name&#34;</span>: <span style="color:#e6db74">&#34;KDU&#34;</span>,
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;region_name&#34;</span>: <span style="color:#e6db74">&#34;Russia&#34;</span>,
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;category_name&#34;</span>: <span style="color:#e6db74">&#34;SILVER&#34;</span>,
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;subscription_fee&#34;</span>: <span style="color:#ae81ff">3500</span>,
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;install_fee&#34;</span>: <span style="color:#ae81ff">50000</span>,
-</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;number_options&#34;</span>: {
-</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;incoming_calls&#34;</span>: <span style="color:#66d9ef">true</span>,
-</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;outgoing_calls&#34;</span>: <span style="color:#66d9ef">false</span>,
-</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;incoming_sms&#34;</span>: <span style="color:#66d9ef">false</span>,
-</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;outgoing_sms&#34;</span>: <span style="color:#66d9ef">false</span>
-</span></span><span style="display:flex;"><span>            }
-</span></span><span style="display:flex;"><span>        }
-</span></span><span style="display:flex;"><span>    ]
-</span></span><span style="display:flex;"><span>}
-</span></span></code></pre></div><h3 id="возможные-ошибки">
-  Возможные ошибки
-</h3>
-<table>
-<thead>
-<tr>
-<th>Код</th>
-<th style="text-align:center">Статус</th>
-<th>Пример сообщения</th>
-<th>Описание</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>400</td>
-<td style="text-align:center">Bad Request</td>
-<td>proto: syntax error (line 1:2): unexpected token</td>
-<td>пустое значение в поле <code>type_id</code></td>
-</tr>
-<tr>
-<td>400</td>
-<td style="text-align:center">Bad Request</td>
-<td>proto: syntax error (line 1:2): invalid value</td>
-<td>значение в поле <code>type_id</code> невалидно</td>
-</tr>
-</tbody>
-</table>
-</div>
+</span></span></code></pre></div></div>
         </div>
 
         <aside class="layout__sidebar">
@@ -2040,7 +1728,7 @@ https://github.com/alex-shpak/hugo-book
   
 
   
-    <a href="/docs/ru/api-reference/numbering-api/getting-free-numbers/" class="active">GetFree</a>
+    <a href="/docs/ru/api-reference/numbering-api/getting-free-numbers/" class="">GetFree</a>
   
 
         </li>
@@ -2105,7 +1793,7 @@ https://github.com/alex-shpak/hugo-book
   
 
   
-    <a href="/docs/ru/api-reference/numbering-api/purchased-number/" class="">GetInfo (купленный номер)</a>
+    <a href="/docs/ru/api-reference/numbering-api/purchased-number/" class="active">GetInfo (купленный номер)</a>
   
 
         </li>
@@ -3684,13 +3372,12 @@ https://github.com/alex-shpak/hugo-book
   
 <nav id="TableOfContents">
   <ul>
-    <li><a href="#метод-getfree">Метод GetFree</a>
+    <li><a href="#метод-getinfo">Метод GetInfo</a>
       <ul>
         <li><a href="#авторизация">Авторизация</a></li>
         <li><a href="#входные-параметры">Входные параметры</a></li>
         <li><a href="#выходные-параметры">Выходные параметры</a></li>
         <li><a href="#примеры">Примеры</a></li>
-        <li><a href="#возможные-ошибки">Возможные ошибки</a></li>
       </ul>
     </li>
   </ul>

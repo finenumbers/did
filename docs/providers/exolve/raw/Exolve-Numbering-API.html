@@ -1,0 +1,6065 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+<script>
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+        originalLocation:
+        document.location.protocol + '//' +
+        document.location.hostname +
+        document.location.pathname +
+         document.location.search
+     });
+</script>
+
+
+<script type="text/javascript">
+    (function(m,e,t,r,i,k,a)
+{         m[i]=m[i]||function()
+{(m[i].a=m[i].a||[]).push(arguments)};
+        m[i].l=1*new Date();
+        for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+        k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+    })(window, document,'script','https://mc.yandex.ru/metrika/tag.js', 'ym');
+    ym(92260545, 'init', {webvisor:true, clickmap:true, referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/92260545" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+
+
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.0.0/styles/default.min.css">
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.0.0/highlight.min.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+
+
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="title" content="Numbering API | документация Exolve">
+<meta name="description" content="Numbering API МТС Exolve — программный интерфейс, который позволяет пользователям управлять номерами приложения в Личном кабинете: покупать свободные номера, удалять их, настраивать переадресацию и т.д.">
+<meta name="theme-color" content="#FFFFFF">
+<meta name="color-scheme" content="light dark"><meta property="og:url" content="/docs/ru/api-reference/numbering-api/">
+  <meta property="og:site_name" content="Exolve">
+  <meta property="og:title" content="Numbering API">
+  <meta property="og:description" content="Numbering API МТС Exolve — программный интерфейс, который позволяет пользователям управлять номерами приложения в Личном кабинете: покупать свободные номера, удалять их, настраивать переадресацию и т.д.">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="website">
+<title>Numbering API | документация Exolve</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="stylesheet" href="/book.min.dcf21648d454fcee6d36309fb42dad2f1c2c380f61a864ca4cb72b9330ba7910.css" >
+  <script defer src="/flexsearch.min.js"></script>
+  <script defer src="/en.search.min.c429f636f4a5d77bd8430ce488a81b7b6c10af4e3871ba402ddca8107d367017.js" ></script>
+<link rel="alternate" type="application/rss+xml" href="/docs/ru/api-reference/numbering-api/index.xml" title="Exolve" />
+<!--
+Made with Book Theme
+https://github.com/alex-shpak/hugo-book
+-->
+</head>
+<body class="page" dir="ltr">
+
+  
+
+  <div class="page__wrapper">
+  <input type="checkbox" class="hidden toggle" id="menu-control" />
+  <input type="checkbox" class="hidden toggle" id="toc-control" />
+
+  <header class="page__header header">
+  <div class="header__wrap">
+    <a class="header__logo" href="https://community.exolve.ru/"
+      ><svg
+        class="header__logo-icon"
+        width="113"
+        height="30"
+        viewBox="0 0 113 30"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <g>
+          <path
+            d="M5.76816 1.71112H0V11.1597H7.53114V18.88H0V28.3286H5.76816L12.9845 18.88V11.1597L5.76816 1.71112Z"
+            fill="#FF0032"
+          />
+          <path
+            d="M18.756 1.71112H12.9844V11.1597H20.519V18.88H12.9844V28.3286H18.756L25.9689 18.88V11.1597L18.756 1.71112Z"
+            fill="#FF0032"
+          />
+        </g>
+        <path
+          d="M43.9249 13.2375H46.566L50.3789 2.90997V13.2375H52.8101V0.865975H49.1196L45.3941 10.9963L41.7036 0.865975H37.8906V13.2375H40.1294V2.96376L43.9249 13.2375Z"
+          fill="currentColor"
+        />
+        <path
+          d="M59.3829 2.90997V13.2375H61.8316V2.90997H66.764V0.865975H54.4506V2.90997H59.3829Z"
+          fill="currentColor"
+        />
+        <path
+          d="M67.2222 7.06969C67.2222 11.7852 69.6534 13.4527 73.9211 13.4527C77.734 13.4527 79.8679 12.2873 80.3052 9.3647H77.839C77.4367 11.068 76.1424 11.4984 73.9211 11.4984C71.315 11.4984 69.6883 10.5301 69.6883 7.66137V6.40629C69.6883 3.48373 71.35 2.60517 73.9211 2.60517C76.2298 2.60517 77.5067 3.1072 77.8215 4.88225H80.2877C79.9379 1.83418 77.769 0.650818 73.9211 0.650818C69.6534 0.650818 67.2222 2.37208 67.2222 7.06969Z"
+          fill="currentColor"
+        />
+        <path
+          d="M37.8906 16.7625V29.1341H48.315V27.1797H40.3393V23.7551H46.4261V21.8725H40.3393V18.7169H48.2451V16.7625H37.8906Z"
+          fill="currentColor"
+        />
+        <path
+          d="M51.7576 29.1341L55.8154 24.4006L59.8907 29.1341H62.8291L57.407 22.8228L62.6018 16.7625H59.9082L56.0078 21.3346L52.0899 16.7625H49.1515L54.4161 22.9124L49.0815 29.1341H51.7576Z"
+          fill="currentColor"
+        />
+        <path
+          d="M74.5882 23.5579C74.5882 26.337 73.014 27.3949 69.9007 27.3949C66.7699 27.3949 65.2132 26.3191 65.2132 23.5579V22.2849C65.2132 19.5596 66.7699 18.5017 69.9007 18.5017C73.014 18.5017 74.5882 19.5596 74.5882 22.2849V23.5579ZM62.747 22.8945C62.747 27.6638 65.2307 29.3492 69.9007 29.3492C74.5707 29.3492 77.0544 27.6638 77.0544 22.8945C77.0544 18.1969 74.5707 16.5473 69.9007 16.5473C65.2307 16.5473 62.747 18.1969 62.747 22.8945Z"
+          fill="currentColor"
+        />
+        <path
+          d="M79.2259 16.7625V29.1341H89.0557V27.0901H81.6746V16.7625H79.2259Z"
+          fill="currentColor"
+        />
+        <path
+          d="M98.8361 16.7625L94.3585 27.3232L89.9159 16.7625H87.2923L92.5569 29.1341H95.8627L101.145 16.7625H98.8361Z"
+          fill="currentColor"
+        />
+        <path
+          d="M102.575 16.7625V29.1341H113V27.1797H105.024V23.7551H111.111V21.8725H105.024V18.7169H112.93V16.7625H102.575Z"
+          fill="currentColor"
+        /></svg
+    ></a>
+    <nav class="header__nav hidden-xs">
+      <ul class="header-menu">
+        <li class="header-menu__item">
+          <a
+            class="header-menu__item-link"
+            href="https://exolve.ru/news/"
+            >Новости</a
+          >
+        </li>
+        <li class="header-menu__item">
+          <a
+            class="header-menu__item-link"
+            href="https://exolve.ru/events/"
+            >События</a
+          >
+        </li>
+        
+        <li class="header-menu__item">
+          <a
+            class="header-menu__item-link"
+            href="https://exolve.ru/faq/"
+            >FAQ</a
+          >
+        </li>
+        <li class="header-menu__item">
+          <a
+            class="header-menu__item-link"
+            href="https://community.exolve.ru/blog/"
+            >Блог</a
+          >
+        </li>
+        <li class="header-menu__item">
+          <a
+            class="header-menu__item-link"
+            href="https://sso.exolve.ru/realms/Exolve/protocol/openid-connect/auth?client_id=exolve_web&redirect_uri=https%3A%2F%2Fdev.exolve.ru&response_mode=fragment&response_type=code"
+            >Попробовать бесплатно</a
+          >
+        </li>
+      </ul>
+    </nav>
+    <div class="header__controls">
+      <div class="header__user-menu hidden-xs" style="display: none">
+        <div class="base-dropdown">
+          <button
+            class="base-dropdown__toggle base-dropdown__toggle--svg"
+            data-toggle="dropdown"
+            type="button"
+          >
+            <span>Русский</span>
+            <svg class="base-dropdown__svg">
+              <use xlink:href="/images/sprite.svg#lang"></use>
+            </svg>
+          </button>
+          <div class="base-dropdown__inner hidden">
+            <ul class="base-dropdown__nav-list">
+              <li>
+                <a class="base-dropdown__nav-item active" href="#">Русский</a>
+              </li>
+              <li>
+                <a class="base-dropdown__nav-item" href="#">Английский</a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="header__user-menu user-menu">
+        <div class="user-menu__item visible-xs">
+          <button class="header__hamburger" type="button" aria-label="Меню">
+            <svg class="header__hamburger-svg">
+              <use xlink:href="/images/sprite.svg#burger"></use>
+            </svg>
+          </button>
+        </div>
+        <div class="user-menu__item hidden-xs">
+          <a
+            class="user-menu__profile-link"
+            href="https://sso.exolve.ru/realms/Exolve/protocol/openid-connect/auth?client_id=exolve_web&redirect_uri=https%3A%2F%2Fdev.exolve.ru&response_mode=fragment&response_type=code"
+            aria-label="Личный кабинет"
+            ><img
+              class="user-menu__avatar"
+              src="/images/empty-avatar.svg"
+              alt=""
+          /></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+
+  
+  
+<main class="page__main">
+    <div class="document-page layout">
+        <div class="layout__content">
+            <ul id="breadcrumbs" class="breadcrumbs">
+        <li class="breadcrumbs__item"><a href="/">Документация</a></li>
+        <li class="breadcrumbs__item"><a href="/docs/">Docs</a></li>
+        <li class="breadcrumbs__item"><a href="/docs/ru/">Документация</a></li>
+        <li class="breadcrumbs__item"><a href="/docs/ru/api-reference/">API Reference</a></li>
+    <li class="breadcrumbs__item"><a href="/docs/ru/api-reference/numbering-api/">Numbering API</a></li>
+</ul>
+
+<style>
+    .breadcrumbs {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -ms-flex-wrap: wrap;
+    flex-wrap: wrap;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    margin: 0 0 24px;
+    padding: 0;
+    color: rgba(56,56,56,.5);
+    list-style: none
+}
+
+.breadcrumbs a {
+    color: var(--text-link-secondary);
+    text-decoration: none;
+    -webkit-transition: all .5s ease;
+    transition: all .5s ease
+}
+
+.breadcrumbs a,.breadcrumbs span:not([class]) {
+    position: relative;
+    display: -webkit-inline-box;
+    display: -ms-inline-flexbox;
+    display: inline-flex;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    font-size: 13px;
+    line-height: 21px;
+    letter-spacing: .01em;
+    color: var(--text-link-secondary)
+}
+
+.breadcrumbs span:not([class]) {
+    color: var(--text-primary)
+}
+
+.breadcrumbs__item {
+    display: -webkit-inline-box;
+    display: -ms-inline-flexbox;
+    display: inline-flex;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    margin-right: 4px;
+    white-space: nowrap
+}
+
+.breadcrumbs__item:not(:last-child)::after {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-left: 4px;
+    content: "";
+    background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cg clip-path='url(%23clip0_2272_60596)'%3E%3Cpath d='M6.16406 3.75196C6.16406 3.08338 6.97192 2.74855 7.44439 3.22131L9.20307 4.98106C10.6253 6.40416 11.3364 7.11571 11.3364 7.9999C11.3364 8.8841 10.6253 9.59565 9.20306 11.0187L7.44439 12.7785C6.97192 13.2513 6.16406 12.9164 6.16406 12.2478C6.16406 12.0488 6.24308 11.8579 6.38373 11.7172L8.1424 9.95743C8.8835 9.21588 9.33037 8.76423 9.61053 8.39681C9.73984 8.22723 9.79494 8.12363 9.81862 8.0668C9.83652 8.02386 9.83644 8.0087 9.8364 8.00091L9.8364 7.9999L9.8364 7.9989C9.83644 7.99111 9.83652 7.97594 9.81862 7.93301C9.79494 7.87617 9.73984 7.77258 9.61053 7.603C9.33037 7.23558 8.8835 6.78393 8.14241 6.04237L6.38373 4.28262C6.24308 4.14188 6.16406 3.951 6.16406 3.75196Z' fill='%23969FA8'/%3E%3C/g%3E%3Cdefs%3E%3CclipPath id='clip0_2272_60596'%3E%3Crect width='16' height='16' fill='white'/%3E%3C/clipPath%3E%3C/defs%3E%3C/svg%3E%0A");
+    background-position: center;
+    background-size: contain;
+    background-repeat: no-repeat
+}
+
+.breadcrumbs__item:first-child, .breadcrumbs__item:nth-child(2) {
+    display: none;
+}
+
+[data-theme=dark] .breadcrumbs__item:not(:last-child)::after {
+    background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cg clip-path='url(%23clip0_2272_61916)'%3E%3Cpath d='M6.16406 3.75196C6.16406 3.08338 6.97192 2.74855 7.44439 3.22131L9.20307 4.98106C10.6253 6.40416 11.3364 7.11571 11.3364 7.9999C11.3364 8.8841 10.6253 9.59565 9.20306 11.0187L7.44439 12.7785C6.97192 13.2513 6.16406 12.9164 6.16406 12.2478C6.16406 12.0488 6.24308 11.8579 6.38373 11.7172L8.1424 9.95743C8.8835 9.21588 9.33037 8.76423 9.61053 8.39681C9.73984 8.22723 9.79494 8.12363 9.81862 8.0668C9.83652 8.02386 9.83644 8.0087 9.8364 8.00091L9.8364 7.9999L9.8364 7.9989C9.83644 7.99111 9.83652 7.97594 9.81862 7.93301C9.79494 7.87617 9.73984 7.77258 9.61053 7.603C9.33037 7.23558 8.8835 6.78393 8.14241 6.04237L6.38373 4.28262C6.24308 4.14188 6.16406 3.951 6.16406 3.75196Z' fill='%23626C77'/%3E%3C/g%3E%3Cdefs%3E%3CclipPath id='clip0_2272_61916'%3E%3Crect width='16' height='16' fill='white'/%3E%3C/clipPath%3E%3C/defs%3E%3C/svg%3E%0A")
+}
+</style>
+            <h1 class="document-page__title">Numbering API</h1>
+            
+            <div><p>Numbering API позволяет управлять номерами: покупать свободные номера, удалять их, настраивать переадресацию входящих вызовов, подключать услуги и т.д.</p>
+<ul>
+<li>
+<p><a href="/docs/ru/api-reference/numbering-api/reference">GetList</a> — получает характеристики номеров Exolve для покупки;</p>
+</li>
+<li>
+<p><a href="/docs/ru/api-reference/numbering-api/getting-free-numbers">GetFree</a> — получает список свободных номеров для покупки по заданным параметрам;</p>
+</li>
+<li>
+<p><a href="/docs/ru/api-reference/numbering-api/locking-number">Lock</a> — бронирует свободный номер для покупки;</p>
+</li>
+<li>
+<p><a href="/docs/ru/api-reference/numbering-api/unlocking-number">Unlock</a> — отменяет бронирование номера;</p>
+</li>
+<li>
+<p><a href="/docs/ru/api-reference/numbering-api/buying-number">Buy</a> — покупает бронированный номер;</p>
+</li>
+<li>
+<p><a href="/docs/ru/api-reference/numbering-api/deleting-number">Delete</a> — удаляет купленный номер;</p>
+</li>
+<li>
+<p><a href="/docs/ru/api-reference/numbering-api/purchased-number">GetInfo</a> — получает информацию о купленном номере;</p>
+</li>
+<li>
+<p><a href="/docs/ru/api-reference/numbering-api/setting-amd-state">SetAmdState</a> — подключает услугу детектирования автоответчиков на номере;</p>
+</li>
+<li>
+<p><a href="/docs/ru/api-reference/numbering-api/call-forwarding">SetCallForwarding</a> — настраивает переадресацию входящих на номер вызовов;</p>
+</li>
+<li>
+<p><a href="/docs/ru/api-reference/numbering-api/deleting-call-forwarding">DeleteCallForwarding</a> — отключает переадресацию входящих звонков на номер;</p>
+</li>
+<li>
+<p><a href="/docs/ru/api-reference/numbering-api/getting-number-attributes">GetAttributes</a> — получает информацию о настройках переадресации и записи разговоров на номере.</p>
+</li>
+</ul>
+<h4 id="решения-где-используется-numbering-api">
+  Решения, где используется Numbering API
+</h4>
+<div class="api-images">
+    <figure>
+        <a href="https://exolve.ru/solutions/virtual-pbx/">
+        <img class="api-image" src="/api-images/virtual-pbx.png">
+        </a>
+        <figcaption><a href="https://exolve.ru/solutions/virtual-pbx/"><h4>Интеграция виртуальной АТС с CRM</h4></a>
+        </figcaption>
+    </figure>
+    <figure>
+        <a href="https://exolve.ru/solutions/call-tracking/">
+        <img class="api-image" src="/api-images/call-tracking.png">
+        </a>
+        <figcaption><a href="https://exolve.ru/solutions/call-tracking/"><h4>Кол-трекинг</h4></a>
+        </figcaption>
+    </figure>
+    <figure>
+        <a href="https://exolve.ru/solutions/promotional-sms-mailings/">
+        <img class="api-image" src="/api-images/sms-mailing-own-base.png">
+        </a>
+        <figcaption><a href="https://exolve.ru/solutions/promotional-sms-mailings/"><h4>Рекламные SMS-рассылки</h4></a>
+        </figcaption>
+    </figure>
+</div>
+
+<style>
+    div.api-images {
+        display: grid;
+        grid-template-columns: repeat(3,1fr);
+        grid-column-gap: var(--column-gap)
+    }
+
+    .api-image {
+        max-height: 151.25px;
+    }
+</style>
+
+
+
+
+
+
+<p><a href="https://sso.exolve.ru/realms/Exolve/protocol/openid-connect/auth?client_id=exolve_web&amp;redirect_uri=https%3A%2F%2Fdev.exolve.ru&amp;response_mode=fragment&amp;response_type=code">Попробовать бесплатно</a></p>
+<h2 id="метод-getlist">
+  Метод GetList
+</h2>
+<p>Примените метод GetList для получения справочника по характеристикам номеров (тип, категория, регион, и проект).
+<strong>Точка подключения</strong>:
+Выполните POST-запрос с входными параметрами к точке подключения:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-html" data-lang="html"><span style="display:flex;"><span>POST: https://api.exolve.ru/number/reference/v1/GetList
+</span></span></code></pre></div><h3 id="авторизация">
+  Авторизация
+</h3>
+<p>Передайте следующие Заголовки HTTP для успешной авторизации.</p>
+<table>
+<thead>
+<tr>
+<th>Имя</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Authorization</strong></td>
+<td style="text-align:center">string</td>
+<td><a href="/docs/ru/instructions/getting-api-key">API-ключ приложения</a> с <code>Bearer</code> перед ним. Пример: <code>Bearer e***s0</code>, где <code>e***s0</code> замените на API-ключ вашего приложения</td>
+</tr>
+</tbody>
+</table>
+<h3 id="входные-параметры">
+  Входные параметры
+</h3>
+<p>Передайте пустой JSON в теле запроса.</p>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>{}</td>
+<td style="text-align:center">пустой JSON</td>
+</tr>
+</tbody>
+</table>
+<h3 id="выходные-параметры">
+  Выходные параметры
+</h3>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>types</td>
+<td style="text-align:center"><a href="#numbertypes">NumberTypes</a></td>
+<td>сопоставляет наименование типа номера и его идентификатор</td>
+</tr>
+<tr>
+<td>categories</td>
+<td style="text-align:center"><a href="#categories">Categories</a></td>
+<td>сопоставляет имя категории и ее идентификатор, а также принадлежащие к ней тип номера и его идентификатор</td>
+</tr>
+<tr>
+<td>regions</td>
+<td style="text-align:center"><a href="#regions">Regions</a></td>
+<td>сопоставляет название региона с его идентификатором и кодом</td>
+</tr>
+</tbody>
+</table>
+<h4 id="numbertypes">
+  NumberTypes
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>type_id</td>
+<td style="text-align:center">uint32</td>
+<td>идентификатор типа номера</td>
+</tr>
+<tr>
+<td>type_name</td>
+<td style="text-align:center">string</td>
+<td>наименование типа номера</td>
+</tr>
+</tbody>
+</table>
+<h4 id="categories">
+  Categories
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>category_id</td>
+<td style="text-align:center">uint32</td>
+<td>идентификатор категории</td>
+</tr>
+<tr>
+<td>type_id</td>
+<td style="text-align:center">uint32</td>
+<td>идентификатор типа номера</td>
+</tr>
+<tr>
+<td>type_name</td>
+<td style="text-align:center">string</td>
+<td>наименование типа номера</td>
+</tr>
+<tr>
+<td>category_name</td>
+<td style="text-align:center">string</td>
+<td>имя категории</td>
+</tr>
+</tbody>
+</table>
+<h4 id="regions">
+  Regions
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>project_id</td>
+<td style="text-align:center">uint32</td>
+<td>идентификатор проекта</td>
+</tr>
+<tr>
+<td>region_id</td>
+<td style="text-align:center">uint32</td>
+<td>идентификатор региона</td>
+</tr>
+<tr>
+<td>parent_region_id</td>
+<td style="text-align:center">uint32</td>
+<td>идентификатор родительского региона</td>
+</tr>
+<tr>
+<td>region_code</td>
+<td style="text-align:center">string</td>
+<td>код региона</td>
+</tr>
+<tr>
+<td>region_name</td>
+<td style="text-align:center">string</td>
+<td>имя региона (латиница)</td>
+</tr>
+<tr>
+<td>description</td>
+<td style="text-align:center">string</td>
+<td>имя региона (кириллица)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="возможные-ошибки">
+  Возможные ошибки
+</h3>
+<table>
+<thead>
+<tr>
+<th>Код</th>
+<th style="text-align:center">Статус</th>
+<th>Пример сообщения</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: syntax error (line 1:2): unexpected token</td>
+<td>некорректный формат запроса</td>
+</tr>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: syntax error (line 1:2): invalid value</td>
+<td>невалидный запрос</td>
+</tr>
+</tbody>
+</table>
+<h3 id="примеры">
+  Примеры
+</h3>
+<p>Входные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{}
+</span></span></code></pre></div><p>Выходные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;regions&#34;</span>: [
+</span></span><span style="display:flex;"><span>        {
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;project_id&#34;</span>: <span style="color:#ae81ff">10008</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;region_id&#34;</span>: <span style="color:#ae81ff">10257</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;parent_region_id&#34;</span>: <span style="color:#ae81ff">10084</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;region_code&#34;</span>: <span style="color:#e6db74">&#34;SLH&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;region_name&#34;</span>: <span style="color:#e6db74">&#34;Salekhard&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;description&#34;</span>: <span style="color:#e6db74">&#34;Салехард&#34;</span>
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>     ],
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;types&#34;</span>: [
+</span></span><span style="display:flex;"><span>        {
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;type_id&#34;</span>: <span style="color:#ae81ff">1104</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;type_name&#34;</span>: <span style="color:#e6db74">&#34;DEF&#34;</span>
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>     ],
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;categories&#34;</span>: [
+</span></span><span style="display:flex;"><span>        {
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;category_id&#34;</span>: <span style="color:#ae81ff">10003</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;type_id&#34;</span>: <span style="color:#ae81ff">1107</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;type_name&#34;</span>: <span style="color:#e6db74">&#34;CEN&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;category_name&#34;</span>: <span style="color:#e6db74">&#34;REGULAR&#34;</span>
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    ]
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h2 id="метод-getfree">
+  Метод GetFree
+</h2>
+<p>Примените метод GetFree для получения списка номеров, доступных для покупки</p>
+<p><strong>Точка подключения</strong>:
+Выполните POST-запрос с входными параметрами к точке подключения:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-html" data-lang="html"><span style="display:flex;"><span>POST: https://api.exolve.ru/number/v1/GetFree
+</span></span></code></pre></div><h3 id="авторизация-1">
+  Авторизация
+</h3>
+<p>Передайте следующие Заголовки HTTP для успешной авторизации.</p>
+<table>
+<thead>
+<tr>
+<th>Имя</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Authorization</strong></td>
+<td style="text-align:center">string</td>
+<td><a href="/docs/ru/instructions/getting-api-key">API-ключ приложения</a> с <code>Bearer</code> перед ним. Пример: <code>Bearer e***s0</code>, где <code>e***s0</code> замените на API-ключ вашего приложения</td>
+</tr>
+</tbody>
+</table>
+<h3 id="входные-параметры-1">
+  Входные параметры
+</h3>
+<p>Передайте следующие параметры в теле запроса в JSON формате. Параметры, отмеченные жирным шрифтом, являются обязательными.</p>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>type_id</strong></td>
+<td style="text-align:center">uint32</td>
+<td><a href="#%d1%81%d0%bf%d0%b8%d1%81%d0%be%d0%ba-%d1%82%d0%b8%d0%bf%d0%be%d0%b2-%d0%bd%d0%be%d0%bc%d0%b5%d1%80%d0%be%d0%b2-type_id">тип номера</a></td>
+</tr>
+<tr>
+<td>region_id</td>
+<td style="text-align:center">uint32</td>
+<td><a href="#%d1%81%d0%bf%d0%b8%d1%81%d0%be%d0%ba-%d1%80%d0%b5%d0%b3%d0%b8%d0%be%d0%bd%d0%be%d0%b2-region_id">регион номера</a></td>
+</tr>
+<tr>
+<td>category_id</td>
+<td style="text-align:center">uint32</td>
+<td><a href="#%d1%81%d0%bf%d0%b8%d1%81%d0%be%d0%ba-%d0%ba%d0%b0%d1%82%d0%b5%d0%b3%d0%be%d1%80%d0%b8%d0%b9-%d0%bd%d0%be%d0%bc%d0%b5%d1%80%d0%be%d0%b2-category_id">категория номера</a></td>
+</tr>
+<tr>
+<td>random</td>
+<td style="text-align:center">boolean</td>
+<td><code>True</code> вернёт номера в случайном порядке</td>
+</tr>
+<tr>
+<td>mask</td>
+<td style="text-align:center">string</td>
+<td><a href="#%d0%bc%d0%b0%d1%81%d0%ba%d0%b0">маска</a></td>
+</tr>
+<tr>
+<td>limit</td>
+<td style="text-align:center">uint32</td>
+<td>лимит выводимых строк</td>
+</tr>
+<tr>
+<td>offset</td>
+<td style="text-align:center">uint32</td>
+<td>номер строки, с которой начинать выборку (начинается с 0)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="список-типов-номеров-type_id">
+  Список типов номеров (type_id)
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">ID типа</th>
+<th style="text-align:right">Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DEF</td>
+<td style="text-align:center">1104</td>
+<td style="text-align:right">Мобильный</td>
+</tr>
+<tr>
+<td>ABC</td>
+<td style="text-align:center">1105</td>
+<td style="text-align:right">Городской</td>
+</tr>
+<tr>
+<td>KDU</td>
+<td style="text-align:center">1106</td>
+<td style="text-align:right">Федеральный 8-800 (использовать только с <a href="#%d1%81%d0%bf%d0%b8%d1%81%d0%be%d0%ba-%d1%80%d0%b5%d0%b3%d0%b8%d0%be%d0%bd%d0%be%d0%b2-region_id">регионом Россия</a>)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="список-категорий-номеров-category_id">
+  Список категорий номеров (category_id)
+</h4>
+<table>
+<thead>
+<tr>
+<th>Название</th>
+<th style="text-align:center">ID категории номера для типа <strong>мобильный</strong></th>
+<th style="text-align:center">ID категории номера для типа <strong>городской</strong></th>
+<th style="text-align:center">ID категории номера для типа <strong>7-800</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Обычный</td>
+<td style="text-align:center">10000</td>
+<td style="text-align:center">10001</td>
+<td style="text-align:center">10002</td>
+</tr>
+<tr>
+<td>Бронзовый</td>
+<td style="text-align:center">10010</td>
+<td style="text-align:center">10011</td>
+<td style="text-align:center">10012</td>
+</tr>
+<tr>
+<td>Серебряный</td>
+<td style="text-align:center">10020</td>
+<td style="text-align:center">10021</td>
+<td style="text-align:center">10022</td>
+</tr>
+<tr>
+<td>Золотой</td>
+<td style="text-align:center">10030</td>
+<td style="text-align:center">10031</td>
+<td style="text-align:center">10032</td>
+</tr>
+<tr>
+<td>Платиновый</td>
+<td style="text-align:center">10040</td>
+<td style="text-align:center">10041</td>
+<td style="text-align:center">10042</td>
+</tr>
+<tr>
+<td>Эксклюзивный</td>
+<td style="text-align:center">10050</td>
+<td style="text-align:center">10051</td>
+<td style="text-align:center">10052</td>
+</tr>
+</tbody>
+</table>
+<h4 id="список-регионов-region_id">
+  Список регионов (region_id)
+</h4>
+<table>
+<thead>
+<tr>
+<th>Название</th>
+<th style="text-align:center">ID типа номера</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Россия</td>
+<td style="text-align:center">10084</td>
+</tr>
+<tr>
+<td>Магнитогорск</td>
+<td style="text-align:center">10186</td>
+</tr>
+<tr>
+<td>Пермь</td>
+<td style="text-align:center">10181</td>
+</tr>
+<tr>
+<td>Санкт-Петербург</td>
+<td style="text-align:center">10182</td>
+</tr>
+<tr>
+<td>Москва</td>
+<td style="text-align:center">10230</td>
+</tr>
+<tr>
+<td>Ростов-на-Дону</td>
+<td style="text-align:center">10231</td>
+</tr>
+<tr>
+<td>Омск</td>
+<td style="text-align:center">10196</td>
+</tr>
+<tr>
+<td>Новороссийск</td>
+<td style="text-align:center">10221</td>
+</tr>
+<tr>
+<td>Екатеринбург</td>
+<td style="text-align:center">10190</td>
+</tr>
+<tr>
+<td>Казань</td>
+<td style="text-align:center">10195</td>
+</tr>
+<tr>
+<td>Сочи</td>
+<td style="text-align:center">10153</td>
+</tr>
+<tr>
+<td>Самара</td>
+<td style="text-align:center">10192</td>
+</tr>
+<tr>
+<td>Краснодар</td>
+<td style="text-align:center">10184</td>
+</tr>
+<tr>
+<td>Нижний Новгород</td>
+<td style="text-align:center">10189</td>
+</tr>
+<tr>
+<td>Новосибирск</td>
+<td style="text-align:center">10183</td>
+</tr>
+<tr>
+<td>Красноярск</td>
+<td style="text-align:center">10191</td>
+</tr>
+<tr>
+<td>Челябинск</td>
+<td style="text-align:center">10229</td>
+</tr>
+<tr>
+<td>Тольятти</td>
+<td style="text-align:center">10227</td>
+</tr>
+<tr>
+<td>Воронеж</td>
+<td style="text-align:center">10193</td>
+</tr>
+</tbody>
+</table>
+<h4 id="маска">
+  Маска
+</h4>
+<table>
+<thead>
+<tr>
+<th>Символ</th>
+<th>Назначение</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Точка ( . ) / Подчёркивание ( _ )</td>
+<td>пропускает один символ параметра <code>number_code</code> в поиске</td>
+</tr>
+<tr>
+<td>Звёздочка ( * ) / Знак процента ( % )</td>
+<td>пропускает несколько символов параметра <code>number_code</code> в поиске</td>
+</tr>
+</tbody>
+</table>
+<h3 id="выходные-параметры-1">
+  Выходные параметры
+</h3>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>numbers</td>
+<td style="text-align:center">array <a href="#numberelement">NumberElement</a></td>
+<td>список номеров с информацией по ним</td>
+</tr>
+</tbody>
+</table>
+<h4 id="numberelement">
+  NumberElement
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>type_name</td>
+<td style="text-align:center">string</td>
+<td>наименование типа номера</td>
+</tr>
+<tr>
+<td>region_name</td>
+<td style="text-align:center">string</td>
+<td>имя региона</td>
+</tr>
+<tr>
+<td>category_name</td>
+<td style="text-align:center">string</td>
+<td>имя категории номера</td>
+</tr>
+<tr>
+<td>number_code</td>
+<td style="text-align:center">uint64</td>
+<td>код номера</td>
+</tr>
+<tr>
+<td>subscription_fee</td>
+<td style="text-align:center">float</td>
+<td>ежемесячная абонентская плата</td>
+</tr>
+<tr>
+<td>install_fee</td>
+<td style="text-align:center">float</td>
+<td>единоразовая плата за подключение</td>
+</tr>
+<tr>
+<td>number_options</td>
+<td style="text-align:center">array <a href="#numberoptions">NumberOptions</a></td>
+<td>возможности номера (звонки, SMS)</td>
+</tr>
+</tbody>
+</table>
+<h5 id="numberoptions">
+  NumberOptions
+</h5>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>incoming_calls</td>
+<td style="text-align:center">bool</td>
+<td>входящие звонки, <code>True</code> — доступно, <code>False</code> — доступно</td>
+</tr>
+<tr>
+<td>outgoing_calls</td>
+<td style="text-align:center">bool</td>
+<td>исходящие звонки, <code>True</code> — доступно, <code>False</code> — доступно</td>
+</tr>
+<tr>
+<td>incoming_sms</td>
+<td style="text-align:center">bool</td>
+<td>входящие SMS, <code>True</code> — доступно, <code>False</code> — доступно</td>
+</tr>
+<tr>
+<td>outgoing_sms</td>
+<td style="text-align:center">bool</td>
+<td>исходящие SMS, <code>True</code> — доступно, <code>False</code> — доступно</td>
+</tr>
+</tbody>
+</table>
+<h3 id="примеры-1">
+  Примеры
+</h3>
+<p>Пример получения свободных номеров для региона «Москва», категории «Обычный», тип «Мобильный»:</p>
+<p>Входные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;type_id&#34;</span>: <span style="color:#ae81ff">1104</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;region_id&#34;</span>: <span style="color:#ae81ff">10230</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;category_id&#34;</span>: <span style="color:#ae81ff">10000</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;random&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;limit&#34;</span>: <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Выходные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;numbers&#34;</span>: [
+</span></span><span style="display:flex;"><span>        {
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;number_code&#34;</span>: <span style="color:#e6db74">&#34;79300655934&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;type_name&#34;</span>: <span style="color:#e6db74">&#34;DEF&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;region_name&#34;</span>: <span style="color:#e6db74">&#34;Moscow&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;category_name&#34;</span>: <span style="color:#e6db74">&#34;REGULAR&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;subscription_fee&#34;</span>: <span style="color:#ae81ff">150</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;install_fee&#34;</span>: <span style="color:#ae81ff">590</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;number_options&#34;</span>: {
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;incoming_calls&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;outgoing_calls&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;incoming_sms&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;outgoing_sms&#34;</span>: <span style="color:#66d9ef">true</span>
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    ]
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Пример получения свободных номеров для региона «Санкт-Петербург», категории «Бронзовый», тип «Городской»:</p>
+<p>Входные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;type_id&#34;</span>: <span style="color:#ae81ff">1105</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;region_id&#34;</span>: <span style="color:#ae81ff">10182</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;category_id&#34;</span>: <span style="color:#ae81ff">10011</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;random&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;mask&#34;</span>: <span style="color:#e6db74">&#34;781221*&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;limit&#34;</span>: <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Выходные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;numbers&#34;</span>: [
+</span></span><span style="display:flex;"><span>        {
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;number_code&#34;</span>: <span style="color:#e6db74">&#34;78122135222&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;type_name&#34;</span>: <span style="color:#e6db74">&#34;ABC&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;region_name&#34;</span>: <span style="color:#e6db74">&#34;St. Petersburg&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;category_name&#34;</span>: <span style="color:#e6db74">&#34;BRONZE&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;subscription_fee&#34;</span>: <span style="color:#ae81ff">200</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;install_fee&#34;</span>: <span style="color:#ae81ff">1000</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;number_options&#34;</span>: {
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;incoming_calls&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;outgoing_calls&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;incoming_sms&#34;</span>: <span style="color:#66d9ef">false</span>,
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;outgoing_sms&#34;</span>: <span style="color:#66d9ef">false</span>
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    ]
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Пример получения свободных номеров для региона «Россия», категории «Серебряный», тип «Федеральный»:</p>
+<p>Входные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;type_id&#34;</span>: <span style="color:#ae81ff">1106</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;region_id&#34;</span>: <span style="color:#ae81ff">10084</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;category_id&#34;</span>: <span style="color:#ae81ff">10022</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;random&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;limit&#34;</span>: <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Входные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;numbers&#34;</span>: [
+</span></span><span style="display:flex;"><span>        {
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;number_code&#34;</span>: <span style="color:#e6db74">&#34;78003333729&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;type_name&#34;</span>: <span style="color:#e6db74">&#34;KDU&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;region_name&#34;</span>: <span style="color:#e6db74">&#34;Russia&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;category_name&#34;</span>: <span style="color:#e6db74">&#34;SILVER&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;subscription_fee&#34;</span>: <span style="color:#ae81ff">3500</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;install_fee&#34;</span>: <span style="color:#ae81ff">50000</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;number_options&#34;</span>: {
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;incoming_calls&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;outgoing_calls&#34;</span>: <span style="color:#66d9ef">false</span>,
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;incoming_sms&#34;</span>: <span style="color:#66d9ef">false</span>,
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;outgoing_sms&#34;</span>: <span style="color:#66d9ef">false</span>
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    ]
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h3 id="возможные-ошибки-1">
+  Возможные ошибки
+</h3>
+<table>
+<thead>
+<tr>
+<th>Код</th>
+<th style="text-align:center">Статус</th>
+<th>Пример сообщения</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: syntax error (line 1:2): unexpected token</td>
+<td>пустое значение в поле <code>type_id</code></td>
+</tr>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: syntax error (line 1:2): invalid value</td>
+<td>значение в поле <code>type_id</code> невалидно</td>
+</tr>
+</tbody>
+</table>
+<h2 id="метод-lock">
+  Метод Lock
+</h2>
+<p>Примените метод Lock для бронирования номера перед его покупкой.</p>
+<p><strong>Точка подключения</strong>:
+Выполните POST-запрос с входными параметрами к точке подключения:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-html" data-lang="html"><span style="display:flex;"><span>POST: https://api.exolve.ru/number/v1/Lock
+</span></span></code></pre></div><h3 id="авторизация-2">
+  Авторизация
+</h3>
+<p>Передайте следующие Заголовки HTTP для успешной авторизации.</p>
+<table>
+<thead>
+<tr>
+<th>Имя</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Authorization</strong></td>
+<td style="text-align:center">string</td>
+<td><a href="/docs/ru/instructions/getting-api-key">API-ключ приложения</a> с <code>Bearer</code> перед ним. Пример: <code>Bearer e***s0</code>, где <code>e***s0</code> замените на API-ключ вашего приложения</td>
+</tr>
+</tbody>
+</table>
+<h3 id="входные-параметры-2">
+  Входные параметры
+</h3>
+<p>Передайте следующие параметры в теле запроса в JSON-формате. Параметры, отмеченные жирным шрифтом, являются обязательными.</p>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>number_code</strong></td>
+<td style="text-align:center">uint64</td>
+<td>номер в формате 79999999999</td>
+</tr>
+<tr>
+<td>seconds</td>
+<td style="text-align:center">uint32</td>
+<td>время бронирования в секундах (от 60 до 600 секунд)</td>
+</tr>
+<tr>
+<td>description</td>
+<td style="text-align:center">string</td>
+<td>комментарий к бронированию номера</td>
+</tr>
+</tbody>
+</table>
+<h3 id="выходные-параметры-2">
+  Выходные параметры
+</h3>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Id</td>
+<td style="text-align:center">uint32</td>
+<td>идентификатор бронирования</td>
+</tr>
+</tbody>
+</table>
+<h3 id="примеры-2">
+  Примеры
+</h3>
+<p>Входные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;number_code&#34;</span>: <span style="color:#ae81ff">74951340002</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;seconds&#34;</span>: <span style="color:#ae81ff">500</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Выходные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;Id&#34;</span>: <span style="color:#ae81ff">1001884</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h3 id="возможные-ошибки-2">
+  Возможные ошибки
+</h3>
+<table>
+<thead>
+<tr>
+<th>Код</th>
+<th style="text-align:center">Статус</th>
+<th>Пример сообщения</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>400</td>
+<td style="text-align:center">Internal Server Error</td>
+<td>Номер {number} не существует</td>
+<td>заданный в поле <code>number_code</code> номер не существует</td>
+</tr>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: syntax error (line 2:20): unexpected token ,</td>
+<td>пустое значение в поле <code>number_code</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="метод-unlock">
+  Метод Unlock
+</h2>
+<p>Примените метод Unlock для отмены бронирования номера.</p>
+<p><strong>Точка подключения</strong>:
+Выполните POST-запрос с входными параметрами к точке подключения:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-html" data-lang="html"><span style="display:flex;"><span>POST: https://api.exolve.ru/number/v1/Unlock
+</span></span></code></pre></div><h3 id="авторизация-3">
+  Авторизация
+</h3>
+<p>Передайте следующие Заголовки HTTP для успешной авторизации.</p>
+<table>
+<thead>
+<tr>
+<th>Имя</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Authorization</strong></td>
+<td style="text-align:center">string</td>
+<td><a href="/docs/ru/instructions/getting-api-key">API-ключ приложения</a> с <code>Bearer</code> перед ним. Пример: <code>Bearer e***s0</code>, где <code>e***s0</code> замените на API-ключ вашего приложения</td>
+</tr>
+</tbody>
+</table>
+<h3 id="входные-параметры-3">
+  Входные параметры
+</h3>
+<p>Передайте следующие параметры в теле запроса в JSON-формате. Параметры, отмеченные жирным шрифтом, являются обязательными.</p>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>number_code</strong></td>
+<td style="text-align:center">uint64</td>
+<td>номер</td>
+</tr>
+<tr>
+<td><strong>uid</strong></td>
+<td style="text-align:center">uint32</td>
+<td>идентификатор бронирования</td>
+</tr>
+</tbody>
+</table>
+<h3 id="выходные-параметры-3">
+  Выходные параметры
+</h3>
+<p>Пустой JSON с 200 OK статусом.</p>
+<h3 id="примеры-3">
+  Примеры
+</h3>
+<p>Входные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;number_code&#34;</span>: <span style="color:#ae81ff">73412209107</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;uid&#34;</span>: <span style="color:#ae81ff">1000988</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Выходные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{}
+</span></span></code></pre></div><h3 id="возможные-ошибки-3">
+  Возможные ошибки
+</h3>
+<table>
+<thead>
+<tr>
+<th>Код</th>
+<th style="text-align:center">Статус</th>
+<th>Пример сообщения</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: syntax error (line 2:20): invalid value к</td>
+<td>значение в поле <code>number_code</code> невалидно</td>
+</tr>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: syntax error (line 2:20): unexpected token ,</td>
+<td>не задано значение в поле <code>number_code</code></td>
+</tr>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: (line 4:1): invalid value for uint32 type: }</td>
+<td>не задано значение в поле <code>uid</code></td>
+</tr>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: syntax error (line 3:20): invalid value к</td>
+<td>значение в поле <code>uid</code> невалидно</td>
+</tr>
+</tbody>
+</table>
+<h2 id="метод-lock-1">
+  Метод Lock
+</h2>
+<p>Примените метод Lock для бронирования номера перед его покупкой.</p>
+<p><strong>Точка подключения</strong>:
+Выполните POST-запрос с входными параметрами к точке подключения:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-html" data-lang="html"><span style="display:flex;"><span>POST: https://api.exolve.ru/number/v1/Lock
+</span></span></code></pre></div><h3 id="авторизация-4">
+  Авторизация
+</h3>
+<p>Передайте следующие Заголовки HTTP для успешной авторизации.</p>
+<table>
+<thead>
+<tr>
+<th>Имя</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Authorization</strong></td>
+<td style="text-align:center">string</td>
+<td><a href="/docs/ru/instructions/getting-api-key">API-ключ приложения</a> с <code>Bearer</code> перед ним. Пример: <code>Bearer e***s0</code>, где <code>e***s0</code> замените на API-ключ вашего приложения</td>
+</tr>
+</tbody>
+</table>
+<h3 id="входные-параметры-4">
+  Входные параметры
+</h3>
+<p>Передайте следующие параметры в теле запроса в JSON-формате. Параметры, отмеченные жирным шрифтом, являются обязательными.</p>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>number_code</strong></td>
+<td style="text-align:center">uint64</td>
+<td>номер в формате 79999999999</td>
+</tr>
+<tr>
+<td>seconds</td>
+<td style="text-align:center">uint32</td>
+<td>время бронирования в секундах (от 60 до 600 секунд)</td>
+</tr>
+<tr>
+<td>description</td>
+<td style="text-align:center">string</td>
+<td>комментарий к бронированию номера</td>
+</tr>
+</tbody>
+</table>
+<h3 id="выходные-параметры-4">
+  Выходные параметры
+</h3>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Id</td>
+<td style="text-align:center">uint32</td>
+<td>идентификатор бронирования</td>
+</tr>
+</tbody>
+</table>
+<h3 id="примеры-4">
+  Примеры
+</h3>
+<p>Входные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;number_code&#34;</span>: <span style="color:#ae81ff">74951340002</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;seconds&#34;</span>: <span style="color:#ae81ff">500</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Выходные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;Id&#34;</span>: <span style="color:#ae81ff">1001884</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h3 id="возможные-ошибки-4">
+  Возможные ошибки
+</h3>
+<table>
+<thead>
+<tr>
+<th>Код</th>
+<th style="text-align:center">Статус</th>
+<th>Пример сообщения</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>400</td>
+<td style="text-align:center">Internal Server Error</td>
+<td>Номер {number} не существует</td>
+<td>заданный в поле <code>number_code</code> номер не существует</td>
+</tr>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: syntax error (line 2:20): unexpected token ,</td>
+<td>пустое значение в поле <code>number_code</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="метод-buy">
+  Метод Buy
+</h2>
+<p>Примените метод Buy для покупки забронированного ранее номера.</p>
+<p><strong>Точка подключения</strong>:
+Выполните POST-запрос с входными параметрами к точке подключения:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-html" data-lang="html"><span style="display:flex;"><span>POST: https://api.exolve.ru/number/v1/Buy
+</span></span></code></pre></div><h3 id="авторизация-5">
+  Авторизация
+</h3>
+<p>Передайте следующие Заголовки HTTP для успешной авторизации.</p>
+<table>
+<thead>
+<tr>
+<th>Имя</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Authorization</strong></td>
+<td style="text-align:center">string</td>
+<td><a href="/docs/ru/instructions/getting-api-key">API-ключ приложения</a> с <code>Bearer</code> перед ним. Пример: <code>Bearer e***s0</code>, где <code>e***s0</code> замените на API-ключ вашего приложения</td>
+</tr>
+</tbody>
+</table>
+<h3 id="входные-параметры-5">
+  Входные параметры
+</h3>
+<p>Передайте следующие параметры в теле запроса в JSON формате. Параметры, отмеченные жирным шрифтом, являются обязательными.</p>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>number_code</strong></td>
+<td style="text-align:center">uint64</td>
+<td>номер</td>
+</tr>
+<tr>
+<td><strong>reserve_uid</strong></td>
+<td style="text-align:center">uint32</td>
+<td>идентификатор забронированного номера (возвращаемое поле <code>id</code> после выполнения запроса <a href="/docs/ru/api-reference/numbering-api/locking-number">LockNumber</a>)</td>
+</tr>
+<tr>
+<td>call_transcribation</td>
+<td style="text-align:center">boolean</td>
+<td>текстовая расшифровка звонков. True — подключить, False — отключить</td>
+</tr>
+<tr>
+<td>speech_analytics</td>
+<td style="text-align:center">boolean</td>
+<td>речевая аналитика звонков. True — подключить, False — отключить</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p>На всех новых номерах автоматически подключена запись разговора. Отключить её можно на 31-й день с момента покупки в Личном кабинете или с помощью API-метода <a href="/docs/ru/api-reference/numbering-api/getting-number-attributes/">GetAttributes</a>. Изменение срока хранения записей доступно в настройках приложения в Личном кабинете.</p>
+<p>Речевая аналитика уже включает в себя текстовую расшифровку звонка, поэтому подключить одновременно и аналитику, и транскрибацию нельзя — выберите одну из услуг</p>
+<hr>
+<h3 id="выходные-параметры-5">
+  Выходные параметры
+</h3>
+<p>Пустой JSON с 200 OK статусом.</p>
+<h3 id="примеры-5">
+  Примеры
+</h3>
+<p>Входные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;number_code&#34;</span>: <span style="color:#ae81ff">74996480010</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;reserve_uid&#34;</span>: <span style="color:#ae81ff">1000993</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;call_transcribation&#34;</span>: <span style="color:#66d9ef">true</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Выходные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{}
+</span></span></code></pre></div><h3 id="возможные-ошибки-5">
+  Возможные ошибки
+</h3>
+<table>
+<thead>
+<tr>
+<th>Код</th>
+<th style="text-align:center">Статус</th>
+<th>Пример сообщения</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: syntax error (line 2:20): invalid value к</td>
+<td>значение в поле <code>number_code</code> невалидно</td>
+</tr>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: syntax error (line 2:20): unexpected token ,</td>
+<td>не задано значение в поле <code>number_code</code></td>
+</tr>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: (line 4:1): invalid value for uint32 type: }</td>
+<td>не задано значение в поле <code>reserved_uid</code></td>
+</tr>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: syntax error (line 3:20): invalid value к</td>
+<td>значение в поле <code>reserved_uid</code> невалидно</td>
+</tr>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: &ldquo;Error buying number: call transcribation and speech analytics cannot be enabled at the same time&rdquo;</td>
+<td>транскрибация и речевая аналитика не могут быть подключены одновременно</td>
+</tr>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>&ldquo;call transcribation must be enabled in the application settings&rdquo;</td>
+<td>услуги транскрибации не может быть подключена, т.к. в настройках приложения уже подключена речевая аналитика</td>
+</tr>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>&ldquo;&ldquo;speech analytics must be enabled in the application setting&rdquo;</td>
+<td>услуги речевой аналитики не может быть подключена, т.к. в настройках приложения уже подключена транскрибация</td>
+</tr>
+<tr>
+<td>401</td>
+<td style="text-align:center">Unauthorized</td>
+<td>malformed token</td>
+<td>не задан API-ключ</td>
+</tr>
+<tr>
+<td>401</td>
+<td style="text-align:center">Unauthorized</td>
+<td>unauthorized</td>
+<td>невалидный API-ключ</td>
+</tr>
+</tbody>
+</table>
+<h2 id="метод-delete">
+  Метод Delete
+</h2>
+<p>Примените метод Delete для удаления купленного номера.</p>
+<p><strong>Точка подключения</strong>:
+Выполните POST-запрос с входными параметрами к точке подключения:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-html" data-lang="html"><span style="display:flex;"><span>POST: https://api.exolve.ru/number/v1/Delete
+</span></span></code></pre></div><h3 id="авторизация-6">
+  Авторизация
+</h3>
+<p>Передайте следующие Заголовки HTTP для успешной авторизации.</p>
+<table>
+<thead>
+<tr>
+<th>Имя</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Authorization</strong></td>
+<td style="text-align:center">string</td>
+<td><a href="/docs/ru/instructions/getting-api-key">API-ключ приложения</a> с <code>Bearer</code> перед ним. Пример: <code>Bearer e***s0</code>, где <code>e***s0</code> замените на API-ключ вашего приложения</td>
+</tr>
+</tbody>
+</table>
+<h3 id="входные-параметры-6">
+  Входные параметры
+</h3>
+<p>Передайте следующие параметры в теле запроса в JSON-формате. Параметры, отмеченные жирным шрифтом, являются обязательными.</p>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>number_code</strong></td>
+<td style="text-align:center">uint64</td>
+<td>код номера</td>
+</tr>
+</tbody>
+</table>
+<h3 id="выходные-параметры-6">
+  Выходные параметры
+</h3>
+<p>Пустой JSON с 200 OK статусом.</p>
+<h3 id="примеры-6">
+  Примеры
+</h3>
+<p>Входные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;number_code&#34;</span>: <span style="color:#ae81ff">74951341115</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Выходные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{}
+</span></span></code></pre></div><h3 id="возможные-ошибки-6">
+  Возможные ошибки
+</h3>
+<table>
+<thead>
+<tr>
+<th>Код</th>
+<th style="text-align:center">Статус</th>
+<th>Пример сообщения</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: syntax error (line 2:20): invalid value п</td>
+<td>значение в поле <code>number_code</code> невалидно</td>
+</tr>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: (line 3:1): invalid value for uint64 type: }</td>
+<td>не задано значение в поле <code>number_code</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="метод-getinfo">
+  Метод GetInfo
+</h2>
+<p>Примените метод GetInfo для получения информации о купленном номере.</p>
+<p><strong>Точка подключения</strong>:
+Выполните POST-запрос с входными параметрами к точке подключения:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-html" data-lang="html"><span style="display:flex;"><span>POST: https://api.exolve.ru/number/customer/v1/GetInfo
+</span></span></code></pre></div><h3 id="авторизация-7">
+  Авторизация
+</h3>
+<p>Передайте следующие Заголовки HTTP для успешной авторизации.</p>
+<table>
+<thead>
+<tr>
+<th>Имя</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Authorization</strong></td>
+<td style="text-align:center">string</td>
+<td><a href="/docs/ru/instructions/getting-api-key">API-ключ приложения</a> с <code>Bearer</code> перед ним. Пример: <code>Bearer e***s0</code>, где <code>e***s0</code> замените на API-ключ вашего приложения</td>
+</tr>
+</tbody>
+</table>
+<h3 id="входные-параметры-7">
+  Входные параметры
+</h3>
+<p>Передайте следующие параметры в теле запроса в JSON формате. Параметры, отмеченные жирным шрифтом, являются обязательными.</p>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>number_code</strong></td>
+<td style="text-align:center">uint64</td>
+<td>купленный номер</td>
+</tr>
+</tbody>
+</table>
+<h3 id="выходные-параметры-7">
+  Выходные параметры
+</h3>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>number_name</td>
+<td style="text-align:center">string</td>
+<td>номер</td>
+</tr>
+<tr>
+<td>type_name</td>
+<td style="text-align:center">string</td>
+<td>тип номера</td>
+</tr>
+<tr>
+<td>region_name</td>
+<td style="text-align:center">string</td>
+<td>региона</td>
+</tr>
+<tr>
+<td>application_name</td>
+<td style="text-align:center">string</td>
+<td>название приложения, в котором куплен номер</td>
+</tr>
+<tr>
+<td>subscription_fee</td>
+<td style="text-align:center">float</td>
+<td>ежемесячная абонентская плата</td>
+</tr>
+<tr>
+<td>install_fee</td>
+<td style="text-align:center">float</td>
+<td>единоразовая плата за подключение</td>
+</tr>
+<tr>
+<td>create_date</td>
+<td style="text-align:center">string</td>
+<td>дата покупки номера в формате <a href="https://datatracker.ietf.org/doc/html/rfc3339">RFC-3339 / ISO-8601</a></td>
+</tr>
+<tr>
+<td>application_uuid</td>
+<td style="text-align:center">string</td>
+<td>идентификатор приложения</td>
+</tr>
+<tr>
+<td>category_name</td>
+<td style="text-align:center">string</td>
+<td>наименование категории</td>
+</tr>
+<tr>
+<td>number_options</td>
+<td style="text-align:center">array <a href="#numberoptions">NumberOptions</a></td>
+<td>возможности номера (звонки, SMS)</td>
+</tr>
+</tbody>
+</table>
+<h5 id="numberoptions-1">
+  NumberOptions
+</h5>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>incoming_calls</td>
+<td style="text-align:center">bool</td>
+<td>входящие звонки, <code>True</code> — доступно, <code>False</code> — доступно</td>
+</tr>
+<tr>
+<td>outgoing_calls</td>
+<td style="text-align:center">bool</td>
+<td>исходящие звонки, <code>True</code> — доступно, <code>False</code> — доступно</td>
+</tr>
+<tr>
+<td>incoming_sms</td>
+<td style="text-align:center">bool</td>
+<td>входящие SMS, <code>True</code> — доступно, <code>False</code> — доступно</td>
+</tr>
+<tr>
+<td>outgoing_sms</td>
+<td style="text-align:center">bool</td>
+<td>исходящие SMS, <code>True</code> — доступно, <code>False</code> — доступно</td>
+</tr>
+</tbody>
+</table>
+<h3 id="примеры-7">
+  Примеры
+</h3>
+<p>Входные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{  
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;number_code&#34;</span>: <span style="color:#ae81ff">79011550006</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Выходные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;number&#34;</span>: {
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;number_name&#34;</span>: <span style="color:#e6db74">&#34;79991234455&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;type_name&#34;</span>: <span style="color:#e6db74">&#34;DEF&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;region_name&#34;</span>: <span style="color:#e6db74">&#34;Moscow&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;application_name&#34;</span>: <span style="color:#e6db74">&#34;FLOWERSHOP24/7&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;subscription_fee&#34;</span>: <span style="color:#ae81ff">150</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;install_fee&#34;</span>: <span style="color:#ae81ff">590</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;create_date&#34;</span>: <span style="color:#e6db74">&#34;2025-06-11T07:50:31.807946Z&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;application_uuid&#34;</span>: <span style="color:#e6db74">&#34;c9c5031b-ad9b-4453-b6f8-bd5b14455790&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;category_name&#34;</span>: <span style="color:#e6db74">&#34;REGULAR&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;number_options&#34;</span>: {
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;incoming_calls&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;outgoing_calls&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;incoming_sms&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;outgoing_sms&#34;</span>: <span style="color:#66d9ef">true</span>
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h2 id="метод-setcallforwarding">
+  Метод SetCallForwarding
+</h2>
+<p>Примените метод SetCallForwarding для настройки переадресации входящих вызовов на номере.</p>
+<p><strong>Точка подключения</strong>:
+Выполните POST-запрос с входными параметрами к точке подключения:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-html" data-lang="html"><span style="display:flex;"><span>POST: https://api.exolve.ru/number/v1/SetCallForwarding
+</span></span></code></pre></div><h3 id="авторизация-8">
+  Авторизация
+</h3>
+<p>Передайте следующие Заголовки HTTP для успешной авторизации.</p>
+<table>
+<thead>
+<tr>
+<th>Имя</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Authorization</strong></td>
+<td style="text-align:center">string</td>
+<td><a href="/docs/ru/instructions/getting-api-key">API-ключ приложения</a> с <code>Bearer</code> перед ним. Пример: <code>Bearer e***s0</code>, где <code>e***s0</code> замените на API-ключ вашего приложения</td>
+</tr>
+</tbody>
+</table>
+<h3 id="входные-параметры-8">
+  Входные параметры
+</h3>
+<p>Передайте следующие параметры в теле запроса в JSON-формате. Параметры, отмеченные жирным шрифтом, являются обязательными.</p>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>number_code</strong></td>
+<td style="text-align:center">uint64</td>
+<td>номер МТС Exolve, на который устанавливается переадресация</td>
+</tr>
+<tr>
+<td><strong>call_forwarding_type</strong></td>
+<td style="text-align:center">enum <a href="#callforwardingtype">CallForwardingType</a></td>
+<td>тип переадресации</td>
+</tr>
+<tr>
+<td><strong>call_forwarding_data</strong></td>
+<td style="text-align:center">oneof <a href="#callforwardingdata">CallForwardingData</a></td>
+<td>настройка переадресации</td>
+</tr>
+</tbody>
+</table>
+<h4 id="callforwardingtype">
+  CallForwardingType
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td style="text-align:center">enum</td>
+<td>переадресация не определена</td>
+</tr>
+<tr>
+<td>1</td>
+<td style="text-align:center">enum</td>
+<td>переадресация на внешний SIP-аккаунт</td>
+</tr>
+<tr>
+<td>2</td>
+<td style="text-align:center">enum</td>
+<td>переадресация на номер или SIP ID платформы МТС Exolve</td>
+</tr>
+<tr>
+<td>3</td>
+<td style="text-align:center">enum</td>
+<td>динамическая переадресация по API (на URL)</td>
+</tr>
+<tr>
+<td>4</td>
+<td style="text-align:center">enum</td>
+<td>переадресация на SIP-транк (Static IP)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="callforwardingdata">
+  CallForwardingData
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>call_forwarding_sip</td>
+<td style="text-align:center"><a href="#callforwardingsip">CallForwardingSip</a></td>
+<td>данные для переадресации на внешний SIP-аккаунт</td>
+</tr>
+<tr>
+<td>call_forwarding_number</td>
+<td style="text-align:center"><a href="#callforwardingnumber">CallForwardingNumber</a></td>
+<td>данные для переадресации на номер или SIP ID</td>
+</tr>
+<tr>
+<td>call_forwarding_ipcr</td>
+<td style="text-align:center"><a href="#callforwardingipcr">CallForwardingIpcr</a></td>
+<td>данные для динамической переадресации по API (на URL)</td>
+</tr>
+<tr>
+<td>call_forwarding_static</td>
+<td style="text-align:center"><a href="#callforwardingstatic">CallForwardingStatic</a></td>
+<td>данные для переадресации на SIP-транк (Static IP)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="callforwardingsip">
+  CallForwardingSip
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>sip_uri</strong></td>
+<td style="text-align:center">string</td>
+<td>URI-адрес SIP-аккаунта формата: {имя пользователя}@{домен или IP}:{порт}</td>
+</tr>
+</tbody>
+</table>
+<h4 id="callforwardingnumber">
+  CallForwardingNumber
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>redirect_type</strong></td>
+<td style="text-align:center">enum <a href="#redirecttype">RedirectType</a></td>
+<td>тип переадресации</td>
+</tr>
+<tr>
+<td><strong>call_control</strong></td>
+<td style="text-align:center"><a href="#callcontrol">CallControl</a></td>
+<td>управление входящим вызовом</td>
+</tr>
+<tr>
+<td>event_url</td>
+<td style="text-align:center">string</td>
+<td>URL для отправки уведомлений о ходе звонка</td>
+</tr>
+<tr>
+<td>event_extended</td>
+<td style="text-align:center">boolean</td>
+<td><code>True</code> для получения расширенных уведомлений. <code>False</code> для получения стандартного набора уведомлений</td>
+</tr>
+<tr>
+<td>client_id</td>
+<td style="text-align:center">string</td>
+<td>сквозной идентификатор вызова от API клиента</td>
+</tr>
+<tr>
+<td>file_to_a</td>
+<td style="text-align:center">string</td>
+<td>аудиосообщение звонящему абоненту</td>
+</tr>
+<tr>
+<td>file_to_b</td>
+<td style="text-align:center">string</td>
+<td>аудиосообщение принимающему абоненту</td>
+</tr>
+<tr>
+<td>masking</td>
+<td style="text-align:center">boolean</td>
+<td><code>True</code> для скрытия номера звонящего абонента. <code>False</code> для показа оригинального номера звонящего абонента</td>
+</tr>
+<tr>
+<td>display_number</td>
+<td style="text-align:center">string</td>
+<td>номер, который показывается абоненту C (номер переадресации). Зависит от параметра <code>masking</code>. Если <code>masking</code> — <code>False</code>, принимающему вызов показывается реальный номер звонящего. Если <code>masking</code> — <code>True</code>, можно передать любой номер Exolve, принадлежащий этому приложению</td>
+</tr>
+</tbody>
+</table>
+<!-- raw HTML omitted -->
+<h4 id="redirecttype">
+  RedirectType
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td style="text-align:center">enum</td>
+<td>одиночная переадресация</td>
+</tr>
+<tr>
+<td>2</td>
+<td style="text-align:center">enum</td>
+<td>последовательная переадресация</td>
+</tr>
+<tr>
+<td>3</td>
+<td style="text-align:center">enum</td>
+<td>параллельная переадресация</td>
+</tr>
+</tbody>
+</table>
+<h4 id="callcontrol">
+  CallControl
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>redirect_number</td>
+<td style="text-align:center">string</td>
+<td>номер или юзернейм SIP ID для переадресации</td>
+</tr>
+<tr>
+<td>timeout</td>
+<td style="text-align:center">uint32</td>
+<td>время ожидания ответа в секундах</td>
+</tr>
+<tr>
+<td>active</td>
+<td style="text-align:center">boolean</td>
+<td><code>True</code> для переадресации вызова на <code>redirect_number</code>, <code>False</code> для сброса вызова</td>
+</tr>
+<tr>
+<td>name</td>
+<td style="text-align:center">string</td>
+<td>произвольное имя номера для переадресации вызова</td>
+</tr>
+<tr>
+<td>period</td>
+<td style="text-align:center">string <a href="#period">Period</a></td>
+<td>расписание активности для переадресации вызова; значение передаётся в виде перечисления (разделитель – пробел) или диапазона (вида «от» и «до» включительно, разделитель – пробел)</td>
+</tr>
+<tr>
+<td>period_description</td>
+<td style="text-align:center">string</td>
+<td>произвольное описание расписания активности для перенаправления вызова</td>
+</tr>
+</tbody>
+</table>
+<!-- raw HTML omitted -->
+<!-- raw HTML omitted -->
+<h4 id="period">
+  Period
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Значение</th>
+<th>Описание и допустимые значения</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>year</td>
+<td style="text-align:center">yr</td>
+<td>Год: 0-3000. <!-- raw HTML omitted --> Пример: yr {2024-2026}</td>
+</tr>
+<tr>
+<td>month</td>
+<td style="text-align:center">mo</td>
+<td>Месяц года: 1-12 <em>или</em> <!-- raw HTML omitted --> jan, feb, mar, apr, may, jun, jul, aug, sep, oct, nov, dec <em>или</em> <!-- raw HTML omitted --> Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec. <!-- raw HTML omitted -->Пример: mo {Jan-Apr} <em>или</em> mo {jan feb nov dec}</td>
+</tr>
+<tr>
+<td>week</td>
+<td style="text-align:center">wk</td>
+<td>Порядковая неделя в месяце: 1-6. <!-- raw HTML omitted --> Пример: wk {1 3 5} <em>или</em> wk {1-2}</td>
+</tr>
+<tr>
+<td>yday</td>
+<td style="text-align:center">yd</td>
+<td>Порядковый день года: 1-365. <!-- raw HTML omitted --> Пример: yd {1-100}</td>
+</tr>
+<tr>
+<td>mday </td>
+<td style="text-align:center">md </td>
+<td>День месяца: 1-31. <!-- raw HTML omitted --> Пример: md {1-5}</td>
+</tr>
+<tr>
+<td>wday </td>
+<td style="text-align:center">wd</td>
+<td>День в неделе: 1-7 <em>или</em> <!-- raw HTML omitted --> mo, tu, we, th, fr, sa, su или Mo, Tu, We, Th, Fr, Sa, Su <em>или</em> <!-- raw HTML omitted --> mon, tue, wed, thu, fri, sat, sun <em>или</em> <!-- raw HTML omitted --> Mon, Tue, Wed, Thu, Fri, Sat, Sun. <!-- raw HTML omitted --> Пример: wd {1 3 5 7} <em>или</em> wd {mo-fr}</td>
+</tr>
+<tr>
+<td>hour</td>
+<td style="text-align:center">hr</td>
+<td>Час: 0-23 <em>или</em> 12am 1am-11am 12pm(12noon) 1pm-11pm. <!-- raw HTML omitted --> Пример: hr {9am-4pm}</td>
+</tr>
+<tr>
+<td>minute</td>
+<td style="text-align:center">min</td>
+<td>Минута: 0-59. <!-- raw HTML omitted --> Пример: min {30-59}</td>
+</tr>
+<tr>
+<td>second</td>
+<td style="text-align:center">sec</td>
+<td>Секунда: 0-59. <!-- raw HTML omitted --> Пример: sec {1-5}</td>
+</tr>
+</tbody>
+</table>
+<h4 id="callforwardingipcr">
+  CallForwardingIpcr
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>url</strong></td>
+<td style="text-align:center">string</td>
+<td>URL-адрес для переадресации звонка</td>
+</tr>
+<tr>
+<td>reserve</td>
+<td style="text-align:center">string</td>
+<td>резервный номер для переадресации, если URL будет недоступен</td>
+</tr>
+</tbody>
+</table>
+<h4 id="callforwardingstatic">
+  CallForwardingStatic
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>static_ip</td>
+<td style="text-align:center">string</td>
+<td>IP адрес</td>
+</tr>
+<tr>
+<td>port</td>
+<td style="text-align:center">uint32</td>
+<td>порт</td>
+</tr>
+<tr>
+<td>timeout</td>
+<td style="text-align:center">uint32</td>
+<td>таймаут переадресации</td>
+</tr>
+<tr>
+<td>did</td>
+<td style="text-align:center">uint64</td>
+<td>DID номер</td>
+</tr>
+</tbody>
+</table>
+<h3 id="выходные-параметры-8">
+  Выходные параметры
+</h3>
+<p>Пустой JSON с 200 OK статусом.</p>
+<!-- raw HTML omitted -->
+<!-- raw HTML omitted -->
+<h3 id="примеры-8">
+  Примеры
+</h3>
+<p>Входные параметры для переадресации на внешний SIP-аккаунт:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;number_code&#34;</span>: <span style="color:#ae81ff">74991112233</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;call_forwarding_type&#34;</span>: <span style="color:#ae81ff">1</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;call_forwarding_sip&#34;</span>: {
+</span></span><span style="display:flex;"><span>       <span style="color:#f92672">&#34;sip_uri&#34;</span>: <span style="color:#e6db74">&#34;testsip06844538@testsip.test.ru&#34;</span>
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Входные параметры для переадресации на номер или SIP ID:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;number_code&#34;</span>: <span style="color:#ae81ff">74991112233</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;call_forwarding_type&#34;</span>: <span style="color:#ae81ff">2</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;call_forwarding_number&#34;</span>: {
+</span></span><span style="display:flex;"><span>       <span style="color:#f92672">&#34;redirect_type&#34;</span>: <span style="color:#ae81ff">1</span>,
+</span></span><span style="display:flex;"><span>       <span style="color:#f92672">&#34;call_control&#34;</span>:[
+</span></span><span style="display:flex;"><span>           {
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;timeout&#34;</span>: <span style="color:#e6db74">&#34;16&#34;</span>,
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;active&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;period&#34;</span>: <span style="color:#e6db74">&#34;wd {Mon-Fri} hr {6am-14pm}&#34;</span>,
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;period_description&#34;</span>: <span style="color:#e6db74">&#34;график будни&#34;</span>,
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;name&#34;</span>: <span style="color:#e6db74">&#34;звонит клиент&#34;</span>,
+</span></span><span style="display:flex;"><span>                <span style="color:#f92672">&#34;redirect_number&#34;</span>: <span style="color:#e6db74">&#34;74992223344&#34;</span> <span style="color:#75715e">// или 883140XXXXXXXXX (SIP ID)
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            }
+</span></span><span style="display:flex;"><span>       ],
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;event_url&#34;</span>: <span style="color:#e6db74">&#34;https://example.com/&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;event_extended&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;client_id&#34;</span>: <span style="color:#e6db74">&#34;test&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;file_to_a&#34;</span>: <span style="color:#e6db74">&#34;12345&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;file_to_b&#34;</span>: <span style="color:#e6db74">&#34;54321&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;masking&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;display_number&#34;</span>: <span style="color:#e6db74">&#34;74995556677&#34;</span>
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Входные параметры для динамической переадресации по API (на URL):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;number_code&#34;</span>: <span style="color:#ae81ff">74991112233</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;call_forwarding_type&#34;</span>: <span style="color:#ae81ff">3</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;call_forwarding_ipcr&#34;</span>: {
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;url&#34;</span>: <span style="color:#e6db74">&#34;https://example.com/&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;reserve&#34;</span>: <span style="color:#e6db74">&#34;74993334455&#34;</span>
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Входные параметры для переадресации на SIP-транк (Static IP):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;number_code&#34;</span>: <span style="color:#ae81ff">74991112233</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;call_forwarding_type&#34;</span>: <span style="color:#ae81ff">4</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;call_forwarding_static&#34;</span>: {
+</span></span><span style="display:flex;"><span>       <span style="color:#f92672">&#34;static_ip&#34;</span>: <span style="color:#e6db74">&#34;127.0.0.1&#34;</span>,
+</span></span><span style="display:flex;"><span>       <span style="color:#f92672">&#34;port&#34;</span>: <span style="color:#ae81ff">10</span>,
+</span></span><span style="display:flex;"><span>       <span style="color:#f92672">&#34;timeout&#34;</span>: <span style="color:#ae81ff">30</span>,
+</span></span><span style="display:flex;"><span>       <span style="color:#f92672">&#34;did&#34;</span>: <span style="color:#ae81ff">111</span>
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Выходные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{}
+</span></span></code></pre></div><h3 id="примечание-к-отправке-уведомлений-при-входящем-звонке">
+  Примечание к отправке уведомлений при входящем звонке
+</h3>
+<p>Вы можете настроить отправку уведомлений о ходе входящих звонков на URL-адрес вашего сервера двумя способами:</p>
+<ol>
+<li>
+<p>Установить URL для определённого номера, передав значение в поле <code>event_url</code> при выполнения метода SetCallForwarding.</p>
+</li>
+<li>
+<p>Установить URL в настройках приложения в блоке «Уведомления о событиях» в <a href="https://sso.exolve.ru/realms/Exolve/protocol/openid-connect/auth?client_id=exolve_web&amp;redirect_uri=https%3A%2F%2Fdev.exolve.ru&amp;response_mode=fragment&amp;response_type=code">Личном кабинете разработчика</a>. Установленный URL применяется ко всем номерам приложения.</p>
+</li>
+</ol>
+<p>При отправке уведомлений о ходе входящего звонка платформа МТС Exolve сначала проверяет, указан ли URL индивидуально на номере вызова. Если URL не указан на номере, проверяет, указан ли в приложении. Подробнее:</p>
+<ol>
+<li>Если URL указан и на номере, и в приложении, уведомления будут отправлены на URL из индивидуальных настроек номера.</li>
+<li>Если URL указан на номере, но пуст в приложении, уведомления будут отправлены на URL из индивидуальных настроек номера.</li>
+<li>Если URL не указан на номере, но указан в приложении, уведомления будут отправлены на URL из приложения</li>
+</ol>
+<h2 id="метод-deletecallforwarding">
+  Метод DeleteCallForwarding
+</h2>
+<p>Примените метод DeleteCallForwarding для удаления настроек переадресации входящих вызовов на номере.</p>
+<p><strong>Точка подключения</strong>:
+Выполните POST-запрос с входными параметрами к точке подключения:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-html" data-lang="html"><span style="display:flex;"><span>POST: https://api.exolve.ru/number/v1/DeleteCallForwarding
+</span></span></code></pre></div><h3 id="авторизация-9">
+  Авторизация
+</h3>
+<p>Передайте следующие Заголовки HTTP для успешной авторизации.</p>
+<table>
+<thead>
+<tr>
+<th>Имя</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Authorization</strong></td>
+<td style="text-align:center">string</td>
+<td><a href="/docs/ru/instructions/getting-api-key">API-ключ приложения</a> с <code>Bearer</code> перед ним. Пример: <code>Bearer e***s0</code>, где <code>e***s0</code> замените на API-ключ вашего приложения</td>
+</tr>
+</tbody>
+</table>
+<h3 id="входные-параметры-9">
+  Входные параметры
+</h3>
+<p>Передайте следующие параметры в теле запроса в JSON-формате. Параметры, отмеченные жирным шрифтом, являются обязательными.</p>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>number_code</strong></td>
+<td style="text-align:center">uint64</td>
+<td>код номера</td>
+</tr>
+</tbody>
+</table>
+<h3 id="выходные-параметры-9">
+  Выходные параметры
+</h3>
+<p>Пустой JSON с 200 OK статусом.</p>
+<h3 id="примеры-9">
+  Примеры
+</h3>
+<p>Входные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;number_code&#34;</span>: <span style="color:#ae81ff">74951341115</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Выходные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{}
+</span></span></code></pre></div><h3 id="возможные-ошибки-7">
+  Возможные ошибки
+</h3>
+<table>
+<thead>
+<tr>
+<th>Код</th>
+<th style="text-align:center">Статус</th>
+<th>Пример сообщения</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: syntax error (line 2:20): invalid value п</td>
+<td>значение в поле <code>number_code</code> невалидно</td>
+</tr>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: (line 3:1): invalid value for uint64 type: }</td>
+<td>не задано значение в поле <code>number_code</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="метод-getattributes">
+  Метод GetAttributes
+</h2>
+<p>Примените метод GetAttributes для получения информации о настройках купленного номера (переадресация входящих звонков, запись разговоров).</p>
+<p><strong>Точка подключения</strong>:
+Выполните POST-запрос с входными параметрами к точке подключения:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-html" data-lang="html"><span style="display:flex;"><span>POST: https://api.exolve.ru/number/v1/GetAttributes
+</span></span></code></pre></div><h3 id="авторизация-10">
+  Авторизация
+</h3>
+<p>Передайте следующие заголовки HTTP для успешной авторизации.</p>
+<table>
+<thead>
+<tr>
+<th>Имя</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Authorization</strong></td>
+<td style="text-align:center">string</td>
+<td><a href="/docs/ru/instructions/getting-api-key">API-ключ приложения</a> с <code>Bearer</code> перед ним. Пример: <code>Bearer e***s0</code>, где <code>e***s0</code> замените на API-ключ вашего приложения</td>
+</tr>
+</tbody>
+</table>
+<h3 id="входные-параметры-10">
+  Входные параметры
+</h3>
+<p>Передайте следующие параметры в теле запроса в JSON-формате. Параметры, отмеченные жирным шрифтом, являются обязательными.</p>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>number_code</strong></td>
+<td style="text-align:center">uint64</td>
+<td>код номера</td>
+</tr>
+</tbody>
+</table>
+<h3 id="выходные-параметры-10">
+  Выходные параметры
+</h3>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>number_resource_id</td>
+<td style="text-align:center">uint64</td>
+<td>код номера</td>
+</tr>
+<tr>
+<td>status_name</td>
+<td style="text-align:center">string</td>
+<td>статус номера</td>
+</tr>
+<tr>
+<td>attributes</td>
+<td style="text-align:center"><a href="#numberattributes">NumberAttributes</a></td>
+<td>атрибуты номера, информация о настройке</td>
+</tr>
+</tbody>
+</table>
+<h4 id="numberattributes">
+  NumberAttributes
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>call_record</td>
+<td style="text-align:center">boolean</td>
+<td>запись звонков. <code>True</code> — подключено, <code>False</code> — отключено</td>
+</tr>
+<tr>
+<td>call_forwarding_type</td>
+<td style="text-align:center">enum <a href="#forwardingtype">ForwardingType</a></td>
+<td>тип переадресации входящих звонков</td>
+</tr>
+<tr>
+<td>call_forwarding_sip</td>
+<td style="text-align:center">enum <a href="#forwardingsip">ForwardingSip</a></td>
+<td>внешний SIP ID, на который переадресуются входящие звонки</td>
+</tr>
+<tr>
+<td>call_forwarding_number</td>
+<td style="text-align:center">enum <a href="#forwardingnumber">ForwardingNumber</a></td>
+<td>настройки номера или SIP ID, на который переадресуются входящие звонки</td>
+</tr>
+<tr>
+<td>call_forwarding_ipcr</td>
+<td style="text-align:center">enum <a href="#forwardingipcr">ForwardingIpcr</a></td>
+<td>URL, на который переадресуются входящие звонки</td>
+</tr>
+<tr>
+<td>call_transcribation</td>
+<td style="text-align:center">boolean</td>
+<td>текстовая расшифровка звонков. <code>True</code> — подключено, <code>False</code> — отключено</td>
+</tr>
+<tr>
+<td>incoming_sms_enabled</td>
+<td style="text-align:center">boolean</td>
+<td>получение входящих SMS. <code>True</code> — подключено, <code>False</code> — отключено</td>
+</tr>
+<tr>
+<td>speech_analytics</td>
+<td style="text-align:center">boolean</td>
+<td>речевая аналитика звонков. <code>True</code> — подключено, <code>False</code> — отключено</td>
+</tr>
+<tr>
+<td>amd</td>
+<td style="text-align:center">boolean</td>
+<td>детектирование автоинформаторов. <code>True</code> — подключено, <code>False</code> — отключено</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p>На всех новых номерах автоматически подключена запись разговора. Отключить её можно на 31-й день с момента покупки. Изменение срока хранения записей доступно в настройках приложения в Личном кабинете.</p>
+<p>Речевая аналитика уже включает в себя текстовую расшифровку звонка, поэтому подключить одновременно и аналитику, и транскрибацию нельзя — выберите одну из услуг</p>
+<hr>
+<h4 id="forwardingtype">
+  ForwardingType
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td style="text-align:center">string</td>
+<td>тип переадресации не определён</td>
+</tr>
+<tr>
+<td>1</td>
+<td style="text-align:center">string</td>
+<td>переадресация на внешний SIP-аккаунт</td>
+</tr>
+<tr>
+<td>2</td>
+<td style="text-align:center">string</td>
+<td>переадресация на номер или SIP ID платформы</td>
+</tr>
+<tr>
+<td>3</td>
+<td style="text-align:center">string</td>
+<td>динамическая переадресация по API</td>
+</tr>
+<tr>
+<td>4</td>
+<td style="text-align:center">string</td>
+<td>переадресация на Static IP</td>
+</tr>
+</tbody>
+</table>
+<h4 id="forwardingnumber">
+  ForwardingNumber
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>redirect_type</td>
+<td style="text-align:center">int64</td>
+<td>тип переадресации: 1 - одиночная, 2 - последовательная, 3 - параллельная</td>
+</tr>
+<tr>
+<td>call_control</td>
+<td style="text-align:center"><a href="#callcontrol">CallControl</a></td>
+<td>управление входящим вызовом</td>
+</tr>
+<tr>
+<td>event_url</td>
+<td style="text-align:center">string</td>
+<td>URL для отправки уведомлений о ходе звонка</td>
+</tr>
+<tr>
+<td>event_extended</td>
+<td style="text-align:center">boolean</td>
+<td><code>True</code> для получения расширенных уведомлений. <code>False</code> для получения стандартного набора уведомлений</td>
+</tr>
+<tr>
+<td>file_to_a</td>
+<td style="text-align:center">string</td>
+<td>аудиосообщение звонящему абоненту</td>
+</tr>
+<tr>
+<td>file_to_b</td>
+<td style="text-align:center">string</td>
+<td>аудиосообщение принимающему абоненту</td>
+</tr>
+<tr>
+<td>answer</td>
+<td style="text-align:center">boolean</td>
+<td><code>True</code> для проигрывания аудиосообщения в предответном состоянии. <code>False</code> для проигрывания аудиосообщения в ответном состоянии (<code>False</code> по умолчанию)</td>
+</tr>
+<tr>
+<td>masking</td>
+<td style="text-align:center">boolean</td>
+<td><code>True</code> для скрытия номер звонящего абонента. <code>False</code> для показа оригинального номера звонящего абонента</td>
+</tr>
+<tr>
+<td>display_number</td>
+<td style="text-align:center">string</td>
+<td>номер Exolve, который видит звонящий абоненту при вызове</td>
+</tr>
+</tbody>
+</table>
+<h4 id="callcontrol-1">
+  CallControl
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>period</td>
+<td style="text-align:center">string</td>
+<td>период переадресации входящего вызова</td>
+</tr>
+<tr>
+<td>period_description</td>
+<td style="text-align:center">string</td>
+<td>описание периода переадресации вызова</td>
+</tr>
+<tr>
+<td>timeout</td>
+<td style="text-align:center">uint32</td>
+<td>время ожидания ответа в секундах</td>
+</tr>
+<tr>
+<td>active</td>
+<td style="text-align:center">boolean</td>
+<td><code>True</code> для переадресации вызова на <code>redirect_number</code>, <code>False</code> для сброса вызова</td>
+</tr>
+<tr>
+<td>name</td>
+<td style="text-align:center">string</td>
+<td>символьное имя номера для переадресации вызова</td>
+</tr>
+<tr>
+<td>redirect_number</td>
+<td style="text-align:center">string</td>
+<td>номер для переадресации</td>
+</tr>
+<tr>
+<td>dtmf</td>
+<td style="text-align:center">string</td>
+<td>добавочный номер</td>
+</tr>
+</tbody>
+</table>
+<h4 id="forwardingipcr">
+  ForwardingIpcr
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>url</td>
+<td style="text-align:center">string</td>
+<td>URL, на который происходит переадресация</td>
+</tr>
+<tr>
+<td>reserve</td>
+<td style="text-align:center">string</td>
+<td>номер, на который происходит переадресация, если URL не доступен</td>
+</tr>
+</tbody>
+</table>
+<h4 id="forwardingsip">
+  ForwardingSip
+</h4>
+<table>
+<thead>
+<tr>
+<th>Параметр</th>
+<th style="text-align:center">Тип</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>sip_uri</td>
+<td style="text-align:center">string</td>
+<td>URI SIP-аккаунта, на который переадресуются входящие звонки</td>
+</tr>
+</tbody>
+</table>
+<!-- raw HTML omitted -->
+<!-- raw HTML omitted -->
+<h3 id="примеры-10">
+  Примеры
+</h3>
+<p>Входные параметры:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;number_code&#34;</span>: <span style="color:#ae81ff">74996487174</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Выходные параметры для номера с переадресацией на номер:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;number_resource_id&#34;</span>: <span style="color:#e6db74">&#34;94004&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;status_name&#34;</span>: <span style="color:#e6db74">&#34;Active&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;attributes&#34;</span>: {
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;call_record&#34;</span>: <span style="color:#66d9ef">false</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;call_forwarding_type&#34;</span>: <span style="color:#ae81ff">2</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;call_forwarding_number&#34;</span>: {
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;redirect_type&#34;</span>: <span style="color:#ae81ff">1</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;call_control&#34;</span>:[
+</span></span><span style="display:flex;"><span>                {
+</span></span><span style="display:flex;"><span>                    <span style="color:#f92672">&#34;timeout&#34;</span>: <span style="color:#e6db74">&#34;16&#34;</span>,
+</span></span><span style="display:flex;"><span>                    <span style="color:#f92672">&#34;active&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>                    <span style="color:#f92672">&#34;name&#34;</span>: <span style="color:#e6db74">&#34;звонит клиент&#34;</span>,
+</span></span><span style="display:flex;"><span>                    <span style="color:#f92672">&#34;redirect_number&#34;</span>: <span style="color:#e6db74">&#34;74996480184&#34;</span>,
+</span></span><span style="display:flex;"><span>                    <span style="color:#f92672">&#34;dtmf&#34;</span>: <span style="color:#e6db74">&#34;8&#34;</span>
+</span></span><span style="display:flex;"><span>                }
+</span></span><span style="display:flex;"><span>            ],
+</span></span><span style="display:flex;"><span>           <span style="color:#f92672">&#34;event_url&#34;</span>: <span style="color:#e6db74">&#34;https://example.com/&#34;</span>,
+</span></span><span style="display:flex;"><span>           <span style="color:#f92672">&#34;event_extended&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>           <span style="color:#f92672">&#34;file_to_a&#34;</span>: <span style="color:#e6db74">&#34;12345&#34;</span>,
+</span></span><span style="display:flex;"><span>           <span style="color:#f92672">&#34;file_to_b&#34;</span>: <span style="color:#e6db74">&#34;54321&#34;</span>,
+</span></span><span style="display:flex;"><span>           <span style="color:#f92672">&#34;answer&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>           <span style="color:#f92672">&#34;masking&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>           <span style="color:#f92672">&#34;display_number&#34;</span>: <span style="color:#e6db74">&#34;74995557890&#34;</span>
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Входные параметры для динамической переадресации по API:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;number_resource_id&#34;</span>: <span style="color:#e6db74">&#34;51802&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;status_name&#34;</span>: <span style="color:#e6db74">&#34;&#34;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;attributes&#34;</span>: {
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;call_record&#34;</span>: <span style="color:#66d9ef">true</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;call_forwarding_type&#34;</span>: <span style="color:#ae81ff">3</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&#34;call_forwarding_ipcr&#34;</span>: {
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;url&#34;</span>: <span style="color:#e6db74">&#34;http://example.com&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">&#34;reserve&#34;</span>: <span style="color:#e6db74">&#34;74996482846&#34;</span>
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h3 id="возможные-ошибки-8">
+  Возможные ошибки
+</h3>
+<table>
+<thead>
+<tr>
+<th>Код</th>
+<th style="text-align:center">Статус</th>
+<th>Пример сообщения</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: syntax error (line 2:20): invalid value п</td>
+<td>значение в поле <code>number_code</code> не валидно</td>
+</tr>
+<tr>
+<td>400</td>
+<td style="text-align:center">Bad Request</td>
+<td>proto: (line 3:1): invalid value for uint64 type: }</td>
+<td>не задано значение в поле <code>number_code</code></td>
+</tr>
+</tbody>
+</table>
+<h4 id="решения-где-используется-numbering-api-1">
+  Решения, где используется Numbering API
+</h4>
+<div class="api-images">
+    <figure>
+        <a href="https://exolve.ru/solutions/it-services/">
+        <img class="api-image" src="/api-images/it-services.png">
+        </a>
+        <figcaption><a href="https://exolve.ru/solutions/it-services/"><h4>Решения для IT-сервисов</h4></a>
+        </figcaption>
+    </figure>
+    <figure>
+        <a href="https://exolve.ru/solutions/ecommerce-retail/">
+        <img class="api-image" src="/api-images/e-commerce.png">
+        </a>
+        <figcaption><a href="https://exolve.ru/solutions/ecommerce-retail/"><h4>Все решения для e‑commerce и ретейла</h4></a>
+        </figcaption>
+    </figure>
+    <figure>
+        <a href="https://exolve.ru/solutions/delivery-services/">
+        <img class="api-image" src="/api-images/delivery.png">
+        </a>
+        <figcaption><a href="https://exolve.ru/solutions/delivery-services/"><h4>Решения для служб доставки</h4></a>
+        </figcaption>
+    </figure>
+</div>
+
+<style>
+    div.api-images {
+        display: grid;
+        grid-template-columns: repeat(3,1fr);
+        grid-column-gap: var(--column-gap)
+    }
+
+    .api-image {
+        max-height: 151.25px;
+    }
+</style>
+
+
+
+
+
+
+<p><a href="https://sso.exolve.ru/realms/Exolve/protocol/openid-connect/auth?client_id=exolve_web&amp;redirect_uri=https%3A%2F%2Fdev.exolve.ru&amp;response_mode=fragment&amp;response_type=code">Попробовать бесплатно</a></p>
+</div>
+        </div>
+
+        <aside class="layout__sidebar">
+            <div class="document-menu book-menu">
+                <div class="document-menu__head">
+                    <p class="document-menu__title">
+                        Навигация по документации
+                    </p>
+                    <button
+                        class="base-button base-button--dark base-button--sm document-menu__btn"
+                        type="button"
+                    >
+                        <span>Открыть</span>
+                    </button>
+                </div>
+                <div class="document-menu__wrap">
+  <nav>
+   
+
+
+
+  
+
+
+
+  
+  <ul>
+    
+      
+        <li class="book-section-flat" >
+          
+  
+  
+
+  
+    <a href="/docs/ru/" class="">Документация</a>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/quick-start/" class="">C чего начать?</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-d79bbfb4911263743071c0bb600435d5" class="toggle"  />
+    <label for="section-d79bbfb4911263743071c0bb600435d5" class="flex justify-between">
+      <a href="/docs/ru/instructions/" class="">API-инструкции</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/getting-api-key/" class="">Как получить API-ключ приложения</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/creating-app/" class="">Как создать приложение</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/buying-number/" class="">Как купить номер</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/call-forwarding/" class="">Как настроить переадресацию входящих вызовов</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/call-forwarding-to-url/" class="">Как настроить динамическую переадресацию входящих вызовов по API (на URL)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/making-callback/" class="">Как совершить обратный звонок (callback)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/making-voice-message/" class="">Как отправить голосовое SMS (автообзвон)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/making-carousel-call/" class="">Как использовать карусель номеров</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/events/" class="">Как получать уведомления о событиях</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/how-to-use-number-lookup/" class="">Как проверить номерную базу</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/sending-sms/" class="">Как отправить SMS</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/running-sms-campaign/" class="">Как отправить массовую SMS-рассылку</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/smart-sending-sms/" class="">Как отправлять SMS только на активные номера</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-bb4ebd598eb707f190304ac995617050" class="toggle"  />
+    <label for="section-bb4ebd598eb707f190304ac995617050" class="flex justify-between">
+      <a href="/docs/ru/integration-instructions/" class="">Инструкции по интеграциям</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/integration-instructions/connecting-crm-to-send-campaign/" class="">Как настроить интеграцию с CRM</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/integration-instructions/sending-campaign-via-amocrm/" class="">Как отправить SMS из amoCRM</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/integration-instructions/sending-campaign-via-bitrix/" class="">Как отправить SMS из Битрикс24</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/integration-instructions/connecting-speech-analytics-via-bitrix/" class="">Как подключить транскрибацию и речевую аналитику в Битрикс24</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-00df68ff861d7d0588c75f02fc37cd15" class="toggle"  />
+    <label for="section-00df68ff861d7d0588c75f02fc37cd15" class="flex justify-between">
+      <a href="/docs/ru/sdk-instructions/" class="">SDK-инструкции</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/sdk-instructions/setting-up-mobile-sdk/" class="">Как настроить Mobile SDK</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/sdk-instructions/setting-up-web-sdk/" class="">Как настроить Web SDK</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/sdk-instructions/connecting-mobile-sdk-demo/" class="">Как подключить Exolve Voice Demo</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-3aaabacb08ce6a1eab0ff4080ad925c0" class="toggle" checked />
+    <label for="section-3aaabacb08ce6a1eab0ff4080ad925c0" class="flex justify-between">
+      <a href="/docs/ru/api-reference/" class="">API Reference</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-0d1eb39b84cc786aa4ead60ae71d32ee" class="toggle"  />
+    <label for="section-0d1eb39b84cc786aa4ead60ae71d32ee" class="flex justify-between">
+      <a href="/docs/ru/api-reference/blacklist-api/" class="">Blacklist API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/blacklist-api/adding-to-blacklist/" class="">Add</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/blacklist-api/checking-blacklist/" class="">Check</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/blacklist-api/getting-blacklist/" class="">GetList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/blacklist-api/deleting-from-blacklist/" class="">Delete</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/blacklist-api/deleting-all-from-blacklist/" class="">DeleteAll</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/blacklist-api/setting-prompt/" class="">SetPrompt</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/blacklist-api/getting-prompt/" class="">GetPrompt</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/blacklist-api/deleting-prompt/" class="">DeletePrompt</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-ab07dc304885b1e1d180ef2957ca36a0" class="toggle"  />
+    <label for="section-ab07dc304885b1e1d180ef2957ca36a0" class="flex justify-between">
+      <a href="/docs/ru/api-reference/branded-call-api/" class="">Branded Call API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/branded-call-api/getting-info/" class="">GetInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/branded-call-api/getting-list/" class="">GetList</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-a5de1e1209c9f083e666202ccfceac59" class="toggle"  />
+    <label for="section-a5de1e1209c9f083e666202ccfceac59" class="flex justify-between">
+      <a href="/docs/ru/api-reference/callback-api/" class="">Callback API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/callback-api/creating-callback/" class="">Create</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/callback-api/getting-callback-list/" class="">GetList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/callback-api/getting-callback-info/" class="">GetInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/callback-api/deleting-callback/" class="">Delete</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/callback-api/updating-callback/" class="">Update</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/callback-api/making-callback/" class="">MakeCallBack</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-f13f72614f2e81a81dad7993a09c1a59" class="toggle"  />
+    <label for="section-f13f72614f2e81a81dad7993a09c1a59" class="flex justify-between">
+      <a href="/docs/ru/api-reference/call-record-api/" class="">Call Record API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/call-record-api/setting-call-record/" class="">SetCallRecordState (номер)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/call-record-api/setting-call-record-sip/" class="">SetCallRecordState (SIP ID)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/call-record-api/getting-info-call-record/" class="">GetInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/call-record-api/downloading-record/" class="">Download</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-14f0bde67f5840732ac54d15a4eeed46" class="toggle"  />
+    <label for="section-14f0bde67f5840732ac54d15a4eeed46" class="flex justify-between">
+      <a href="/docs/ru/api-reference/call-transcribation-api/" class="">Call Transcribation API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/call-transcribation-api/setting-transcribation-state/" class="">SetCallTranscribationState</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/call-transcribation-api/getting-transcribation/" class="">GetTranscribation</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/call-transcribation-api/getting-transcribations-list/" class="">GetTranscribationsList</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-3d207fb5a0ecbaea89c4e269f6dd9b46" class="toggle"  />
+    <label for="section-3d207fb5a0ecbaea89c4e269f6dd9b46" class="flex justify-between">
+      <a href="/docs/ru/api-reference/campaign-api/" class="">Campaign API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/creating-campaign/" class="">Create</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/getting-list/" class="">GetList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/getting-info/" class="">GetInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/updating-campaign/" class="">Update</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/getting-history/" class="">GetHistory</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/downloading-file-template/" class="">DownloadFileTemplate</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/uploading-contact-file/" class="">UploadContactFile</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/getting-file-info/" class="">GetFileInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/downloading-file-error/" class="">DownloadFileError</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/deleting-file/" class="">DeleteFile</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/creating-call-list-from-file/" class="">CreateCallListFromFile</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/getting-call-list/" class="">GetCallList</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-aa2387845612daecea9e6f2db43feff5" class="toggle"  />
+    <label for="section-aa2387845612daecea9e6f2db43feff5" class="flex justify-between">
+      <a href="/docs/ru/api-reference/carousel-api/" class="">Carousel API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/carousel-api/creating-carousel/" class="">Create</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/carousel-api/updating-carousel/" class="">Update</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/carousel-api/deleting-carousel/" class="">Delete</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/carousel-api/getting-carousel-info/" class="">GetInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/carousel-api/getting-carousel-list/" class="">GetList</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-b7ef1773a6f653796d95ef185672a7ce" class="toggle"  />
+    <label for="section-b7ef1773a6f653796d95ef185672a7ce" class="flex justify-between">
+      <a href="/docs/ru/api-reference/finance-api/" class="">Finance API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/finance-api/getting-balance/" class="">GetBalance</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-8981fa6d326e858499d4632bedb77e86" class="toggle"  />
+    <label for="section-8981fa6d326e858499d4632bedb77e86" class="flex justify-between">
+      <a href="/docs/ru/api-reference/media-api/" class="">Media API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/media-api/uploading-audio/" class="">Upload</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/media-api/getting-list/" class="">GetList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/media-api/synthesizing/" class="">Synthesize</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/media-api/synthesizing-and-saving/" class="">SynthesizeAndSave</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/media-api/getting-info/" class="">GetInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/media-api/downloading-audio/" class="">Download</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/media-api/updating-audio/" class="">Update</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/media-api/deleting-audio/" class="">Delete</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-ce49876a727f125be093c000d188db0e" class="toggle" checked />
+    <label for="section-ce49876a727f125be093c000d188db0e" class="flex justify-between">
+      <a href="/docs/ru/api-reference/numbering-api/" class="active">Numbering API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/reference/" class="">GetList (справочник)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/getting-free-numbers/" class="">GetFree</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/locking-number/" class="">Lock</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/unlocking-number/" class="">Unlock</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/buying-number/" class="">Buy</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/deleting-number/" class="">Delete</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/purchased-number/" class="">GetInfo (купленный номер)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/getting-number-attributes/" class="">GetAttributes</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/getting-purchsed-numbers/" class="">GetList (купленные номера)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/call-forwarding/" class="">SetCallForwarding</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/deleting-call-forwarding/" class="">DeleteCallForwarding</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/setting-amd-state/" class="">SetAmdState</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-5d076c851d703cac73af1bacfb419b06" class="toggle"  />
+    <label for="section-5d076c851d703cac73af1bacfb419b06" class="flex justify-between">
+      <a href="/docs/ru/api-reference/hlr-api/" class="">Number Lookup API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/generating-activity-score-report/" class="">GenerateActivityScoreReport</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/generating-best-call-time-report/" class="">GenerateBestCallTimeReport</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/getting-activity-score/" class="">GetActivityScore</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/getting-sim-status/" class="">GetSimStatus</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/getting-best-call-time/" class="">GetBestCallTime</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/getting-best-sms-time/" class="">GetBestSmsTime</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/getting-hlr-list-report/" class="">GetHLRListReport</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/getting-last-date-activity/" class="">GetLastDateActivity</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/getting-base-number-info/" class="">GetBaseNumberInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/getting-hlr-report/" class="">GetHLRReport</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-f27681d04e737a620a3be00e3a74ce56" class="toggle"  />
+    <label for="section-f27681d04e737a620a3be00e3a74ce56" class="flex justify-between">
+      <a href="/docs/ru/api-reference/push-api/" class="">Push API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/push-api/adding-sip-device-push-token/" class="">AddSipDevicePushToken</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/push-api/getting-device-list/" class="">GetDeviceList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/push-api/deleting-sip-device-push-token/" class="">DeleteSipDevicePushToken</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-95daa59146e1321845af72a91ad1572a" class="toggle"  />
+    <label for="section-95daa59146e1321845af72a91ad1572a" class="flex justify-between">
+      <a href="/docs/ru/api-reference/sip-api/" class="">SIP API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sip-api/creating-sip/" class="">Create</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sip-api/deleting-sip/" class="">Delete</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sip-api/getting-sip-fees/" class="">GetFees</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sip-api/getting-sip-attributes/" class="">GetAttributes</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sip-api/getting-sip-list/" class="">GetSIPList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sip-api/setting-display-number/" class="">SetDisplayNumber</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sip-api/changing-password/" class="">ChangePassword</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-db9e58b4b35af74a6629a052a8c47271" class="toggle"  />
+    <label for="section-db9e58b4b35af74a6629a052a8c47271" class="flex justify-between">
+      <a href="/docs/ru/api-reference/sms-api/" class="">SMS API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/sending-sms/" class="">SendSMS</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/sending-message/" class="">SendMessage</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/getting-messages-count/" class="">GetCount</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/getting-messages-list/" class="">GetList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/sms-events/" class="">SMS Events</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/getting-alpha-names/" class="">GetAlphaNames</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/checking-templates/" class="">CheckTemplate</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/creating-template/" class="">CreateTemplate</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/getting-template/" class="">GetTemplate</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/getting-templates/" class="">GetTemplates</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-0eb3c8e6105d8acbc5aa846d17017507" class="toggle"  />
+    <label for="section-0eb3c8e6105d8acbc5aa846d17017507" class="flex justify-between">
+      <a href="/docs/ru/api-reference/sms-smpp/" class="">SMS SMPP</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-smpp/glossary/" class="">Глоссарий</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-smpp/connection-parameters/" class="">Параметры подключения</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-smpp/connection/" class="">Подключение</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-smpp/sending-sms/" class="">Отправка сообщений</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-smpp/sending-requirements/" class="">Требования к отправке сообщения</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-6f4564681ba9ecb9e42535ac75aee58e" class="toggle"  />
+    <label for="section-6f4564681ba9ecb9e42535ac75aee58e" class="flex justify-between">
+      <a href="/docs/ru/api-reference/speech-analytics-api/" class="">Speech Analytics API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/speech-analytics-api/setting-speech-analytics-state/" class="">SetSpeechAnalyticsState</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/speech-analytics-api/getting-speech-analytic/" class="">GetSpeechAnalytic</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/speech-analytics-api/getting-speech-analytics-list/" class="">GetSpeechAnalyticsList</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-1ea8614cdb8f97aece574d04d5471f3e" class="toggle"  />
+    <label for="section-1ea8614cdb8f97aece574d04d5471f3e" class="flex justify-between">
+      <a href="/docs/ru/api-reference/static-api/" class="">Static API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/static-api/creating-static-ip/" class="">Create</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/static-api/getting-attributes-static-ip/" class="">GetAttributes</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/static-api/getting-static-list/" class="">GetStaticList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/static-api/updating-static-ip/" class="">Update</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/static-api/deleting-static-ip/" class="">Delete</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-f2582860c66d67fa527475955e9d257f" class="toggle"  />
+    <label for="section-f2582860c66d67fa527475955e9d257f" class="flex justify-between">
+      <a href="/docs/ru/api-reference/statistics-api/" class="">Statistics API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/call-history/" class="">GetList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/getting-call-info/" class="">GetInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/call-events/" class="">Inbound Call Events (URL, номер, SIP ID)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/sip-events/" class="">Outbound Call Events (SIP ID)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/callback-events/" class="">Callback Call Events</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/getting-hlr-list-activity-score/" class="">GetHLRListActivityScore</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/getting-hlr-list-aggregation/" class="">GetHLRListAggregation</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/getting-hlr-list-base-number-info/" class="">GetHLRListBaseNumberInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/getting-hlr-list-best-call-time/" class="">GetHLRListBestCallTime</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/getting-hlr-list-best-sms-time/" class="">GetHLRListBestSmsTime</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-9c9481cc74a2b5293eba609449f66e7a" class="toggle"  />
+    <label for="section-9c9481cc74a2b5293eba609449f66e7a" class="flex justify-between">
+      <a href="/docs/ru/api-reference/voice-api/" class="">Voice API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/voice-api/creating-voice-message/" class="">Create</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/voice-api/updating-voice-message/" class="">Update</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/voice-api/deleting-voice-message/" class="">Delete</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/voice-api/getting-voice-message-info/" class="">GetInfo (голосовое SMS)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/voice-api/making-voice-message/" class="">MakeVoiceMessage</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/voice-api/getting-voice-message-list/" class="">GetList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/voice-api/getting-info/" class="">GetInfo (статистика отправленного SMS)</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-d4b901d68175dea9df83ccb4a5ac76b1" class="toggle"  />
+    <label for="section-d4b901d68175dea9df83ccb4a5ac76b1" class="flex justify-between">
+      <a href="/docs/ru/mobile-sdk/" class="">Mobile SDK</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-929e06fe0791eebd632a65d429c2f2b1" class="toggle"  />
+    <label for="section-929e06fe0791eebd632a65d429c2f2b1" class="flex justify-between">
+      <a href="/docs/ru/mobile-sdk/android/" class="">Android</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/audio-route-data/" class="">AudioRouteData</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/audio-route-listener/" class="">IAudioRouteListener</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/call-client/" class="">CallClient</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/call-location-consumer/" class="">Call</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/call/" class="">Call</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/call-location-requester/" class="">ICallLocationRequester</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/calls-listener/" class="">ICallsListener</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/communicator/" class="">Communicator</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/configuration-builder/" class="">Configuration.Builder</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/configuration-manager/" class="">ConfigurationManager</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/configuration/" class="">Configuration</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/contact-name-resolver/" class="">ContactNameResolver</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/contact-resolver/" class="">ContactResolver</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/log-configuration-builder/" class="">LogConfiguration.Builder</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/log-configuration/" class="">LogConfiguration</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/notification-configuration-builder/" class="">NotificationConfiguration.Builder</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/notification-configuration/" class="">NotificationConfiguration</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/registration-listener/" class="">IRegistrationListener</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-dc580b2947b61631fa863060c84f1524" class="toggle"  />
+    <label for="section-dc580b2947b61631fa863060c84f1524" class="flex justify-between">
+      <a href="/docs/ru/mobile-sdk/ios/" class="">iOS</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/call/" class="">Call</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/call-client/" class="">CallClient</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/call-location-requester-delegate/" class="">CallLocationRequesterDelegate</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/registration-delegate/" class="">RegistrationDelegate</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/calls-delegate/" class="">CallsDelegate</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/communicator/" class="">Communicator</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/configuration/" class="">Configuration</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/configuration-manager/" class="">ConfigurationManager</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/log-configuration/" class="">LogConfiguration</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/callkit-configuration/" class="">CallKitConfiguration</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/flutter/" class="">Flutter</a>
+  
+
+          
+  <ul>
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/react-native/" class="">React Native</a>
+  
+
+          
+  <ul>
+    
+  </ul>
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/web-sdk/" class="">WebSDK</a>
+  
+
+          
+  <ul>
+    
+  </ul>
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+  </ul>
+
+
+
+
+
+
+  
+
+
+
+ 
+</nav>
+<a
+  href="https://sso.exolve.ru/realms/Exolve/protocol/openid-connect/auth?client_id=exolve_web&redirect_uri=https%3A%2F%2Fdev.exolve.ru&response_mode=fragment&response_type=code"
+>
+  <img src="/menu-banner.jpg" />
+</a>
+
+
+ 
+<script>
+  (function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()
+</script>
+
+
+</div>
+            </div>
+        </aside>
+
+        
+        <div class="layout__sidebar-right">
+            <div class="document-contents">
+                <div class="document-contents__head">
+                    <p class="document-contents__title">
+                        Содержание <span>статьи</span>
+                    </p>
+                </div>
+                <div class="document-contents__wrap">
+                    
+  
+<nav id="TableOfContents">
+  <ul>
+    <li>
+      <ul>
+        <li></li>
+      </ul>
+    </li>
+    <li><a href="#метод-getlist">Метод GetList</a>
+      <ul>
+        <li><a href="#авторизация">Авторизация</a></li>
+        <li><a href="#входные-параметры">Входные параметры</a></li>
+        <li><a href="#выходные-параметры">Выходные параметры</a></li>
+        <li><a href="#возможные-ошибки">Возможные ошибки</a></li>
+        <li><a href="#примеры">Примеры</a></li>
+      </ul>
+    </li>
+    <li><a href="#метод-getfree">Метод GetFree</a>
+      <ul>
+        <li><a href="#авторизация-1">Авторизация</a></li>
+        <li><a href="#входные-параметры-1">Входные параметры</a></li>
+        <li><a href="#выходные-параметры-1">Выходные параметры</a></li>
+        <li><a href="#примеры-1">Примеры</a></li>
+        <li><a href="#возможные-ошибки-1">Возможные ошибки</a></li>
+      </ul>
+    </li>
+    <li><a href="#метод-lock">Метод Lock</a>
+      <ul>
+        <li><a href="#авторизация-2">Авторизация</a></li>
+        <li><a href="#входные-параметры-2">Входные параметры</a></li>
+        <li><a href="#выходные-параметры-2">Выходные параметры</a></li>
+        <li><a href="#примеры-2">Примеры</a></li>
+        <li><a href="#возможные-ошибки-2">Возможные ошибки</a></li>
+      </ul>
+    </li>
+    <li><a href="#метод-unlock">Метод Unlock</a>
+      <ul>
+        <li><a href="#авторизация-3">Авторизация</a></li>
+        <li><a href="#входные-параметры-3">Входные параметры</a></li>
+        <li><a href="#выходные-параметры-3">Выходные параметры</a></li>
+        <li><a href="#примеры-3">Примеры</a></li>
+        <li><a href="#возможные-ошибки-3">Возможные ошибки</a></li>
+      </ul>
+    </li>
+    <li><a href="#метод-lock-1">Метод Lock</a>
+      <ul>
+        <li><a href="#авторизация-4">Авторизация</a></li>
+        <li><a href="#входные-параметры-4">Входные параметры</a></li>
+        <li><a href="#выходные-параметры-4">Выходные параметры</a></li>
+        <li><a href="#примеры-4">Примеры</a></li>
+        <li><a href="#возможные-ошибки-4">Возможные ошибки</a></li>
+      </ul>
+    </li>
+    <li><a href="#метод-buy">Метод Buy</a>
+      <ul>
+        <li><a href="#авторизация-5">Авторизация</a></li>
+        <li><a href="#входные-параметры-5">Входные параметры</a></li>
+        <li><a href="#выходные-параметры-5">Выходные параметры</a></li>
+        <li><a href="#примеры-5">Примеры</a></li>
+        <li><a href="#возможные-ошибки-5">Возможные ошибки</a></li>
+      </ul>
+    </li>
+    <li><a href="#метод-delete">Метод Delete</a>
+      <ul>
+        <li><a href="#авторизация-6">Авторизация</a></li>
+        <li><a href="#входные-параметры-6">Входные параметры</a></li>
+        <li><a href="#выходные-параметры-6">Выходные параметры</a></li>
+        <li><a href="#примеры-6">Примеры</a></li>
+        <li><a href="#возможные-ошибки-6">Возможные ошибки</a></li>
+      </ul>
+    </li>
+    <li><a href="#метод-getinfo">Метод GetInfo</a>
+      <ul>
+        <li><a href="#авторизация-7">Авторизация</a></li>
+        <li><a href="#входные-параметры-7">Входные параметры</a></li>
+        <li><a href="#выходные-параметры-7">Выходные параметры</a></li>
+        <li><a href="#примеры-7">Примеры</a></li>
+      </ul>
+    </li>
+    <li><a href="#метод-setcallforwarding">Метод SetCallForwarding</a>
+      <ul>
+        <li><a href="#авторизация-8">Авторизация</a></li>
+        <li><a href="#входные-параметры-8">Входные параметры</a></li>
+        <li><a href="#выходные-параметры-8">Выходные параметры</a></li>
+        <li><a href="#примеры-8">Примеры</a></li>
+        <li><a href="#примечание-к-отправке-уведомлений-при-входящем-звонке">Примечание к отправке уведомлений при входящем звонке</a></li>
+      </ul>
+    </li>
+    <li><a href="#метод-deletecallforwarding">Метод DeleteCallForwarding</a>
+      <ul>
+        <li><a href="#авторизация-9">Авторизация</a></li>
+        <li><a href="#входные-параметры-9">Входные параметры</a></li>
+        <li><a href="#выходные-параметры-9">Выходные параметры</a></li>
+        <li><a href="#примеры-9">Примеры</a></li>
+        <li><a href="#возможные-ошибки-7">Возможные ошибки</a></li>
+      </ul>
+    </li>
+    <li><a href="#метод-getattributes">Метод GetAttributes</a>
+      <ul>
+        <li><a href="#авторизация-10">Авторизация</a></li>
+        <li><a href="#входные-параметры-10">Входные параметры</a></li>
+        <li><a href="#выходные-параметры-10">Выходные параметры</a></li>
+        <li><a href="#примеры-10">Примеры</a></li>
+        <li><a href="#возможные-ошибки-8">Возможные ошибки</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+
+
+
+                    
+                </div>
+                <div class="document-contents__bottom">
+                    <button
+                        class="document-contents__collapse-btn"
+                        type="button"
+                    >
+                        <span class="more">Развернуть</span
+                        ><span class="less">Свернуть</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+</main>
+ 
+  
+
+  
+  
+  <div class="book-comments">
+
+</div>
+  
+ 
+
+  <footer class="book-footer">
+    
+  <footer class="page__footer footer">
+  <div class="footer__wrap">
+    <div class="footer__item">
+      <p class="footer__lead">
+        МТС Exolve&nbsp;&mdash; связь и&nbsp;экосистема цифровых сервисов
+      </p>
+      <p class="footer__text">
+        Омниканальная платформа МТС Exolve позволяет гибко создавать
+        сценарии любой сложности для общения с клиентами
+      </p>
+      <br />
+      <div class="footer__menu-item">Наши услуги</div>
+      <br />
+      <p class="footer__link-group">
+        <a
+          class="footer__link"
+          href="https://exolve.ru/products/numbering-api/"
+          >Нумерация</a
+        >
+        <a class="footer__link" href="https://exolve.ru/products/voice-api/"
+          >Исходящая связь</a
+        >
+        <a
+          class="footer__link"
+          href="https://exolve.ru/products/call-forwarding/"
+          >Переадресация звонков</a
+        >
+        <a class="footer__link" href="https://exolve.ru/solutions/speech-analytics/"
+          >Речевая аналитика</a
+        >
+        <a class="footer__link" href="https://exolve.ru/products/sms-api/"
+          >SMS-сообщения</a
+        >
+        <a class="footer__link" href="https://exolve.ru/products/hlr/"
+          >Умная проверка номеров</a
+        >
+        <a class="footer__link" href="https://exolve.ru/products/mobile-sdk/"
+          >Mobile SDK</a
+        >
+      </p>
+    </div>
+    <div class="footer__item">
+      <div class="footer__menu-wrap">
+        <ul class="footer__menu">
+          <li class="footer__menu-item">
+            <a href="https://exolve.ru/">МТС Exolve</a>
+          </li>
+          <li class="footer__menu-item">
+            <a
+              href="https://sso.exolve.ru/realms/Exolve/protocol/openid-connect/auth?client_id=exolve_web&redirect_uri=https%3A%2F%2Fdev.exolve.ru&response_mode=fragment&response_type=code"
+              >Личный кабинет</a
+            >
+          </li>
+          <li class="footer__menu-item">
+            <a href="https://exolve.ru/tariffs/">Тарифы</a>
+          </li>
+          <li class="footer__menu-item">
+            <a href="https://exolve.ru/blog/">Блог</a>
+          </li>
+          <li class="footer__menu-item">
+            <a href="https://exolve.ru/events/">Календарь событий</a>
+          </li>
+        </ul>
+        <ul class="footer__menu">
+          <li class="footer__menu-item">
+            <a href="/">Документация</a>
+            <ul class="footer__submenu">
+              <li class="footer__submenu-item">
+                <a href="/docs/ru/quick-start">Начало работы</a>
+              </li>
+              <li class="footer__submenu-item">
+                <a href="/docs/ru/api-reference/voice-api/making-voice-message/"
+                  >Voice API</a
+                >
+              </li>
+              <li class="footer__submenu-item">
+                <a href="/docs/ru/api-reference/sms-api/sending-sms">SMS API</a>
+              </li>
+              
+              <li class="footer__submenu-item">
+                <a href="/docs/ru/api-reference/numbering-api/reference/"
+                  >Numbering API</a
+                >
+              </li>
+              <li class="footer__submenu-item">
+                <a href="/docs/ru/api-reference/statistics-api/call-history"
+                  >Statistics API</a
+                >
+              </li>
+            </ul>
+          </li>
+        </ul>
+        <ul class="footer__menu">
+          <li class="footer__menu-item">
+            <label>Помощь</label>
+            <ul class="footer__submenu">
+              <li class="footer__submenu-item">
+                <a href="https://exolve.ru/faq/">FAQ</a>
+              </li>
+              
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer__item">
+      
+    </div>
+    <div class="footer__item">
+      <p class="footer__link-group">
+        <a
+          class="footer__link"
+          href="https://exolve.ru/faq/consent-processing-personal-data/"
+          >Согласие на обработку персональных данных</a
+        >
+        <a
+          class="footer__link"
+          href="https://exolve.ru/faq/personal-data-policy/"
+          >Политика обработки персональных данных</a
+        >
+      </p>
+      <p class="footer__link-group">
+        <a
+          class="footer__link"
+          href="hhttps://exolve.ru/faq/conditions-for-provision/"
+        >
+          Условия оказания услуг связи</a
+        >
+        <a class="footer__link" href="https://exolve.ru/faq/terms/"
+          >Условия использования Платформы</a
+        >
+      </p>
+    </div>
+    <div class="footer__copyright">
+      <p>© 2026 АО «МТТ». Все права защищены</p>
+      <p>18+</p>
+    </div>
+  </div>
+</footer>
+
+ 
+    
+  </footer>
+
+  
+
+  </div>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+

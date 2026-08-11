@@ -157,10 +157,10 @@ def test_build_free_slices_category_mode_uses_getlist_categories():
         region_ids=[10084, 10230],
         sync_mode=contract.SYNC_MODE_TYPE_REGION_CATEGORY,
         categories_raw=[
-            {"type_id": 1104, "category_id": 10000},
-            {"type_id": 1104, "category_id": 10010},
-            {"type_id": 1105, "category_id": 10001},
-            {"type_id": 1106, "category_id": 10002},
+            {"type_id": 1104, "category_id": 10000, "type_name": "DEF"},
+            {"type_id": 1104, "category_id": 10010, "type_name": "DEF"},
+            {"type_id": 1105, "category_id": 10001, "type_name": "ABC"},
+            {"type_id": 1106, "category_id": 10002, "type_name": "KDU"},
         ],
     )
     # DEF: 2 regions × 2 cats; ABC: 2 × 1; KDU: 1 × 1
@@ -170,13 +170,47 @@ def test_build_free_slices_category_mode_uses_getlist_categories():
     assert (contract.TYPE_KDU, 10230, 10002, "KDU") not in slices
 
 
+def test_build_free_slices_includes_all_getlist_types():
+    slices = _build_free_slices(
+        region_ids=[10084, 10230],
+        sync_mode=contract.SYNC_MODE_TYPE_REGION_CATEGORY,
+        categories_raw=[
+            {"type_id": 1104, "category_id": 10000, "type_name": "DEF"},
+            {"type_id": 1107, "category_id": 10003, "type_name": "CEN"},
+            {"type_id": 1110, "category_id": 10006, "type_name": "TollFree"},
+            {"type_id": 1106, "category_id": 10002, "type_name": "KDU"},
+        ],
+    )
+    type_ids = {t for t, _, _, _ in slices}
+    assert type_ids == {1104, 1106, 1107, 1110}
+    assert (1107, 10230, 10003, "CEN") in slices
+    assert (1110, 10084, 10006, "TollFree") in slices
+    assert (1106, contract.RUSSIA_REGION_ID, 10002, "KDU") in slices
+    assert (1106, 10230, 10002, "KDU") not in slices
+    # DEF×2 regions + CEN×2 + TollFree×2 + KDU×1
+    assert len(slices) == 2 + 2 + 2 + 1
+
+
+def test_build_free_slices_empty_categories_falls_back_to_docs_types():
+    slices = _build_free_slices(
+        region_ids=[10230],
+        sync_mode=contract.SYNC_MODE_TYPE_REGION_CATEGORY,
+        categories_raw=[],
+    )
+    type_ids = {t for t, _, _, _ in slices}
+    assert type_ids == set(contract.SYNC_TYPE_IDS)
+    assert any(t == contract.TYPE_DEF and c == 10000 for t, _, c, _ in slices)
+
+
 def test_build_free_slices_type_region_omits_category():
     slices = _build_free_slices(
         region_ids=[10230],
         sync_mode=contract.SYNC_MODE_TYPE_REGION,
-        categories_raw=[{"type_id": 1104, "category_id": 10000}],
+        categories_raw=[{"type_id": 1104, "category_id": 10000, "type_name": "DEF"}],
     )
-    assert len(slices) == 3  # DEF+ABC on 10230, KDU Russia
+    # Only types present in GetList categories (DEF); no category_id in body
+    assert len(slices) == 1
+    assert slices[0] == (1104, 10230, None, "DEF")
     assert all(cid is None for _, _, cid, _ in slices)
 
 

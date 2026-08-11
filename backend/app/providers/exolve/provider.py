@@ -23,9 +23,16 @@ from app.providers.progress_emit import emit_progress
 logger = logging.getLogger(__name__)
 
 
-def _category_ids_by_type(categories: list[dict[str, Any]]) -> dict[int, list[int]]:
-    """Map type_id → category_ids from GetList; fall back to docs table per type."""
-    by_type: dict[int, list[int]] = {tid: [] for tid in contract.SYNC_TYPE_IDS}
+def _category_ids_by_type(
+    categories: list[dict[str, Any]],
+) -> tuple[list[int], dict[int, list[int]], dict[int, str]]:
+    """Build type_ids + category map + labels from GetList categories[].
+
+    Uses every type_id present in the reference. If categories are empty,
+    falls back to docs DEF/ABC/KDU table.
+    """
+    by_type: dict[int, list[int]] = {}
+    labels: dict[int, str] = {}
     for row in categories:
         if not isinstance(row, dict):
             continue
@@ -34,14 +41,28 @@ def _category_ids_by_type(categories: list[dict[str, Any]]) -> dict[int, list[in
             cid = int(row.get("category_id"))
         except (TypeError, ValueError):
             continue
-        if tid in by_type and cid not in by_type[tid]:
-            by_type[tid].append(cid)
-    for tid in contract.SYNC_TYPE_IDS:
-        if not by_type[tid]:
+        bucket = by_type.setdefault(tid, [])
+        if cid not in bucket:
+            bucket.append(cid)
+        type_name = row.get("type_name")
+        if type_name is not None and tid not in labels:
+            labels[tid] = str(type_name)
+
+    if not by_type:
+        for tid in contract.SYNC_TYPE_IDS:
             by_type[tid] = list(contract.DOC_CATEGORY_IDS_BY_TYPE.get(tid, ()))
-        else:
-            by_type[tid].sort()
-    return by_type
+            labels[tid] = contract.TYPE_NAMES.get(tid, str(tid))
+    else:
+        for tid, cats in by_type.items():
+            if not cats and tid in contract.DOC_CATEGORY_IDS_BY_TYPE:
+                by_type[tid] = list(contract.DOC_CATEGORY_IDS_BY_TYPE[tid])
+            else:
+                cats.sort()
+            if tid not in labels:
+                labels[tid] = contract.TYPE_NAMES.get(tid, str(tid))
+
+    type_ids = sorted(by_type.keys())
+    return type_ids, by_type, labels
 
 
 def _normalize_categories_list(raw: Any) -> list[dict[str, Any]]:
@@ -85,23 +106,32 @@ def _build_free_slices(
     sync_mode: str,
     categories_raw: list[dict[str, Any]],
 ) -> list[tuple[int, int, int | None, str]]:
-    """Return (type_id, region_id, category_id|None, label)."""
+    """Return (type_id, region_id, category_id|None, label).
+
+    Fan-out: every GetList type × regions × categories (category mode).
+    KDU uses Russia region only; all other types use the full region list.
+    """
     slices: list[tuple[int, int, int | None, str]] = []
-    cats_by_type = _category_ids_by_type(categories_raw)
+    type_ids, cats_by_type, labels = _category_ids_by_type(categories_raw)
     use_category = sync_mode == contract.SYNC_MODE_TYPE_REGION_CATEGORY
 
-    for type_id in contract.SYNC_TYPE_IDS:
-        label = contract.TYPE_NAMES.get(type_id, str(type_id))
+    for type_id in type_ids:
+        label = labels.get(type_id) or contract.TYPE_NAMES.get(type_id, str(type_id))
         regions = (
             [contract.RUSSIA_REGION_ID]
             if type_id == contract.TYPE_KDU
             else region_ids
         )
-        cat_ids: list[int | None]
         if use_category:
-            cat_ids = list(cats_by_type.get(type_id) or [])
-            if not cat_ids:
-                cat_ids = [None]
+            found = list(cats_by_type.get(type_id) or [])
+            if not found:
+                logger.warning(
+                    "Exolve free sync: skip type_id=%s (%s) — no categories in GetList",
+                    type_id,
+                    label,
+                )
+                continue
+            cat_ids: list[int | None] = found
         else:
             cat_ids = [None]
         for rid in regions:
@@ -296,17 +326,28 @@ class ExolveProvider(AbstractProvider):
                 code="EXOLVE_EMPTY_REGIONS",
             )
 
+        type_ids, _cats_by_type, type_labels = _category_ids_by_type(categories_raw)
         slices = _build_free_slices(
             region_ids=region_ids,
             sync_mode=sync_mode,
             categories_raw=categories_raw,
+        )
+        logger.warning(
+            "Exolve free slices planned=%s types=%s labels=%s sync_mode=%s",
+            len(slices),
+            type_ids,
+            [type_labels.get(t) for t in type_ids],
+            sync_mode,
         )
 
         all_items: list[dict[str, Any]] = []
         envelopes = [ref_env]
         slices_empty = 0
         slices_failed = 0
-        per_type: dict[str, int] = {n: 0 for n in contract.TYPE_NAMES.values()}
+        per_type: dict[str, int] = {
+            type_labels.get(tid) or contract.TYPE_NAMES.get(tid, str(tid)): 0
+            for tid in type_ids
+        }
         first_response_diag: dict[str, Any] | None = None
 
         def _on_first_raw(raw: RawHttpResult) -> None:
@@ -401,6 +442,8 @@ class ExolveProvider(AbstractProvider):
 
         integrity = {
             "regions_in_reference": len(region_ids),
+            "types_planned": type_ids,
+            "type_labels": [type_labels.get(t) for t in type_ids],
             "slices_planned": len(slices),
             "slices_done": len(slices) - slices_failed,
             "slices_empty": slices_empty,
