@@ -1,9 +1,9 @@
 # Exolve (МТС Exolve) — machine contract
 
-Sources:
-- https://docs.exolve.ru/docs/ru/api-reference/numbering-api/reference/
-- https://docs.exolve.ru/docs/ru/api-reference/numbering-api/getting-free-numbers/
-- https://docs.exolve.ru/docs/ru/instructions/getting-api-key
+Sources (local artifacts win — see [`exolve/SOURCE.md`](exolve/SOURCE.md)):
+- [`exolve/raw/Exolve-GetList.md`](exolve/raw/Exolve-GetList.md) — https://docs.exolve.ru/docs/ru/api-reference/numbering-api/reference/
+- [`exolve/raw/Exolve-GetFree.md`](exolve/raw/Exolve-GetFree.md) — https://docs.exolve.ru/docs/ru/api-reference/numbering-api/getting-free-numbers/
+- [`exolve/raw/Exolve-getting-api-key.md`](exolve/raw/Exolve-getting-api-key.md) — https://docs.exolve.ru/docs/ru/instructions/getting-api-key
 
 ## Auth
 

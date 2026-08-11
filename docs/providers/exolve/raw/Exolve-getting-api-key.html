@@ -1,0 +1,3402 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+<script>
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+        originalLocation:
+        document.location.protocol + '//' +
+        document.location.hostname +
+        document.location.pathname +
+         document.location.search
+     });
+</script>
+
+
+<script type="text/javascript">
+    (function(m,e,t,r,i,k,a)
+{         m[i]=m[i]||function()
+{(m[i].a=m[i].a||[]).push(arguments)};
+        m[i].l=1*new Date();
+        for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+        k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+    })(window, document,'script','https://mc.yandex.ru/metrika/tag.js', 'ym');
+    ym(92260545, 'init', {webvisor:true, clickmap:true, referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/92260545" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+
+
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.0.0/styles/default.min.css">
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.0.0/highlight.min.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+
+
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="title" content="Метод Как получить API-ключ приложения | API-инструкции | документация Exolve">
+<meta name="description" content="После создания приложения вы можете посмотреть и скопировать его API-ключ, чтобы управлять ресурсами (номерами) и услугами приложения через API. Чтобы посмотреть или скопировать API-ключ выполните следующие шаги:
+Перейдите во вкладку &ldquo;Приложения&rdquo; в верхнем меню аккаунта. Нажмите на приложение, API-ключ которого хотите посмотреть или скопировать. Выберите вкладу &ldquo;API-ключи&rdquo; в левом меню. Посмотрите API-ключ или скопируйте его, используя соответствующие кнопки справа от зашифрованного API-ключа. ">
+<meta name="theme-color" content="#FFFFFF">
+<meta name="color-scheme" content="light dark"><meta property="og:url" content="/docs/ru/instructions/getting-api-key/">
+  <meta property="og:site_name" content="Exolve">
+  <meta property="og:title" content="Как получить API-ключ приложения">
+  <meta property="og:description" content="После создания приложения вы можете посмотреть и скопировать его API-ключ, чтобы управлять ресурсами (номерами) и услугами приложения через API. Чтобы посмотреть или скопировать API-ключ выполните следующие шаги:
+Перейдите во вкладку “Приложения” в верхнем меню аккаунта. Нажмите на приложение, API-ключ которого хотите посмотреть или скопировать. Выберите вкладу “API-ключи” в левом меню. Посмотрите API-ключ или скопируйте его, используя соответствующие кнопки справа от зашифрованного API-ключа. ">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="docs">
+<title>Метод Как получить API-ключ приложения | API-инструкции | документация Exolve</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="stylesheet" href="/book.min.dcf21648d454fcee6d36309fb42dad2f1c2c380f61a864ca4cb72b9330ba7910.css" >
+  <script defer src="/flexsearch.min.js"></script>
+  <script defer src="/en.search.min.e1283fdea7348fd818fbb0f86bf8df9439c81e0b11347576395c6e89116fa6d5.js" ></script>
+<!--
+Made with Book Theme
+https://github.com/alex-shpak/hugo-book
+-->
+</head>
+<body class="page" dir="ltr">
+
+  
+
+  <div class="page__wrapper">
+  <input type="checkbox" class="hidden toggle" id="menu-control" />
+  <input type="checkbox" class="hidden toggle" id="toc-control" />
+
+  <header class="page__header header">
+  <div class="header__wrap">
+    <a class="header__logo" href="https://community.exolve.ru/"
+      ><svg
+        class="header__logo-icon"
+        width="113"
+        height="30"
+        viewBox="0 0 113 30"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <g>
+          <path
+            d="M5.76816 1.71112H0V11.1597H7.53114V18.88H0V28.3286H5.76816L12.9845 18.88V11.1597L5.76816 1.71112Z"
+            fill="#FF0032"
+          />
+          <path
+            d="M18.756 1.71112H12.9844V11.1597H20.519V18.88H12.9844V28.3286H18.756L25.9689 18.88V11.1597L18.756 1.71112Z"
+            fill="#FF0032"
+          />
+        </g>
+        <path
+          d="M43.9249 13.2375H46.566L50.3789 2.90997V13.2375H52.8101V0.865975H49.1196L45.3941 10.9963L41.7036 0.865975H37.8906V13.2375H40.1294V2.96376L43.9249 13.2375Z"
+          fill="currentColor"
+        />
+        <path
+          d="M59.3829 2.90997V13.2375H61.8316V2.90997H66.764V0.865975H54.4506V2.90997H59.3829Z"
+          fill="currentColor"
+        />
+        <path
+          d="M67.2222 7.06969C67.2222 11.7852 69.6534 13.4527 73.9211 13.4527C77.734 13.4527 79.8679 12.2873 80.3052 9.3647H77.839C77.4367 11.068 76.1424 11.4984 73.9211 11.4984C71.315 11.4984 69.6883 10.5301 69.6883 7.66137V6.40629C69.6883 3.48373 71.35 2.60517 73.9211 2.60517C76.2298 2.60517 77.5067 3.1072 77.8215 4.88225H80.2877C79.9379 1.83418 77.769 0.650818 73.9211 0.650818C69.6534 0.650818 67.2222 2.37208 67.2222 7.06969Z"
+          fill="currentColor"
+        />
+        <path
+          d="M37.8906 16.7625V29.1341H48.315V27.1797H40.3393V23.7551H46.4261V21.8725H40.3393V18.7169H48.2451V16.7625H37.8906Z"
+          fill="currentColor"
+        />
+        <path
+          d="M51.7576 29.1341L55.8154 24.4006L59.8907 29.1341H62.8291L57.407 22.8228L62.6018 16.7625H59.9082L56.0078 21.3346L52.0899 16.7625H49.1515L54.4161 22.9124L49.0815 29.1341H51.7576Z"
+          fill="currentColor"
+        />
+        <path
+          d="M74.5882 23.5579C74.5882 26.337 73.014 27.3949 69.9007 27.3949C66.7699 27.3949 65.2132 26.3191 65.2132 23.5579V22.2849C65.2132 19.5596 66.7699 18.5017 69.9007 18.5017C73.014 18.5017 74.5882 19.5596 74.5882 22.2849V23.5579ZM62.747 22.8945C62.747 27.6638 65.2307 29.3492 69.9007 29.3492C74.5707 29.3492 77.0544 27.6638 77.0544 22.8945C77.0544 18.1969 74.5707 16.5473 69.9007 16.5473C65.2307 16.5473 62.747 18.1969 62.747 22.8945Z"
+          fill="currentColor"
+        />
+        <path
+          d="M79.2259 16.7625V29.1341H89.0557V27.0901H81.6746V16.7625H79.2259Z"
+          fill="currentColor"
+        />
+        <path
+          d="M98.8361 16.7625L94.3585 27.3232L89.9159 16.7625H87.2923L92.5569 29.1341H95.8627L101.145 16.7625H98.8361Z"
+          fill="currentColor"
+        />
+        <path
+          d="M102.575 16.7625V29.1341H113V27.1797H105.024V23.7551H111.111V21.8725H105.024V18.7169H112.93V16.7625H102.575Z"
+          fill="currentColor"
+        /></svg
+    ></a>
+    <nav class="header__nav hidden-xs">
+      <ul class="header-menu">
+        <li class="header-menu__item">
+          <a
+            class="header-menu__item-link"
+            href="https://exolve.ru/news/"
+            >Новости</a
+          >
+        </li>
+        <li class="header-menu__item">
+          <a
+            class="header-menu__item-link"
+            href="https://exolve.ru/events/"
+            >События</a
+          >
+        </li>
+        
+        <li class="header-menu__item">
+          <a
+            class="header-menu__item-link"
+            href="https://exolve.ru/faq/"
+            >FAQ</a
+          >
+        </li>
+        <li class="header-menu__item">
+          <a
+            class="header-menu__item-link"
+            href="https://community.exolve.ru/blog/"
+            >Блог</a
+          >
+        </li>
+        <li class="header-menu__item">
+          <a
+            class="header-menu__item-link"
+            href="https://sso.exolve.ru/realms/Exolve/protocol/openid-connect/auth?client_id=exolve_web&redirect_uri=https%3A%2F%2Fdev.exolve.ru&response_mode=fragment&response_type=code"
+            >Попробовать бесплатно</a
+          >
+        </li>
+      </ul>
+    </nav>
+    <div class="header__controls">
+      <div class="header__user-menu hidden-xs" style="display: none">
+        <div class="base-dropdown">
+          <button
+            class="base-dropdown__toggle base-dropdown__toggle--svg"
+            data-toggle="dropdown"
+            type="button"
+          >
+            <span>Русский</span>
+            <svg class="base-dropdown__svg">
+              <use xlink:href="/images/sprite.svg#lang"></use>
+            </svg>
+          </button>
+          <div class="base-dropdown__inner hidden">
+            <ul class="base-dropdown__nav-list">
+              <li>
+                <a class="base-dropdown__nav-item active" href="#">Русский</a>
+              </li>
+              <li>
+                <a class="base-dropdown__nav-item" href="#">Английский</a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="header__user-menu user-menu">
+        <div class="user-menu__item visible-xs">
+          <button class="header__hamburger" type="button" aria-label="Меню">
+            <svg class="header__hamburger-svg">
+              <use xlink:href="/images/sprite.svg#burger"></use>
+            </svg>
+          </button>
+        </div>
+        <div class="user-menu__item hidden-xs">
+          <a
+            class="user-menu__profile-link"
+            href="https://sso.exolve.ru/realms/Exolve/protocol/openid-connect/auth?client_id=exolve_web&redirect_uri=https%3A%2F%2Fdev.exolve.ru&response_mode=fragment&response_type=code"
+            aria-label="Личный кабинет"
+            ><img
+              class="user-menu__avatar"
+              src="/images/empty-avatar.svg"
+              alt=""
+          /></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+
+  
+  
+<main class="page__main">
+    <div class="document-page layout">
+        <div class="layout__content">
+            <ul id="breadcrumbs" class="breadcrumbs">
+        <li class="breadcrumbs__item"><a href="/">Документация</a></li>
+        <li class="breadcrumbs__item"><a href="/docs/">Docs</a></li>
+        <li class="breadcrumbs__item"><a href="/docs/ru/">Документация</a></li>
+        <li class="breadcrumbs__item"><a href="/docs/ru/instructions/">API-инструкции</a></li>
+    <li class="breadcrumbs__item"><a href="/docs/ru/instructions/getting-api-key/">Как получить API-ключ приложения</a></li>
+</ul>
+
+<style>
+    .breadcrumbs {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -ms-flex-wrap: wrap;
+    flex-wrap: wrap;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    margin: 0 0 24px;
+    padding: 0;
+    color: rgba(56,56,56,.5);
+    list-style: none
+}
+
+.breadcrumbs a {
+    color: var(--text-link-secondary);
+    text-decoration: none;
+    -webkit-transition: all .5s ease;
+    transition: all .5s ease
+}
+
+.breadcrumbs a,.breadcrumbs span:not([class]) {
+    position: relative;
+    display: -webkit-inline-box;
+    display: -ms-inline-flexbox;
+    display: inline-flex;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    font-size: 13px;
+    line-height: 21px;
+    letter-spacing: .01em;
+    color: var(--text-link-secondary)
+}
+
+.breadcrumbs span:not([class]) {
+    color: var(--text-primary)
+}
+
+.breadcrumbs__item {
+    display: -webkit-inline-box;
+    display: -ms-inline-flexbox;
+    display: inline-flex;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    margin-right: 4px;
+    white-space: nowrap
+}
+
+.breadcrumbs__item:not(:last-child)::after {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-left: 4px;
+    content: "";
+    background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cg clip-path='url(%23clip0_2272_60596)'%3E%3Cpath d='M6.16406 3.75196C6.16406 3.08338 6.97192 2.74855 7.44439 3.22131L9.20307 4.98106C10.6253 6.40416 11.3364 7.11571 11.3364 7.9999C11.3364 8.8841 10.6253 9.59565 9.20306 11.0187L7.44439 12.7785C6.97192 13.2513 6.16406 12.9164 6.16406 12.2478C6.16406 12.0488 6.24308 11.8579 6.38373 11.7172L8.1424 9.95743C8.8835 9.21588 9.33037 8.76423 9.61053 8.39681C9.73984 8.22723 9.79494 8.12363 9.81862 8.0668C9.83652 8.02386 9.83644 8.0087 9.8364 8.00091L9.8364 7.9999L9.8364 7.9989C9.83644 7.99111 9.83652 7.97594 9.81862 7.93301C9.79494 7.87617 9.73984 7.77258 9.61053 7.603C9.33037 7.23558 8.8835 6.78393 8.14241 6.04237L6.38373 4.28262C6.24308 4.14188 6.16406 3.951 6.16406 3.75196Z' fill='%23969FA8'/%3E%3C/g%3E%3Cdefs%3E%3CclipPath id='clip0_2272_60596'%3E%3Crect width='16' height='16' fill='white'/%3E%3C/clipPath%3E%3C/defs%3E%3C/svg%3E%0A");
+    background-position: center;
+    background-size: contain;
+    background-repeat: no-repeat
+}
+
+.breadcrumbs__item:first-child, .breadcrumbs__item:nth-child(2) {
+    display: none;
+}
+
+[data-theme=dark] .breadcrumbs__item:not(:last-child)::after {
+    background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cg clip-path='url(%23clip0_2272_61916)'%3E%3Cpath d='M6.16406 3.75196C6.16406 3.08338 6.97192 2.74855 7.44439 3.22131L9.20307 4.98106C10.6253 6.40416 11.3364 7.11571 11.3364 7.9999C11.3364 8.8841 10.6253 9.59565 9.20306 11.0187L7.44439 12.7785C6.97192 13.2513 6.16406 12.9164 6.16406 12.2478C6.16406 12.0488 6.24308 11.8579 6.38373 11.7172L8.1424 9.95743C8.8835 9.21588 9.33037 8.76423 9.61053 8.39681C9.73984 8.22723 9.79494 8.12363 9.81862 8.0668C9.83652 8.02386 9.83644 8.0087 9.8364 8.00091L9.8364 7.9999L9.8364 7.9989C9.83644 7.99111 9.83652 7.97594 9.81862 7.93301C9.79494 7.87617 9.73984 7.77258 9.61053 7.603C9.33037 7.23558 8.8835 6.78393 8.14241 6.04237L6.38373 4.28262C6.24308 4.14188 6.16406 3.951 6.16406 3.75196Z' fill='%23626C77'/%3E%3C/g%3E%3Cdefs%3E%3CclipPath id='clip0_2272_61916'%3E%3Crect width='16' height='16' fill='white'/%3E%3C/clipPath%3E%3C/defs%3E%3C/svg%3E%0A")
+}
+</style>
+            <h1 class="document-page__title">Как получить API-ключ приложения</h1>
+            
+            <div><p>После создания приложения вы можете посмотреть и скопировать его API-ключ, чтобы управлять ресурсами (номерами) и услугами приложения через API. Чтобы посмотреть или скопировать API-ключ выполните следующие шаги:</p>
+<ol>
+<li>Перейдите во вкладку &ldquo;Приложения&rdquo; в верхнем меню аккаунта.</li>
+<li>Нажмите на приложение, API-ключ которого хотите посмотреть или скопировать.</li>
+<li>Выберите вкладу &ldquo;API-ключи&rdquo; в левом меню.</li>
+<li>Посмотрите API-ключ или скопируйте его, используя соответствующие кнопки справа от зашифрованного API-ключа.</li>
+</ol>
+</div>
+        </div>
+
+        <aside class="layout__sidebar">
+            <div class="document-menu book-menu">
+                <div class="document-menu__head">
+                    <p class="document-menu__title">
+                        Навигация по документации
+                    </p>
+                    <button
+                        class="base-button base-button--dark base-button--sm document-menu__btn"
+                        type="button"
+                    >
+                        <span>Открыть</span>
+                    </button>
+                </div>
+                <div class="document-menu__wrap">
+  <nav>
+   
+
+
+
+  
+
+
+
+  
+  <ul>
+    
+      
+        <li class="book-section-flat" >
+          
+  
+  
+
+  
+    <a href="/docs/ru/" class="">Документация</a>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/quick-start/" class="">C чего начать?</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-d79bbfb4911263743071c0bb600435d5" class="toggle" checked />
+    <label for="section-d79bbfb4911263743071c0bb600435d5" class="flex justify-between">
+      <a href="/docs/ru/instructions/" class="">API-инструкции</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/getting-api-key/" class="active">Как получить API-ключ приложения</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/creating-app/" class="">Как создать приложение</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/buying-number/" class="">Как купить номер</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/call-forwarding/" class="">Как настроить переадресацию входящих вызовов</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/call-forwarding-to-url/" class="">Как настроить динамическую переадресацию входящих вызовов по API (на URL)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/making-callback/" class="">Как совершить обратный звонок (callback)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/making-voice-message/" class="">Как отправить голосовое SMS (автообзвон)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/making-carousel-call/" class="">Как использовать карусель номеров</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/events/" class="">Как получать уведомления о событиях</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/how-to-use-number-lookup/" class="">Как проверить номерную базу</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/sending-sms/" class="">Как отправить SMS</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/running-sms-campaign/" class="">Как отправить массовую SMS-рассылку</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/instructions/smart-sending-sms/" class="">Как отправлять SMS только на активные номера</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-bb4ebd598eb707f190304ac995617050" class="toggle"  />
+    <label for="section-bb4ebd598eb707f190304ac995617050" class="flex justify-between">
+      <a href="/docs/ru/integration-instructions/" class="">Инструкции по интеграциям</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/integration-instructions/connecting-crm-to-send-campaign/" class="">Как настроить интеграцию с CRM</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/integration-instructions/sending-campaign-via-amocrm/" class="">Как отправить SMS из amoCRM</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/integration-instructions/sending-campaign-via-bitrix/" class="">Как отправить SMS из Битрикс24</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/integration-instructions/connecting-speech-analytics-via-bitrix/" class="">Как подключить транскрибацию и речевую аналитику в Битрикс24</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-00df68ff861d7d0588c75f02fc37cd15" class="toggle"  />
+    <label for="section-00df68ff861d7d0588c75f02fc37cd15" class="flex justify-between">
+      <a href="/docs/ru/sdk-instructions/" class="">SDK-инструкции</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/sdk-instructions/setting-up-mobile-sdk/" class="">Как настроить Mobile SDK</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/sdk-instructions/setting-up-web-sdk/" class="">Как настроить Web SDK</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/sdk-instructions/connecting-mobile-sdk-demo/" class="">Как подключить Exolve Voice Demo</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-3aaabacb08ce6a1eab0ff4080ad925c0" class="toggle"  />
+    <label for="section-3aaabacb08ce6a1eab0ff4080ad925c0" class="flex justify-between">
+      <a href="/docs/ru/api-reference/" class="">API Reference</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-0d1eb39b84cc786aa4ead60ae71d32ee" class="toggle"  />
+    <label for="section-0d1eb39b84cc786aa4ead60ae71d32ee" class="flex justify-between">
+      <a href="/docs/ru/api-reference/blacklist-api/" class="">Blacklist API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/blacklist-api/adding-to-blacklist/" class="">Add</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/blacklist-api/checking-blacklist/" class="">Check</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/blacklist-api/getting-blacklist/" class="">GetList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/blacklist-api/deleting-from-blacklist/" class="">Delete</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/blacklist-api/deleting-all-from-blacklist/" class="">DeleteAll</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/blacklist-api/setting-prompt/" class="">SetPrompt</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/blacklist-api/getting-prompt/" class="">GetPrompt</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/blacklist-api/deleting-prompt/" class="">DeletePrompt</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-ab07dc304885b1e1d180ef2957ca36a0" class="toggle"  />
+    <label for="section-ab07dc304885b1e1d180ef2957ca36a0" class="flex justify-between">
+      <a href="/docs/ru/api-reference/branded-call-api/" class="">Branded Call API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/branded-call-api/getting-info/" class="">GetInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/branded-call-api/getting-list/" class="">GetList</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-a5de1e1209c9f083e666202ccfceac59" class="toggle"  />
+    <label for="section-a5de1e1209c9f083e666202ccfceac59" class="flex justify-between">
+      <a href="/docs/ru/api-reference/callback-api/" class="">Callback API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/callback-api/creating-callback/" class="">Create</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/callback-api/getting-callback-list/" class="">GetList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/callback-api/getting-callback-info/" class="">GetInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/callback-api/deleting-callback/" class="">Delete</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/callback-api/updating-callback/" class="">Update</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/callback-api/making-callback/" class="">MakeCallBack</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-f13f72614f2e81a81dad7993a09c1a59" class="toggle"  />
+    <label for="section-f13f72614f2e81a81dad7993a09c1a59" class="flex justify-between">
+      <a href="/docs/ru/api-reference/call-record-api/" class="">Call Record API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/call-record-api/setting-call-record/" class="">SetCallRecordState (номер)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/call-record-api/setting-call-record-sip/" class="">SetCallRecordState (SIP ID)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/call-record-api/getting-info-call-record/" class="">GetInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/call-record-api/downloading-record/" class="">Download</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-14f0bde67f5840732ac54d15a4eeed46" class="toggle"  />
+    <label for="section-14f0bde67f5840732ac54d15a4eeed46" class="flex justify-between">
+      <a href="/docs/ru/api-reference/call-transcribation-api/" class="">Call Transcribation API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/call-transcribation-api/setting-transcribation-state/" class="">SetCallTranscribationState</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/call-transcribation-api/getting-transcribation/" class="">GetTranscribation</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/call-transcribation-api/getting-transcribations-list/" class="">GetTranscribationsList</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-3d207fb5a0ecbaea89c4e269f6dd9b46" class="toggle"  />
+    <label for="section-3d207fb5a0ecbaea89c4e269f6dd9b46" class="flex justify-between">
+      <a href="/docs/ru/api-reference/campaign-api/" class="">Campaign API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/creating-campaign/" class="">Create</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/getting-list/" class="">GetList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/getting-info/" class="">GetInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/updating-campaign/" class="">Update</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/getting-history/" class="">GetHistory</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/downloading-file-template/" class="">DownloadFileTemplate</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/uploading-contact-file/" class="">UploadContactFile</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/getting-file-info/" class="">GetFileInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/downloading-file-error/" class="">DownloadFileError</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/deleting-file/" class="">DeleteFile</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/creating-call-list-from-file/" class="">CreateCallListFromFile</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/campaign-api/getting-call-list/" class="">GetCallList</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-aa2387845612daecea9e6f2db43feff5" class="toggle"  />
+    <label for="section-aa2387845612daecea9e6f2db43feff5" class="flex justify-between">
+      <a href="/docs/ru/api-reference/carousel-api/" class="">Carousel API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/carousel-api/creating-carousel/" class="">Create</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/carousel-api/updating-carousel/" class="">Update</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/carousel-api/deleting-carousel/" class="">Delete</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/carousel-api/getting-carousel-info/" class="">GetInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/carousel-api/getting-carousel-list/" class="">GetList</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-b7ef1773a6f653796d95ef185672a7ce" class="toggle"  />
+    <label for="section-b7ef1773a6f653796d95ef185672a7ce" class="flex justify-between">
+      <a href="/docs/ru/api-reference/finance-api/" class="">Finance API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/finance-api/getting-balance/" class="">GetBalance</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-8981fa6d326e858499d4632bedb77e86" class="toggle"  />
+    <label for="section-8981fa6d326e858499d4632bedb77e86" class="flex justify-between">
+      <a href="/docs/ru/api-reference/media-api/" class="">Media API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/media-api/uploading-audio/" class="">Upload</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/media-api/getting-list/" class="">GetList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/media-api/synthesizing/" class="">Synthesize</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/media-api/synthesizing-and-saving/" class="">SynthesizeAndSave</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/media-api/getting-info/" class="">GetInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/media-api/downloading-audio/" class="">Download</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/media-api/updating-audio/" class="">Update</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/media-api/deleting-audio/" class="">Delete</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-ce49876a727f125be093c000d188db0e" class="toggle"  />
+    <label for="section-ce49876a727f125be093c000d188db0e" class="flex justify-between">
+      <a href="/docs/ru/api-reference/numbering-api/" class="">Numbering API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/reference/" class="">GetList (справочник)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/getting-free-numbers/" class="">GetFree</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/locking-number/" class="">Lock</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/unlocking-number/" class="">Unlock</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/buying-number/" class="">Buy</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/deleting-number/" class="">Delete</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/purchased-number/" class="">GetInfo (купленный номер)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/getting-number-attributes/" class="">GetAttributes</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/getting-purchsed-numbers/" class="">GetList (купленные номера)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/call-forwarding/" class="">SetCallForwarding</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/deleting-call-forwarding/" class="">DeleteCallForwarding</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/numbering-api/setting-amd-state/" class="">SetAmdState</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-5d076c851d703cac73af1bacfb419b06" class="toggle"  />
+    <label for="section-5d076c851d703cac73af1bacfb419b06" class="flex justify-between">
+      <a href="/docs/ru/api-reference/hlr-api/" class="">Number Lookup API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/generating-activity-score-report/" class="">GenerateActivityScoreReport</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/generating-best-call-time-report/" class="">GenerateBestCallTimeReport</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/getting-activity-score/" class="">GetActivityScore</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/getting-sim-status/" class="">GetSimStatus</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/getting-best-call-time/" class="">GetBestCallTime</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/getting-best-sms-time/" class="">GetBestSmsTime</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/getting-hlr-list-report/" class="">GetHLRListReport</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/getting-last-date-activity/" class="">GetLastDateActivity</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/getting-base-number-info/" class="">GetBaseNumberInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/hlr-api/getting-hlr-report/" class="">GetHLRReport</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-f27681d04e737a620a3be00e3a74ce56" class="toggle"  />
+    <label for="section-f27681d04e737a620a3be00e3a74ce56" class="flex justify-between">
+      <a href="/docs/ru/api-reference/push-api/" class="">Push API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/push-api/adding-sip-device-push-token/" class="">AddSipDevicePushToken</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/push-api/getting-device-list/" class="">GetDeviceList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/push-api/deleting-sip-device-push-token/" class="">DeleteSipDevicePushToken</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-95daa59146e1321845af72a91ad1572a" class="toggle"  />
+    <label for="section-95daa59146e1321845af72a91ad1572a" class="flex justify-between">
+      <a href="/docs/ru/api-reference/sip-api/" class="">SIP API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sip-api/creating-sip/" class="">Create</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sip-api/deleting-sip/" class="">Delete</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sip-api/getting-sip-fees/" class="">GetFees</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sip-api/getting-sip-attributes/" class="">GetAttributes</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sip-api/getting-sip-list/" class="">GetSIPList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sip-api/setting-display-number/" class="">SetDisplayNumber</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sip-api/changing-password/" class="">ChangePassword</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-db9e58b4b35af74a6629a052a8c47271" class="toggle"  />
+    <label for="section-db9e58b4b35af74a6629a052a8c47271" class="flex justify-between">
+      <a href="/docs/ru/api-reference/sms-api/" class="">SMS API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/sending-sms/" class="">SendSMS</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/sending-message/" class="">SendMessage</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/getting-messages-count/" class="">GetCount</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/getting-messages-list/" class="">GetList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/sms-events/" class="">SMS Events</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/getting-alpha-names/" class="">GetAlphaNames</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/checking-templates/" class="">CheckTemplate</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/creating-template/" class="">CreateTemplate</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/getting-template/" class="">GetTemplate</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-api/getting-templates/" class="">GetTemplates</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-0eb3c8e6105d8acbc5aa846d17017507" class="toggle"  />
+    <label for="section-0eb3c8e6105d8acbc5aa846d17017507" class="flex justify-between">
+      <a href="/docs/ru/api-reference/sms-smpp/" class="">SMS SMPP</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-smpp/glossary/" class="">Глоссарий</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-smpp/connection-parameters/" class="">Параметры подключения</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-smpp/connection/" class="">Подключение</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-smpp/sending-sms/" class="">Отправка сообщений</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/sms-smpp/sending-requirements/" class="">Требования к отправке сообщения</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-6f4564681ba9ecb9e42535ac75aee58e" class="toggle"  />
+    <label for="section-6f4564681ba9ecb9e42535ac75aee58e" class="flex justify-between">
+      <a href="/docs/ru/api-reference/speech-analytics-api/" class="">Speech Analytics API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/speech-analytics-api/setting-speech-analytics-state/" class="">SetSpeechAnalyticsState</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/speech-analytics-api/getting-speech-analytic/" class="">GetSpeechAnalytic</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/speech-analytics-api/getting-speech-analytics-list/" class="">GetSpeechAnalyticsList</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-1ea8614cdb8f97aece574d04d5471f3e" class="toggle"  />
+    <label for="section-1ea8614cdb8f97aece574d04d5471f3e" class="flex justify-between">
+      <a href="/docs/ru/api-reference/static-api/" class="">Static API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/static-api/creating-static-ip/" class="">Create</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/static-api/getting-attributes-static-ip/" class="">GetAttributes</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/static-api/getting-static-list/" class="">GetStaticList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/static-api/updating-static-ip/" class="">Update</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/static-api/deleting-static-ip/" class="">Delete</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-f2582860c66d67fa527475955e9d257f" class="toggle"  />
+    <label for="section-f2582860c66d67fa527475955e9d257f" class="flex justify-between">
+      <a href="/docs/ru/api-reference/statistics-api/" class="">Statistics API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/call-history/" class="">GetList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/getting-call-info/" class="">GetInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/call-events/" class="">Inbound Call Events (URL, номер, SIP ID)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/sip-events/" class="">Outbound Call Events (SIP ID)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/callback-events/" class="">Callback Call Events</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/getting-hlr-list-activity-score/" class="">GetHLRListActivityScore</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/getting-hlr-list-aggregation/" class="">GetHLRListAggregation</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/getting-hlr-list-base-number-info/" class="">GetHLRListBaseNumberInfo</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/getting-hlr-list-best-call-time/" class="">GetHLRListBestCallTime</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/statistics-api/getting-hlr-list-best-sms-time/" class="">GetHLRListBestSmsTime</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-9c9481cc74a2b5293eba609449f66e7a" class="toggle"  />
+    <label for="section-9c9481cc74a2b5293eba609449f66e7a" class="flex justify-between">
+      <a href="/docs/ru/api-reference/voice-api/" class="">Voice API</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/voice-api/creating-voice-message/" class="">Create</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/voice-api/updating-voice-message/" class="">Update</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/voice-api/deleting-voice-message/" class="">Delete</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/voice-api/getting-voice-message-info/" class="">GetInfo (голосовое SMS)</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/voice-api/making-voice-message/" class="">MakeVoiceMessage</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/voice-api/getting-voice-message-list/" class="">GetList</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/api-reference/voice-api/getting-info/" class="">GetInfo (статистика отправленного SMS)</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-d4b901d68175dea9df83ccb4a5ac76b1" class="toggle"  />
+    <label for="section-d4b901d68175dea9df83ccb4a5ac76b1" class="flex justify-between">
+      <a href="/docs/ru/mobile-sdk/" class="">Mobile SDK</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-929e06fe0791eebd632a65d429c2f2b1" class="toggle"  />
+    <label for="section-929e06fe0791eebd632a65d429c2f2b1" class="flex justify-between">
+      <a href="/docs/ru/mobile-sdk/android/" class="">Android</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/audio-route-data/" class="">AudioRouteData</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/audio-route-listener/" class="">IAudioRouteListener</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/call-client/" class="">CallClient</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/call-location-consumer/" class="">Call</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/call/" class="">Call</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/call-location-requester/" class="">ICallLocationRequester</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/calls-listener/" class="">ICallsListener</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/communicator/" class="">Communicator</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/configuration-builder/" class="">Configuration.Builder</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/configuration-manager/" class="">ConfigurationManager</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/configuration/" class="">Configuration</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/contact-name-resolver/" class="">ContactNameResolver</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/contact-resolver/" class="">ContactResolver</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/log-configuration-builder/" class="">LogConfiguration.Builder</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/log-configuration/" class="">LogConfiguration</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/notification-configuration-builder/" class="">NotificationConfiguration.Builder</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/notification-configuration/" class="">NotificationConfiguration</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/android/registration-listener/" class="">IRegistrationListener</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-dc580b2947b61631fa863060c84f1524" class="toggle"  />
+    <label for="section-dc580b2947b61631fa863060c84f1524" class="flex justify-between">
+      <a href="/docs/ru/mobile-sdk/ios/" class="">iOS</a>
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/call/" class="">Call</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/call-client/" class="">CallClient</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/call-location-requester-delegate/" class="">CallLocationRequesterDelegate</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/registration-delegate/" class="">RegistrationDelegate</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/calls-delegate/" class="">CallsDelegate</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/communicator/" class="">Communicator</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/configuration/" class="">Configuration</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/configuration-manager/" class="">ConfigurationManager</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/log-configuration/" class="">LogConfiguration</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/ios/callkit-configuration/" class="">CallKitConfiguration</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/flutter/" class="">Flutter</a>
+  
+
+          
+  <ul>
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/mobile-sdk/react-native/" class="">React Native</a>
+  
+
+          
+  <ul>
+    
+  </ul>
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/ru/web-sdk/" class="">WebSDK</a>
+  
+
+          
+  <ul>
+    
+  </ul>
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+  </ul>
+
+
+
+
+
+
+  
+
+
+
+ 
+</nav>
+<a
+  href="https://sso.exolve.ru/realms/Exolve/protocol/openid-connect/auth?client_id=exolve_web&redirect_uri=https%3A%2F%2Fdev.exolve.ru&response_mode=fragment&response_type=code"
+>
+  <img src="/menu-banner.jpg" />
+</a>
+
+
+ 
+<script>
+  (function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()
+</script>
+
+
+</div>
+            </div>
+        </aside>
+
+        
+        <div class="layout__sidebar-right">
+            <div class="document-contents">
+                <div class="document-contents__head">
+                    <p class="document-contents__title">
+                        Содержание <span>статьи</span>
+                    </p>
+                </div>
+                <div class="document-contents__wrap">
+                    
+  
+<nav id="TableOfContents"></nav>
+
+
+
+                    
+                </div>
+                <div class="document-contents__bottom">
+                    <button
+                        class="document-contents__collapse-btn"
+                        type="button"
+                    >
+                        <span class="more">Развернуть</span
+                        ><span class="less">Свернуть</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+</main>
+ 
+  
+
+  
+  
+  <div class="book-comments">
+
+</div>
+  
+ 
+
+  <footer class="book-footer">
+    
+  <footer class="page__footer footer">
+  <div class="footer__wrap">
+    <div class="footer__item">
+      <p class="footer__lead">
+        МТС Exolve&nbsp;&mdash; связь и&nbsp;экосистема цифровых сервисов
+      </p>
+      <p class="footer__text">
+        Омниканальная платформа МТС Exolve позволяет гибко создавать
+        сценарии любой сложности для общения с клиентами
+      </p>
+      <br />
+      <div class="footer__menu-item">Наши услуги</div>
+      <br />
+      <p class="footer__link-group">
+        <a
+          class="footer__link"
+          href="https://exolve.ru/products/numbering-api/"
+          >Нумерация</a
+        >
+        <a class="footer__link" href="https://exolve.ru/products/voice-api/"
+          >Исходящая связь</a
+        >
+        <a
+          class="footer__link"
+          href="https://exolve.ru/products/call-forwarding/"
+          >Переадресация звонков</a
+        >
+        <a class="footer__link" href="https://exolve.ru/solutions/speech-analytics/"
+          >Речевая аналитика</a
+        >
+        <a class="footer__link" href="https://exolve.ru/products/sms-api/"
+          >SMS-сообщения</a
+        >
+        <a class="footer__link" href="https://exolve.ru/products/hlr/"
+          >Умная проверка номеров</a
+        >
+        <a class="footer__link" href="https://exolve.ru/products/mobile-sdk/"
+          >Mobile SDK</a
+        >
+      </p>
+    </div>
+    <div class="footer__item">
+      <div class="footer__menu-wrap">
+        <ul class="footer__menu">
+          <li class="footer__menu-item">
+            <a href="https://exolve.ru/">МТС Exolve</a>
+          </li>
+          <li class="footer__menu-item">
+            <a
+              href="https://sso.exolve.ru/realms/Exolve/protocol/openid-connect/auth?client_id=exolve_web&redirect_uri=https%3A%2F%2Fdev.exolve.ru&response_mode=fragment&response_type=code"
+              >Личный кабинет</a
+            >
+          </li>
+          <li class="footer__menu-item">
+            <a href="https://exolve.ru/tariffs/">Тарифы</a>
+          </li>
+          <li class="footer__menu-item">
+            <a href="https://exolve.ru/blog/">Блог</a>
+          </li>
+          <li class="footer__menu-item">
+            <a href="https://exolve.ru/events/">Календарь событий</a>
+          </li>
+        </ul>
+        <ul class="footer__menu">
+          <li class="footer__menu-item">
+            <a href="/">Документация</a>
+            <ul class="footer__submenu">
+              <li class="footer__submenu-item">
+                <a href="/docs/ru/quick-start">Начало работы</a>
+              </li>
+              <li class="footer__submenu-item">
+                <a href="/docs/ru/api-reference/voice-api/making-voice-message/"
+                  >Voice API</a
+                >
+              </li>
+              <li class="footer__submenu-item">
+                <a href="/docs/ru/api-reference/sms-api/sending-sms">SMS API</a>
+              </li>
+              
+              <li class="footer__submenu-item">
+                <a href="/docs/ru/api-reference/numbering-api/reference/"
+                  >Numbering API</a
+                >
+              </li>
+              <li class="footer__submenu-item">
+                <a href="/docs/ru/api-reference/statistics-api/call-history"
+                  >Statistics API</a
+                >
+              </li>
+            </ul>
+          </li>
+        </ul>
+        <ul class="footer__menu">
+          <li class="footer__menu-item">
+            <label>Помощь</label>
+            <ul class="footer__submenu">
+              <li class="footer__submenu-item">
+                <a href="https://exolve.ru/faq/">FAQ</a>
+              </li>
+              
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer__item">
+      
+    </div>
+    <div class="footer__item">
+      <p class="footer__link-group">
+        <a
+          class="footer__link"
+          href="https://exolve.ru/faq/consent-processing-personal-data/"
+          >Согласие на обработку персональных данных</a
+        >
+        <a
+          class="footer__link"
+          href="https://exolve.ru/faq/personal-data-policy/"
+          >Политика обработки персональных данных</a
+        >
+      </p>
+      <p class="footer__link-group">
+        <a
+          class="footer__link"
+          href="hhttps://exolve.ru/faq/conditions-for-provision/"
+        >
+          Условия оказания услуг связи</a
+        >
+        <a class="footer__link" href="https://exolve.ru/faq/terms/"
+          >Условия использования Платформы</a
+        >
+      </p>
+    </div>
+    <div class="footer__copyright">
+      <p>© 2026 АО «МТТ». Все права защищены</p>
+      <p>18+</p>
+    </div>
+  </div>
+</footer>
+
+ 
+    
+  </footer>
+
+  
+
+  </div>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
