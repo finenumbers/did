@@ -50,6 +50,7 @@ class ExolveClient:
                 "Exolve API key missing (Settings → Exolve → API-ключ)",
                 details={"code": "EXOLVE_API_KEY_MISSING"},
             )
+        self._shared_http: httpx.AsyncClient | None = None
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -58,16 +59,33 @@ class ExolveClient:
             "Accept": "application/json",
         }
 
-    async def _post(self, path: str, body: dict[str, Any]) -> RawHttpResult:
-        url = f"{self.base_url}{path}"
-        timeout = httpx.Timeout(
+    def _http_timeout(self) -> httpx.Timeout:
+        return httpx.Timeout(
             self.timeout.total_timeout,
             connect=self.timeout.connect_timeout,
             read=self.timeout.read_timeout,
         )
+
+    async def open(self) -> None:
+        """Reuse one AsyncClient across fan-out slice calls."""
+        if self._shared_http is None:
+            self._shared_http = httpx.AsyncClient(timeout=self._http_timeout())
+
+    async def aclose(self) -> None:
+        if self._shared_http is not None:
+            await self._shared_http.aclose()
+            self._shared_http = None
+
+    async def _post(self, path: str, body: dict[str, Any]) -> RawHttpResult:
+        url = f"{self.base_url}{path}"
+        timeout = self._http_timeout()
         t0 = time.perf_counter()
 
         async def _once() -> httpx.Response:
+            if self._shared_http is not None:
+                return await self._shared_http.post(
+                    url, json=body, headers=self._headers()
+                )
             async with httpx.AsyncClient(timeout=timeout) as client:
                 return await client.post(url, json=body, headers=self._headers())
 

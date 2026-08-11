@@ -387,12 +387,18 @@ class RunexisNumberingClient:
 
         next_offset = limit
         page_num = 1
-        # Parallel waves can truncate early; verify once with sequential re-fetch.
+        # Parallel waves can truncate early; verify once, then restore concurrency.
         sequential_resume_used = concurrency <= 1
+        soft_verify_used = False
         final_short_page_offset: int | None = None
+        # Large short pages are almost always true list end; peek next offset instead
+        # of re-fetching the short page (production: ~10min saved on last page).
+        # Tiny shorts (common false-truncate) still hard-verify the short offset.
+        soft_verify_min = max(1, limit // 2)
 
         while next_offset <= 5_000_000:
-            wave = [next_offset + i * limit for i in range(concurrency)]
+            wave_concurrency = concurrency
+            wave = [next_offset + i * limit for i in range(wave_concurrency)]
             tasks: dict[int, asyncio.Task[tuple[int, list[Any], RawHttpResult, int]]] = {
                 off: asyncio.create_task(
                     self._fetch_page(filters, offset=off, limit=limit),
@@ -488,7 +494,7 @@ class RunexisNumberingClient:
                     first_short = off
                     seen_end = True
 
-            def _resume_sequential_from(start: int) -> None:
+            def _resume_hard_verify_from(start: int) -> None:
                 nonlocal next_offset, concurrency, sequential_resume_used
                 for off in [o for o in list(pages.keys()) if o >= start]:
                     del pages[off]
@@ -503,7 +509,7 @@ class RunexisNumberingClient:
                     hole_off,
                     first_short,
                 )
-                _resume_sequential_from(first_short)
+                _resume_hard_verify_from(first_short)
                 continue
 
             if hole_off is not None:
@@ -518,9 +524,56 @@ class RunexisNumberingClient:
 
             if seen_end:
                 final_short_page_offset = first_short
-                # Always sequential-verify after parallel end — API may false-short.
                 if not sequential_resume_used and first_short is not None:
+                    short_chunk = pages.get(first_short) or []
                     total_fetched = sum(len(c) for c in pages.values())
+                    # Soft verify: large short page + empty next offset → true end.
+                    # Avoids re-fetching the expensive short page (often minutes).
+                    if short_chunk and len(short_chunk) >= soft_verify_min:
+                        for off in [o for o in list(pages.keys()) if o > first_short]:
+                            del pages[off]
+                        peek_off = first_short + limit
+                        logger.warning(
+                            "Runexis Numbering soft-verify next offset=%s after short "
+                            "offset=%s got=%s (fetched=%s count_hint=%s)",
+                            peek_off,
+                            first_short,
+                            len(short_chunk),
+                            total_fetched,
+                            count_hint,
+                        )
+                        _poff, peek_chunk, peek_raw, peek_ms = await self._fetch_page(
+                            filters, offset=peek_off, limit=limit
+                        )
+                        page_num += 1
+                        last_env = peek_raw
+                        logger.warning(
+                            "Runexis Numbering search_numbers page=%s offset=%s got=%s "
+                            "total_fetched=%s count_hint=%s ms=%s soft_verify=1",
+                            page_num,
+                            peek_off,
+                            len(peek_chunk),
+                            total_fetched,
+                            count_hint,
+                            peek_ms,
+                        )
+                        sequential_resume_used = True
+                        soft_verify_used = True
+                        if not peek_chunk:
+                            break
+                        # Data after a short page → discard short, hard-verify + parallel.
+                        logger.warning(
+                            "Runexis Numbering soft-verify found data at offset=%s; "
+                            "hard-verifying from short offset=%s with concurrency=%s",
+                            peek_off,
+                            first_short,
+                            concurrency_requested,
+                        )
+                        del pages[first_short]
+                        next_offset = first_short
+                        concurrency = concurrency_requested
+                        continue
+
                     logger.warning(
                         "Runexis Numbering parallel fetch stopped at offset=%s "
                         "(fetched=%s count_hint=%s); verifying sequentially",
@@ -528,11 +581,25 @@ class RunexisNumberingClient:
                         total_fetched,
                         count_hint,
                     )
-                    _resume_sequential_from(first_short)
+                    _resume_hard_verify_from(first_short)
                     continue
                 break
 
-            next_offset += concurrency * limit
+            # Full wave: advance by the concurrency actually used, then restore
+            # parallel fan-out after a one-page hard verify proved false-short.
+            next_offset += wave_concurrency * limit
+            if (
+                sequential_resume_used
+                and concurrency < concurrency_requested
+                and concurrency_requested > 1
+            ):
+                logger.warning(
+                    "Runexis Numbering restoring concurrency=%s after verified full page "
+                    "at offset>=%s",
+                    concurrency_requested,
+                    next_offset - limit,
+                )
+                concurrency = concurrency_requested
 
         items: list[Any] = []
         for off in sorted(pages.keys()):
@@ -545,17 +612,19 @@ class RunexisNumberingClient:
             if len(chunk) < limit:
                 final_short_page_offset = off
                 break
+        meta = self._page_meta(
+            count_hint=count_hint,
+            raw_fetched=len(items),
+            sequential_verify=sequential_resume_used and concurrency_requested > 1,
+            final_short_page_offset=final_short_page_offset,
+            page_limit=limit,
+            concurrency_requested=concurrency_requested,
+        )
+        meta["soft_verify"] = soft_verify_used
         return (
             items,
             [last_env],
-            self._page_meta(
-                count_hint=count_hint,
-                raw_fetched=len(items),
-                sequential_verify=sequential_resume_used and concurrency_requested > 1,
-                final_short_page_offset=final_short_page_offset,
-                page_limit=limit,
-                concurrency_requested=concurrency_requested,
-            ),
+            meta,
         )
 
     async def list_all_free_numbers(

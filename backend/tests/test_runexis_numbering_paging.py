@@ -155,6 +155,55 @@ def test_list_all_free_documents_count_hint_progress_only_policy():
     assert meta["list_ended_naturally"] is True
 
 
+def test_page_all_soft_verifies_large_short_without_refetch():
+    """Large short page + empty next offset → accept without re-fetching short."""
+    data = [{"n": i} for i in range(52)]
+    scripts = {
+        0: [data[0:20]],
+        20: [data[20:40]],
+        # 12/20 >= soft_verify_min (limit//2) → peek offset 60, do not re-fetch 40
+        40: [data[40:52]],
+        60: [[]],
+        80: [[]],
+        100: [[]],
+    }
+    client = ScriptedNumberingClient(scripts, count_hint=500)
+    items, _envs, meta = asyncio.run(
+        client._page_all({}, limit=20, concurrency=4, count_hint=500)
+    )
+    assert len(items) == 52
+    assert meta["soft_verify"] is True
+    assert meta["sequential_verify"] is True
+    assert meta["final_short_page_offset"] == 40
+    assert client.fetch_log.count((40, 20)) == 1
+    assert client.fetch_log.count((60, 20)) >= 1
+
+
+def test_page_all_restores_concurrency_after_hard_verify_false_short():
+    """Tiny false-short hard-verifies, then restores parallel for the remainder."""
+    data = [{"n": i} for i in range(100)]
+    scripts = {
+        0: [data[0:20]],
+        20: [data[20:40]],
+        40: [data[40:60]],
+        # tiny short (5 < limit//2) → hard verify; second response full
+        60: [data[60:65], data[60:80]],
+        80: [[], data[80:100]],
+        100: [[]],
+        120: [[]],
+        140: [[]],
+    }
+    client = ScriptedNumberingClient(scripts, count_hint=500)
+    items, _envs, meta = asyncio.run(
+        client._page_all({}, limit=20, concurrency=4, count_hint=500)
+    )
+    assert len(items) == 100
+    assert [row["n"] for row in items] == list(range(100))
+    assert meta["sequential_verify"] is True
+    assert meta.get("soft_verify") is False
+    assert client.fetch_log.count((60, 20)) >= 2
+
+
 def test_page_all_cancels_higher_offsets_after_short_page():
     """Short page must cancel slower higher-offset siblings (wall-time win)."""
     data = [{"n": i} for i in range(45)]

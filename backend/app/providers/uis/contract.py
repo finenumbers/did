@@ -11,8 +11,8 @@ METHOD_VIRTUAL_NUMBERS = "get.virtual_numbers"
 AUTH_ACCESS_TOKEN = "access_token"
 AUTH_USER_ID = "user_id"
 
-# VERIFIED pagination defaults/max
-DEFAULT_LIMIT = 1000
+# VERIFIED pagination defaults/max (docs allow up to MAX_LIMIT)
+DEFAULT_LIMIT = 10_000
 MAX_LIMIT = 10_000
 MAX_OFFSET = 100_000
 

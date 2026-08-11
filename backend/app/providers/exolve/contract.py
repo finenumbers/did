@@ -51,6 +51,8 @@ DOC_CATEGORY_IDS_BY_TYPE: dict[int, tuple[int, ...]] = {
 # OPERATIONAL — docs do not state max page size; raise after live probe if needed
 DEFAULT_PAGE_LIMIT = 500
 MAX_OFFSET = 5_000_000
+# OPERATIONAL — GetFree slice fan-out; every planned slice is still called (no skip-empty)
+MAX_SLICE_CONCURRENCY = 6
 
 # OPERATIONAL — omit random by default for inventory pagination
 DEFAULT_RANDOM_MODE = "omit"

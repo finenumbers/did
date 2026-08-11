@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -260,6 +261,9 @@ class ExolveProvider(AbstractProvider):
         slices_failed = 0
         per_type: dict[str, int] = {n: 0 for n in contract.TYPE_NAMES.values()}
         first_response_diag: dict[str, Any] | None = None
+        sem = asyncio.Semaphore(contract.MAX_SLICE_CONCURRENCY)
+        lock = asyncio.Lock()
+        done = 0
 
         def _on_first_raw(raw: RawHttpResult) -> None:
             nonlocal first_response_diag
@@ -270,23 +274,45 @@ class ExolveProvider(AbstractProvider):
             )
             logger.warning("Exolve GetFree first sync response %s", first_response_diag)
 
-        for idx, (type_id, region_id, category_id, label) in enumerate(slices, start=1):
+        async def _one(
+            idx: int, type_id: int, region_id: int, category_id: int | None, label: str
+        ) -> None:
+            nonlocal done, slices_empty, slices_failed
             cat_part = f" cat={category_id}" if category_id is not None else ""
-            await emit_progress(
-                on_progress,
-                f"Exolve slice {idx}/{len(slices)} {label} region={region_id}{cat_part}",
-                len(all_items),
-                None,
-            )
-            try:
-                page_items, envs = await client.iter_free_slice(
-                    type_id=type_id,
-                    region_id=region_id,
-                    category_id=category_id,
-                    on_progress=on_progress,
-                    type_label=label,
-                    on_first_raw=_on_first_raw if first_response_diag is None else None,
-                )
+            async with sem:
+                try:
+                    page_items, envs = await client.iter_free_slice(
+                        type_id=type_id,
+                        region_id=region_id,
+                        category_id=category_id,
+                        on_progress=on_progress,
+                        type_label=label,
+                        on_first_raw=_on_first_raw,
+                    )
+                except (ProviderAuthError, ProviderError, ProviderTransportError):
+                    raise
+                except Exception as exc:
+                    slices_failed += 1
+                    logger.exception(
+                        "Exolve free slice failed type=%s region=%s category=%s",
+                        type_id,
+                        region_id,
+                        category_id,
+                    )
+                    raise ProviderError(
+                        (
+                            f"Exolve free slice failed type={type_id} "
+                            f"region={region_id} category={category_id}: {exc}"
+                        ),
+                        code="EXOLVE_SLICE_FAILED",
+                        details={
+                            "type_id": type_id,
+                            "region_id": region_id,
+                            "category_id": category_id,
+                        },
+                    ) from exc
+
+            async with lock:
                 envelopes.extend(envs)
                 if not page_items:
                     slices_empty += 1
@@ -299,28 +325,37 @@ class ExolveProvider(AbstractProvider):
                             it["_exolve_category_id"] = category_id
                         all_items.append(it)
                     per_type[label] = per_type.get(label, 0) + len(page_items)
+                done += 1
+                await emit_progress(
+                    on_progress,
+                    (
+                        f"Exolve slices done {done}/{len(slices)} "
+                        f"{label} region={region_id}{cat_part}"
+                    ),
+                    done,
+                    len(slices),
+                )
+
+        await client.open()
+        try:
+            try:
+                await asyncio.gather(
+                    *[
+                        _one(idx, type_id, region_id, category_id, label)
+                        for idx, (type_id, region_id, category_id, label) in enumerate(
+                            slices, start=1
+                        )
+                    ]
+                )
             except (ProviderAuthError, ProviderError, ProviderTransportError):
                 raise
             except Exception as exc:
-                slices_failed += 1
-                logger.exception(
-                    "Exolve free slice failed type=%s region=%s category=%s",
-                    type_id,
-                    region_id,
-                    category_id,
-                )
                 raise ProviderError(
-                    (
-                        f"Exolve free slice failed type={type_id} "
-                        f"region={region_id} category={category_id}: {exc}"
-                    ),
-                    code="EXOLVE_SLICE_FAILED",
-                    details={
-                        "type_id": type_id,
-                        "region_id": region_id,
-                        "category_id": category_id,
-                    },
+                    f"Exolve free fan-out failed: {exc}",
+                    code="EXOLVE_FANOUT_FAILED",
                 ) from exc
+        finally:
+            await client.aclose()
 
         await emit_progress(
             on_progress, "Exolve: разбор и маппинг…", len(all_items), len(all_items)
@@ -358,6 +393,7 @@ class ExolveProvider(AbstractProvider):
             "slices_done": len(slices) - slices_failed,
             "slices_empty": slices_empty,
             "slices_failed": slices_failed,
+            "slice_concurrency": contract.MAX_SLICE_CONCURRENCY,
             "fetched_raw": len(all_items),
             "unique_keys": len(mapped),
             "map_failed": len(unmapped_raw),

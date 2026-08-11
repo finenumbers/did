@@ -511,6 +511,7 @@ def test_test_connection_is_simple_getlist_ok(monkeypatch):
 
 def test_default_page_limit_is_500():
     assert contract.DEFAULT_PAGE_LIMIT == 500
+    assert contract.MAX_SLICE_CONCURRENCY == 6
     client = ExolveClient(_conn())
     assert client.page_limit == 500
 
