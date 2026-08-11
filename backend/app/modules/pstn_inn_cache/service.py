@@ -34,6 +34,8 @@ REQUIRED_OPERATORS: list[tuple[str, str]] = [
     ("АО «ЭР-Телеком Холдинг»", "5902202276"),
     ("АО «МТТ»", "7705017253"),
     ("ООО «МСН Телеком»", "7727752084"),
+    ("ООО «Фастком»", "7702764401"),
+    ("ООО «Миател»", "7841482919"),
 ]
 REQUIRED_INNS: frozenset[str] = frozenset(inn for _, inn in REQUIRED_OPERATORS)
 

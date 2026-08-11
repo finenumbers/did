@@ -32,7 +32,7 @@ Nav: [`finenumbers/SOURCE.md`](finenumbers/SOURCE.md) · [`finenumbers-contract.
 
 ## Sync gate
 
-- `require_min_cache_ready` / `is_min_cache_ready`: all three required INNs enabled with `ranges_count > 0`.
+- `require_min_cache_ready` / `is_min_cache_ready`: all `REQUIRED_OPERATORS` INNs enabled with `ranges_count > 0`.
 - Scheduler 00:00 Europe/Moscow skips if cache not ready or sync already running.
 - Unified `POST /api/v1/sync/start` returns error if cache not ready or refresh running.
 - Operator enrichment failure after successful provider cutovers → run status `partial`; catalog is not rolled back.

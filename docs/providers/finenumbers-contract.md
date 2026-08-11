@@ -43,13 +43,20 @@ Same INN may appear in both contours (e.g. Frontier). Contour A loads numbers; C
 
 ## Contour B min set (sync gate)
 
-Manual cache load must cover before unified sync starts:
+Manual cache load must cover before unified sync starts. Source of truth: `REQUIRED_OPERATORS` in `backend/app/modules/pstn_inn_cache/service.py`.
 
 | Operator | INN |
 |---|---|
 | ООО «СИПАУТНЭТ» | `5920032027` |
 | ООО «ИНТЕРНОД» | `7733808377` |
 | ООО «Фронтир Нетворк» | `5406978329` |
+| ООО «НОВОСИСТЕМ» | `7710311878` |
+| ООО «Аврора Телеком» | `7810833282` |
+| АО «ЭР-Телеком Холдинг» | `5902202276` |
+| АО «МТТ» | `7705017253` |
+| ООО «МСН Телеком» | `7727752084` |
+| ООО «Фастком» | `7702764401` |
+| ООО «Миател» | `7841482919` |
 
 Sync does **not** auto-refresh Contour B. Cache refresh is manual from Settings.
 

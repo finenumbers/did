@@ -26,6 +26,14 @@ def test_required_inns_include_mtt_and_msn_telecom():
     assert by_inn["7727752084"] == "ООО «МСН Телеком»"
 
 
+def test_required_inns_include_fastcom_and_miatel():
+    assert "7702764401" in REQUIRED_INNS
+    assert "7841482919" in REQUIRED_INNS
+    by_inn = {inn: name for name, inn in REQUIRED_OPERATORS}
+    assert by_inn["7702764401"] == "ООО «Фастком»"
+    assert by_inn["7841482919"] == "ООО «Миател»"
+
+
 def test_ensure_required_operators_keeps_existing_name():
     """Same INN with a different display name must not be overwritten."""
     existing = [
