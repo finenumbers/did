@@ -57,7 +57,7 @@ NEXT_PUBLIC_API_URL=/api/backend
 BACKEND_INTERNAL_URL=http://backend:8000
 ```
 
-**Auth:** keep a **single** `backend` replica for schedule/sync. Optional `ADMIN_API_TOKEN` belongs on the **backend** service only (scripts/CI call `did-backend` directly). Do **not** set it on `frontend` — the Next `/api/backend` proxy never injects a machine token (that would bypass login).
+**Auth:** keep a **single** `backend` replica for schedule/sync. Optional `ADMIN_API_TOKEN` belongs on the **backend** service only (machine/CI clients call `did-backend` directly). Do **not** set it on `frontend` — the Next `/api/backend` proxy never injects a machine token (that would bypass login).
 
 ## 4. Optional: separate API host
 

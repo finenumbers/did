@@ -257,6 +257,7 @@ mark.search-hit {
   background: var(--panel);
   z-index: 1;
   box-shadow: inset 0 -1px 0 var(--line);
+  overflow: visible;
 }
 
 .table-scroll tbody tr.row-selected {
@@ -310,10 +311,6 @@ mark.search-hit {
   cursor: pointer;
 }
 .active-filter-chip:hover { background: #d7e7f3; }
-.table-scroll thead th {
-  overflow: visible;
-}
-
 .col-header {
   position: relative;
 }

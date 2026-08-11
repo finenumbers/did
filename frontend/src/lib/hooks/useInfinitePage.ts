@@ -20,7 +20,6 @@ export function useInfinitePage<T>({
   enabled = true,
 }: UseInfinitePageOptions) {
   const [items, setItems] = useState<T[]>([]);
-  const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -36,7 +35,6 @@ export function useInfinitePage<T>({
 
   const applyPageResult = useCallback((data: Page<T>, append: boolean) => {
     setItems((prev) => (append ? [...prev, ...data.items] : data.items));
-    setPage(data.page);
     pageRef.current = data.page;
     setTotal(data.total);
     const more = data.page < data.total_pages;
@@ -49,7 +47,6 @@ export function useInfinitePage<T>({
       const path = getPathRef.current(nextPage, INFINITE_PAGE_SIZE);
       if (!path) {
         setItems([]);
-        setPage(0);
         pageRef.current = 0;
         setTotal(0);
         setHasMore(false);
@@ -73,7 +70,6 @@ export function useInfinitePage<T>({
         setError(e instanceof Error ? e.message : "Ошибка загрузки");
         if (!append) {
           setItems([]);
-          setPage(0);
           pageRef.current = 0;
           setTotal(0);
           setHasMore(false);
@@ -97,7 +93,6 @@ export function useInfinitePage<T>({
       requestId.current += 1;
       loadingRef.current = false;
       setItems([]);
-      setPage(0);
       pageRef.current = 0;
       setTotal(0);
       setHasMore(false);
@@ -110,7 +105,6 @@ export function useInfinitePage<T>({
     pageRef.current = 0;
     hasMoreRef.current = false;
     setItems([]);
-    setPage(0);
     setHasMore(false);
     void fetchPage(1, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset keyed by depsKey
@@ -121,74 +115,14 @@ export function useInfinitePage<T>({
     void fetchPage(pageRef.current + 1, true);
   }, [enabled, fetchPage]);
 
-  const reload = useCallback(() => {
-    if (!enabled) return;
-    pageRef.current = 0;
-    hasMoreRef.current = false;
-    setItems([]);
-    setPage(0);
-    setHasMore(false);
-    void fetchPage(1, false);
-  }, [enabled, fetchPage]);
-
-  /** Re-fetch already loaded pages without clearing the list first. */
-  const refresh = useCallback(async () => {
-    if (!enabled) return;
-    const lastPage = Math.max(pageRef.current, 1);
-    const rid = ++requestId.current;
-    loadingRef.current = true;
-    setLoading(true);
-    setError(null);
-
-    try {
-      const collected: T[] = [];
-      let totalCount = 0;
-      let totalPages = 1;
-      let loadedPage = 0;
-
-      for (let p = 1; p <= lastPage; p += 1) {
-        const path = getPathRef.current(p, INFINITE_PAGE_SIZE);
-        if (!path) break;
-        const data = await apiFetch<Page<T>>(path);
-        if (rid !== requestId.current) return;
-        collected.push(...data.items);
-        totalCount = data.total;
-        totalPages = data.total_pages;
-        loadedPage = data.page;
-        if (data.page >= data.total_pages) break;
-      }
-
-      if (rid !== requestId.current) return;
-      setItems(collected);
-      setPage(loadedPage);
-      pageRef.current = loadedPage;
-      setTotal(totalCount);
-      const more = loadedPage < totalPages;
-      setHasMore(more);
-      hasMoreRef.current = more;
-    } catch (e) {
-      if (rid !== requestId.current) return;
-      setError(e instanceof Error ? e.message : "Ошибка загрузки");
-    } finally {
-      if (rid === requestId.current) {
-        loadingRef.current = false;
-        setLoading(false);
-        setLoadingMore(false);
-      }
-    }
-  }, [enabled]);
-
   return {
     items,
-    page,
     total,
     hasMore,
     loading,
     loadingMore,
     error,
     loadMore,
-    reload,
-    refresh,
     pageSize: INFINITE_PAGE_SIZE,
   };
 }

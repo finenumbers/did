@@ -43,6 +43,7 @@ from app.models.voximplant_raw import (
     VoximplantRegionRaw,
 )
 from app.models.mcn_raw import McnCityRaw, McnFreeNumberRaw, McnRegionRaw
+from app.providers.runexis import contract as runexis_contract
 from app.modules.sync_engine.hashing import payload_hash
 from app.modules.sync_engine.staging import (
     cutover_from_staging,
@@ -841,9 +842,9 @@ def persist_runexis_numbers(
         else "runexis_purchased_numbers_raw"
     )
     default_source = (
-        "numbering-api:search_numbers"
+        runexis_contract.NUMBERING_SOURCE_ENDPOINT
         if inventory_kind == InventoryKind.free
-        else "api/v1/numbers/management"
+        else runexis_contract.GET_NUMBERS_MANAGEMENT
     )
     stg_raw_name = f"{table_name}_stg"
     stg_cat_name = "numbers_catalog_normalized_stg"

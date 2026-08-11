@@ -97,14 +97,3 @@ export async function apiDownload(path: string): Promise<Blob> {
   }
   return res.blob();
 }
-
-/**
- * URL with ?access_token= — only for iframe downloads that cannot set headers.
- * Prefer apiDownload for normal app fetches.
- */
-export function apiUrl(path: string): string {
-  const token = getAccessToken();
-  if (!token) return `${API_URL}${path}`;
-  const sep = path.includes("?") ? "&" : "?";
-  return `${API_URL}${path}${sep}access_token=${encodeURIComponent(token)}`;
-}

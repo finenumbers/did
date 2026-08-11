@@ -42,7 +42,7 @@ class ExolveClient:
         self.base_url = raw_base.rstrip("/")
         self.page_limit = int(page_limit or contract.DEFAULT_PAGE_LIMIT)
         # Default omit for inventory pagination (docs examples use random=true for demos).
-        self.random_mode: RandomMode = random_mode or "omit"
+        self.random_mode: RandomMode = random_mode or contract.DEFAULT_RANDOM_MODE  # type: ignore[assignment]
         auth = connection.auth_settings or {}
         self._api_key = (auth.get(contract.AUTH_API_KEY) or "").strip() or None
         if not self._api_key:

@@ -11,7 +11,6 @@ dependencies = [
   "psycopg[binary]>=3.2.0",
   "pydantic-settings>=2.6.0",
   "httpx>=0.28.0",
-  "python-multipart>=0.0.17",
   "openpyxl>=3.1.0",
   "xlsxwriter>=3.2.0",
   "PyJWT[crypto]>=2.9.0",

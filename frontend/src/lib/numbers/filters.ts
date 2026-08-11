@@ -1,4 +1,3 @@
-import { formatCount } from "@/lib/format";
 import type { ColumnFilters } from "@/lib/types/api";
 
 const EMPTY_FILTER_TOKEN = "__empty__";
@@ -10,10 +9,6 @@ export function encodeFilters(filters: ColumnFilters): string | null {
   }
   if (Object.keys(cleaned).length === 0) return null;
   return JSON.stringify(cleaned);
-}
-
-export function formatFacetCount(n: number): string {
-  return formatCount(n);
 }
 
 const PROVIDER_LABELS: Record<string, string> = {

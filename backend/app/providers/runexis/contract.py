@@ -53,17 +53,13 @@ EXAMPLE_AUTH_TOKEN_KEYS = frozenset(
     {"token", "refresh_token", "token_expire", "refresh_token_expire"}
 )
 
-# VERIFIED paths
+# VERIFIED paths (only those used by live sync clients)
 GET_ME = "api/v1/me"
 GET_REGIONS = "api/v1/regions"
 GET_CITIES = "api/v1/regions/cities"
-GET_REGION_CODES = "api/v1/regions/codes"
-GET_NUMBERS = "api/v1/numbers"
 GET_NUMBERS_MANAGEMENT = "api/v1/numbers/management"
-POST_NUMBERS_LOAD_DATA = "api/v1/numbers/load-data"
-GET_NUMBERS_LOAD_DATA = "api/v1/numbers/load-data"
 
-# EXAMPLE-CONFIRMED response keys
+# EXAMPLE-CONFIRMED response keys (field-schema documentation mirrors)
 EXAMPLE_REGION_KEYS = frozenset({"id", "name"})
 EXAMPLE_CITY_KEYS = frozenset({"city_id", "city_name", "region_id", "region_name"})
 EXAMPLE_MANAGEMENT_KEYS = frozenset(
@@ -71,10 +67,6 @@ EXAMPLE_MANAGEMENT_KEYS = frozenset(
 )
 
 # Inventory sync from management list (VERIFIED path)
-FREE_NUMBERS_SUPPORTED = True
-PURCHASED_NUMBERS_SUPPORTED = True
-# EXAMPLE-CONFIRMED: docs example pairs number_status_id=1 with status.mnemonic=free
-NUMBER_STATUS_ID_FREE = 1
 STATUS_MNEMONIC_FREE = "free"
 MANAGEMENT_PAGE_LIMIT = 100
 DOC_REFS_INVENTORY = [

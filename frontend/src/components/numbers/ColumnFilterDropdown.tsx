@@ -3,11 +3,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { apiFetch } from "@/lib/api/client";
+import { formatCount } from "@/lib/format";
 import type { ColumnFilters, FacetResponse } from "@/lib/types/api";
 import {
   displayFacetValue,
   encodeFilters,
-  formatFacetCount,
   toFilterToken,
 } from "@/lib/numbers/filters";
 
@@ -168,7 +168,7 @@ export function ColumnFilterDropdown({
                     {displayFacetValue(item.value, column)}
                   </span>
                   <span className="col-filter-option-count">
-                    ({formatFacetCount(item.count)})
+                    ({formatCount(item.count)})
                   </span>
                 </label>
               );

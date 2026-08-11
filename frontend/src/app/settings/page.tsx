@@ -123,7 +123,6 @@ export default function SettingsPage() {
   }, []);
 
   const reloadAll = async () => {
-    await apiFetch("/api/v1/providers");
     const next: Record<ProviderCode, Draft> = {
       sipout: { ...EMPTY_DRAFT },
       runexis: { ...EMPTY_DRAFT },

@@ -1,19 +1,14 @@
-import asyncio
-import tempfile
 from decimal import Decimal
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from starlette.background import BackgroundTask
 
 from app.core.db import get_db
 from app.models.enums import InventoryKind
 from app.schemas.common import Page
 from app.schemas.export_jobs import ExportJobCreate, ExportJobOut
 from app.schemas.numbers import FacetResponse, NumberItem
-from app.services.numbers_export import export_xlsx_job
 from app.services.numbers_export_jobs import (
     copy_job_file_for_download,
     create_export_job,
@@ -24,10 +19,6 @@ from app.services.numbers_service import NumbersService
 router = APIRouter(prefix="/numbers", tags=["Numbers"])
 
 _XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-
-def _cleanup_tmp(path: str) -> None:
-    Path(path).unlink(missing_ok=True)
 
 
 def _parse_filters_param(filters: str | None) -> dict[str, list[str]]:
@@ -197,39 +188,6 @@ def list_purchased(
     )
 
 
-async def _export_xlsx(
-    kind: InventoryKind,
-    *,
-    filters: str | None,
-    number_local_q: str | None,
-    sort_by: str | None,
-    sort_dir: str,
-    filename: str,
-) -> FileResponse:
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-    tmp_path = tmp.name
-    tmp.close()
-    try:
-        await asyncio.to_thread(
-            export_xlsx_job,
-            inventory_kind=kind,
-            path=tmp_path,
-            filters=_parse_filters_param(filters),
-            number_local_q=number_local_q,
-            sort_by=sort_by,
-            sort_dir=sort_dir,
-        )
-    except Exception:
-        _cleanup_tmp(tmp_path)
-        raise
-    return FileResponse(
-        tmp_path,
-        media_type=_XLSX_MEDIA,
-        filename=filename,
-        background=BackgroundTask(_cleanup_tmp, tmp_path),
-    )
-
-
 def _start_export_job(kind: InventoryKind, body: ExportJobCreate) -> ExportJobOut:
     try:
         job = create_export_job(
@@ -296,50 +254,6 @@ def download_export_job(job_id: str) -> FileResponse:
         path,
         media_type=_XLSX_MEDIA,
         filename=job.filename,
-    )
-
-
-@router.get(
-    "/free/export.xlsx",
-    summary="Export free numbers to XLSX (legacy sync)",
-    response_class=FileResponse,
-    deprecated=True,
-)
-async def export_free_xlsx(
-    sort_by: str | None = Query("abc_code"),
-    sort_dir: str = Query("asc", pattern="^(asc|desc)$"),
-    filters: str | None = Query(None),
-    number_local_q: str | None = None,
-) -> FileResponse:
-    return await _export_xlsx(
-        InventoryKind.free,
-        filters=filters,
-        number_local_q=number_local_q,
-        sort_by=sort_by,
-        sort_dir=sort_dir,
-        filename="free_numbers.xlsx",
-    )
-
-
-@router.get(
-    "/purchased/export.xlsx",
-    summary="Export purchased numbers to XLSX (legacy sync)",
-    response_class=FileResponse,
-    deprecated=True,
-)
-async def export_purchased_xlsx(
-    sort_by: str | None = Query("abc_code"),
-    sort_dir: str = Query("asc", pattern="^(asc|desc)$"),
-    filters: str | None = Query(None),
-    number_local_q: str | None = None,
-) -> FileResponse:
-    return await _export_xlsx(
-        InventoryKind.purchased,
-        filters=filters,
-        number_local_q=number_local_q,
-        sort_by=sort_by,
-        sort_dir=sort_dir,
-        filename="purchased_numbers.xlsx",
     )
 
 

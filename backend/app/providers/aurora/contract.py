@@ -16,8 +16,6 @@ DEFAULT_CSV_FILES: tuple[str, ...] = (
 )
 # Legacy alias: dirname of a single .csv Settings URL becomes the base.
 EXAMPLE_BASE_URL = DEFAULT_CSV_BASE
-# Back-compat name used in older tests/docs references (directory, not a file).
-DEFAULT_CSV_URL = DEFAULT_CSV_BASE
 
 PRIMARY_ENCODING = "cp1251"
 FALLBACK_ENCODING = "utf-8-sig"

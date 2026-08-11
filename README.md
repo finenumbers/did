@@ -1,6 +1,6 @@
 # DID — telecom numbering analytics
 
-Internal admin console for loading and analyzing phone number inventory from independent providers (**SipOut**, **Runexis**, **UIS**, **Aurora Telecom**, **Finenumbers**), with PSTN-based operator enrichment.
+Internal admin console for loading and analyzing phone number inventory from independent providers (**SipOut**, **Runexis**, **UIS**, **Aurora Telecom**, **Exolve**, **Voximplant**, **MCN Telecom**, **Finenumbers**), with PSTN-based operator enrichment.
 
 ## Stack
 
@@ -19,10 +19,15 @@ This is **not** a CDR / RADIUS / softswitch platform.
 
 ## Provider docs
 
-- SipOut HTML: [`docs/providers/sipout/raw/SipOut.html`](docs/providers/sipout/raw/SipOut.html)
-- Runexis DIDAPI HTML + Numbering API DOCX: see [`docs/providers/runexis/SOURCE.md`](docs/providers/runexis/SOURCE.md)
+Index: [`docs/providers/README.md`](docs/providers/README.md)
+
+- SipOut: [`docs/providers/sipout/SOURCE.md`](docs/providers/sipout/SOURCE.md)
+- Runexis: [`docs/providers/runexis/SOURCE.md`](docs/providers/runexis/SOURCE.md)
 - UIS: [`docs/providers/uis/SOURCE.md`](docs/providers/uis/SOURCE.md)
-- Aurora Telecom CSV: [`docs/providers/aurora/SOURCE.md`](docs/providers/aurora/SOURCE.md)
+- Aurora Telecom: [`docs/providers/aurora/SOURCE.md`](docs/providers/aurora/SOURCE.md)
+- Exolve: [`docs/providers/exolve/SOURCE.md`](docs/providers/exolve/SOURCE.md)
+- Voximplant: [`docs/providers/voximplant/SOURCE.md`](docs/providers/voximplant/SOURCE.md)
+- MCN Telecom: [`docs/providers/mcn/SOURCE.md`](docs/providers/mcn/SOURCE.md)
 - Finenumbers/PSTN: [`docs/providers/finenumbers-contract.md`](docs/providers/finenumbers-contract.md)
 
 **Locked product decisions:** provider APIs are read-only; wipe is per inventory slice (not full catalog purge); sync requires manually loaded min PSTN INN cache (СИПАУТНЭТ, ИНТЕРНОД, Фронтир Нетворк).

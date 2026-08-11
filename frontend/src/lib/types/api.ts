@@ -62,16 +62,6 @@ export interface FacetResponse {
 /** Multi-select facet filters: field -> selected values (`__empty__` for blank/NULL). */
 export type ColumnFilters = Record<string, string[]>;
 
-export interface ProviderOut {
-  id: string;
-  code: string;
-  name: string;
-  is_enabled: boolean;
-  capabilities: Record<string, { supported: boolean; action?: string; reason_code?: string }>;
-  last_tested_at?: string | null;
-  last_test_status?: string | null;
-}
-
 export interface ProviderSettings {
   provider_code: string;
   base_url: string | null;

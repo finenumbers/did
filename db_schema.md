@@ -4,7 +4,7 @@
 
 | Table | Purpose |
 |---|---|
-| `providers` | Independent sources registry (sipout, runexis, uis, aurora, finenumbers) |
+| `providers` | Independent sources registry (sipout, runexis, uis, aurora, exolve, voximplant, mcn, finenumbers) |
 | `provider_connections` | Auth/base URL/test status |
 | `system_settings` | Key/value settings (`sync_schedule`, `pstn_inn_cache_refresh`, …) |
 | `sync_jobs` / `sync_job_logs` | Per-provider job audit (also used inside unified run) |
