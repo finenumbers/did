@@ -485,31 +485,12 @@ def test_sync_free_empty_raises_clear_error(monkeypatch):
         assert exc.code == "EXOLVE_FREE_EMPTY"
 
 
-def test_test_connection_reports_doc_vs_no_category(monkeypatch):
+def test_test_connection_is_simple_getlist_ok(monkeypatch):
     provider = ExolveProvider()
     ref = {
         "regions": [{"region_id": 1}],
         "types": [{"type_id": 1104, "type_name": "DEF"}],
-        "categories": [
-            {
-                "category_id": 10003,
-                "type_id": 1107,
-                "type_name": "CEN",
-                "category_name": "REGULAR",
-            },
-            {
-                "category_id": 10000,
-                "type_id": 1104,
-                "type_name": "DEF",
-                "category_name": "REGULAR",
-            },
-            {
-                "category_id": 10010,
-                "type_id": 1104,
-                "type_name": "DEF",
-                "category_name": "BRONZE",
-            },
-        ],
+        "categories": [{"category_id": 10000, "type_id": 1104}],
     }
 
     class FakeClient(ExolveClient):
@@ -517,30 +498,15 @@ def test_test_connection_reports_doc_vs_no_category(monkeypatch):
             return ref, _raw(ref)
 
         async def probe_get_free(self):
-            return [
-                {
-                    "probe": "doc_moscow_def_regular",
-                    "numbers_len": 2,
-                    "json_keys": ["numbers"],
-                    "http_status": 200,
-                },
-                {"probe": "doc_moscow_abc_regular", "numbers_len": 0, "http_status": 200},
-                {"probe": "moscow_def_random_false", "numbers_len": 0, "http_status": 200},
-                {"probe": "moscow_def_omit_random", "numbers_len": 0, "http_status": 200},
-                {"probe": "type_only_def", "numbers_len": 0, "http_status": 200},
-            ]
+            raise AssertionError("test_connection must not run GetFree canaries")
 
     monkeypatch.setattr(provider, "_client", lambda connection, **kw: FakeClient(connection, **kw))
     result = asyncio.run(provider.test_connection(_conn()))
     assert result.ok is True
-    assert "doc_example_numbers=2" in result.message
-    assert "no_category_numbers=0" in result.message
-    assert "type_region_category" in result.message
-    assert "by_type=" not in result.message
-    assert result.details["recommended_sync_mode"] == contract.SYNC_MODE_TYPE_REGION_CATEGORY
-    assert result.details["categories"] == 3
-    assert "categories_list" not in result.details
-    assert "categories_by_type" not in result.details
+    assert result.message == "Exolve GetList OK"
+    assert result.details["regions"] == 1
+    assert "get_free_probes" not in result.details
+    assert "doc_example_numbers" not in result.details
 
 
 def test_default_page_limit_is_500():

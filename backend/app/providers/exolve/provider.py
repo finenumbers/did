@@ -100,7 +100,7 @@ class ExolveProvider(AbstractProvider):
             "test_connection": {
                 "supported": True,
                 "source": "documentation_verified",
-                "action": "POST GetList + GetFree canary probes",
+                "action": "POST /number/reference/v1/GetList",
             },
         }
 
@@ -111,40 +111,26 @@ class ExolveProvider(AbstractProvider):
         client = self._client(connection)
         data, raw = await client.get_reference()
         regions = data.get("regions") if isinstance(data.get("regions"), list) else []
-        categories = data.get("categories") if isinstance(data.get("categories"), list) else []
-        probes = await client.probe_get_free()
-        totals = client.probe_number_totals(probes)
-        chosen_random = client.choose_random_mode_from_probes(probes)
-        sync_mode = client.choose_sync_mode_from_probes(probes)
-        message = (
-            f"Exolve GetList OK (regions={len(regions)}); "
-            f"GetFree doc_example_numbers={totals['doc_example_numbers']} "
-            f"no_category_numbers={totals['no_category_numbers']} "
-            f"sync_mode={sync_mode} random_mode={chosen_random}"
-        )
-        if totals["best_numbers"] == 0:
-            message += (
-                " — GetFree empty including docs examples "
-                "(category_id+random:true); check app inventory/balance in Exolve LK"
+        if not regions:
+            return DiagnosticsResult(
+                ok=False,
+                message="Exolve GetList returned no regions",
+                checked_at=datetime.now(timezone.utc),
+                details={"regions": 0},
+                raw=raw,
             )
-        elif sync_mode == contract.SYNC_MODE_TYPE_REGION_CATEGORY:
-            message += " — docs examples need category_id; sync will use type×region×category"
         return DiagnosticsResult(
             ok=True,
-            message=message,
+            message="Exolve GetList OK",
             checked_at=datetime.now(timezone.utc),
             details={
                 "regions": len(regions),
                 "types": len(data.get("types") or [])
                 if isinstance(data.get("types"), list)
                 else 0,
-                "categories": len(categories),
-                "get_free_probes": probes,
-                "get_free_best_numbers": totals["best_numbers"],
-                "doc_example_numbers": totals["doc_example_numbers"],
-                "no_category_numbers": totals["no_category_numbers"],
-                "recommended_random_mode": chosen_random,
-                "recommended_sync_mode": sync_mode,
+                "categories": len(data.get("categories") or [])
+                if isinstance(data.get("categories"), list)
+                else 0,
             },
             raw=raw,
         )
