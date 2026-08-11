@@ -40,17 +40,15 @@ Sync rules (completeness):
 1. Prefer **omitting** `random` for inventory pagination. Docs demos use `random: true`; canary also probes that shape. Do not use `random: true` in the production loop.
 2. Live canary decides slice mode:
    - **Docs examples** (with `category_id` + `random: true`, e.g. Moscow DEF/`10000`, Moscow ABC/`10001`) vs **no-category** probes.
-   - If docs examples return numbers and no-category probes are empty → sync = **type × region × category** (categories from GetList `categories[]` for that `type_id`; fallback to docs category table for DEF/ABC/KDU only).
+   - If docs examples return numbers and no-category probes are empty → sync = **type × region × category** (categories from GetList `categories[]` for that `type_id`; fallback to docs category table).
    - Otherwise → sync = **type × region** without `category_id`.
-3. **Types:** every distinct `type_id` from GetList `categories[]` (live often includes DEF/ABC/KDU plus CEN, ITFS, Local, National, TollFree, UAN, UIFN, …). If GetList categories are empty → fallback docs types DEF/ABC/KDU only.
-4. Region fan-out:
-   - KDU `1106` × Russia `10084` only (docs)
-   - **All other types** × all GetList region_ids
-5. Paginate each slice until short/empty page (`DEFAULT_PAGE_LIMIT = 500`; docs do not state a max); `offset > MAX_OFFSET` → fail `EXOLVE_PAGINATION_TRUNCATED` (no wipe).
-6. Merge slices; dedupe by normalized `number_code`.
-7. If all slices empty **and** docs-example canary is also 0 → fail with explicit LK inventory/balance message.
-
-Test connection returns GetList `categories_list` (full rows) and `categories_by_type` counts in `details` for inventory diagnostics.
+3. Region fan-out (docs types only):
+   - DEF `1104` × all GetList region_ids
+   - ABC `1105` × all GetList region_ids
+   - KDU `1106` × Russia `10084` only
+4. Paginate each slice until short/empty page (`DEFAULT_PAGE_LIMIT = 500`; docs do not state a max); `offset > MAX_OFFSET` → fail `EXOLVE_PAGINATION_TRUNCATED` (no wipe).
+5. Merge slices; dedupe by normalized `number_code`.
+6. If all slices empty **and** docs-example canary is also 0 → fail with explicit LK inventory/balance message.
 
 ## NumberElement → catalog (summary)
 

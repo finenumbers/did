@@ -116,6 +116,8 @@ Same search object as `search_numbers`, without `from`/`limit`. Returns count in
 
 **Operational note:** live `search_numbers_count` behaves as an **API-total / progress upper bound**, not the size of the free-only list. Sync must not fail when free `search_numbers` pages end with `fetched < count`.
 
+**Pagination (product):** parallel waves (`NUMBERING_FETCH_CONCURRENCY`) cancel in-flight requests with **higher** offsets when a short/empty page completes (cancelled ≠ empty). After any parallel end signal, sync always **sequential-verifies** from the first short offset so a false parallel end cannot truncate the free list.
+
 ---
 
 ## Supporting read methods (dictionaries) — VERIFIED

@@ -170,7 +170,7 @@ def test_build_free_slices_category_mode_uses_getlist_categories():
     assert (contract.TYPE_KDU, 10230, 10002, "KDU") not in slices
 
 
-def test_build_free_slices_includes_all_getlist_types():
+def test_build_free_slices_ignores_non_docs_getlist_types():
     slices = _build_free_slices(
         region_ids=[10084, 10230],
         sync_mode=contract.SYNC_MODE_TYPE_REGION_CATEGORY,
@@ -182,13 +182,10 @@ def test_build_free_slices_includes_all_getlist_types():
         ],
     )
     type_ids = {t for t, _, _, _ in slices}
-    assert type_ids == {1104, 1106, 1107, 1110}
-    assert (1107, 10230, 10003, "CEN") in slices
-    assert (1110, 10084, 10006, "TollFree") in slices
+    assert type_ids == {1104, 1105, 1106}  # ABC via docs fallback categories
+    assert all(t != 1107 and t != 1110 for t, _, _, _ in slices)
     assert (1106, contract.RUSSIA_REGION_ID, 10002, "KDU") in slices
     assert (1106, 10230, 10002, "KDU") not in slices
-    # DEF×2 regions + CEN×2 + TollFree×2 + KDU×1
-    assert len(slices) == 2 + 2 + 2 + 1
 
 
 def test_build_free_slices_empty_categories_falls_back_to_docs_types():
@@ -208,10 +205,11 @@ def test_build_free_slices_type_region_omits_category():
         sync_mode=contract.SYNC_MODE_TYPE_REGION,
         categories_raw=[{"type_id": 1104, "category_id": 10000, "type_name": "DEF"}],
     )
-    # Only types present in GetList categories (DEF); no category_id in body
-    assert len(slices) == 1
-    assert slices[0] == (1104, 10230, None, "DEF")
+    # Docs types DEF+ABC+KDU; no category_id in body
+    assert len(slices) == 3
     assert all(cid is None for _, _, cid, _ in slices)
+    assert (contract.TYPE_DEF, 10230, None, "DEF") in slices
+    assert (contract.TYPE_KDU, contract.RUSSIA_REGION_ID, None, "KDU") in slices
 
 
 def test_map_number_prices_and_class():
@@ -538,31 +536,11 @@ def test_test_connection_reports_doc_vs_no_category(monkeypatch):
     assert "doc_example_numbers=2" in result.message
     assert "no_category_numbers=0" in result.message
     assert "type_region_category" in result.message
-    assert "categories=3" in result.message
-    assert "by_type={CEN:1,DEF:2}" in result.message
+    assert "by_type=" not in result.message
     assert result.details["recommended_sync_mode"] == contract.SYNC_MODE_TYPE_REGION_CATEGORY
     assert result.details["categories"] == 3
-    assert result.details["categories_by_type"] == {"CEN": 1, "DEF": 2}
-    assert result.details["categories_list"] == [
-        {
-            "category_id": 10000,
-            "type_id": 1104,
-            "type_name": "DEF",
-            "category_name": "REGULAR",
-        },
-        {
-            "category_id": 10010,
-            "type_id": 1104,
-            "type_name": "DEF",
-            "category_name": "BRONZE",
-        },
-        {
-            "category_id": 10003,
-            "type_id": 1107,
-            "type_name": "CEN",
-            "category_name": "REGULAR",
-        },
-    ]
+    assert "categories_list" not in result.details
+    assert "categories_by_type" not in result.details
 
 
 def test_default_page_limit_is_500():

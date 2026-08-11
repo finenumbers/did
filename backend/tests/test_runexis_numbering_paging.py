@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 
 from app.providers.dto.common import ConnectionConfig, RawHttpResult
 from app.providers.runexis.numbering_client import RunexisNumberingClient
@@ -22,7 +23,13 @@ def _raw() -> RawHttpResult:
 class ScriptedNumberingClient(RunexisNumberingClient):
     """Serves scripted pages: offset -> queue of chunk responses."""
 
-    def __init__(self, scripts: dict[int, list[list[dict]]], *, count_hint: int):
+    def __init__(
+        self,
+        scripts: dict[int, list[list[dict]]],
+        *,
+        count_hint: int,
+        delays: dict[int, float] | None = None,
+    ):
         super().__init__(
             ConnectionConfig(
                 base_url="https://example.test",
@@ -34,7 +41,10 @@ class ScriptedNumberingClient(RunexisNumberingClient):
         )
         self._scripts = {k: list(v) for k, v in scripts.items()}
         self._count_hint = count_hint
+        self._delays = delays or {}
+        self._delay_used: set[int] = set()
         self.fetch_log: list[tuple[int, int]] = []
+        self.cancelled_high_offsets: list[int] = []
 
     async def search_numbers_count(self, filters: dict) -> int:  # type: ignore[override]
         return self._count_hint
@@ -47,6 +57,14 @@ class ScriptedNumberingClient(RunexisNumberingClient):
         limit: int,
     ) -> tuple[int, list, RawHttpResult, int]:
         self.fetch_log.append((offset, limit))
+        delay = float(self._delays.get(offset, 0))
+        if delay and offset not in self._delay_used:
+            self._delay_used.add(offset)
+            try:
+                await asyncio.sleep(delay)
+            except asyncio.CancelledError:
+                self.cancelled_high_offsets.append(offset)
+                raise
         queue = self._scripts.setdefault(offset, [[]])
         chunk = queue.pop(0) if queue else []
         return offset, chunk, _raw(), 1
@@ -97,6 +115,34 @@ def test_page_all_accepts_free_list_below_count_hint():
     assert meta["sequential_verify"] is False
     assert meta["final_short_page_offset"] == 40
     assert len(items) == 45
+
+
+def test_page_all_cancels_higher_offsets_after_short_page():
+    """Short page must cancel slower higher-offset siblings (wall-time win)."""
+    data = [{"n": i} for i in range(45)]
+    scripts = {
+        0: [data[0:20]],
+        20: [data[20:40]],
+        # parallel short + sequential-verify short (script queue)
+        40: [data[40:45], data[40:45]],
+        60: [[]],
+        80: [[]],
+        100: [[]],
+    }
+    client = ScriptedNumberingClient(
+        scripts,
+        count_hint=500,
+        delays={60: 2.0, 80: 2.0, 100: 2.0},
+    )
+    t0 = time.perf_counter()
+    items, _envs, meta = asyncio.run(
+        client._page_all({}, limit=20, concurrency=4, count_hint=500)
+    )
+    elapsed = time.perf_counter() - t0
+    assert len(items) == 45
+    assert meta["sequential_verify"] is True
+    assert elapsed < 1.5  # would be ~2s+ without cancel
+    assert client.cancelled_high_offsets  # at least one higher offset cancelled
 
 
 def test_page_all_emits_pending_progress_before_slow_calls():

@@ -16,7 +16,7 @@
 | testConnection | DIDAPI `GET me` and/or Numbering `connect` when respective creds set |
 | sync regions/cities | DIDAPI |
 | sync purchased | DIDAPI `GET api/v1/numbers/management` exclude free mnemonic |
-| sync free | Numbering `search_numbers` with free filter (`access_state` then fallback `usage_statuses`) |
+| sync free | Numbering `search_numbers` with free filter (`access_state` then fallback `usage_statuses`); parallel pages with early-cancel of higher offsets + sequential verify for completeness |
 
 ## Settings UI
 

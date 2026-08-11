@@ -392,26 +392,64 @@ class RunexisNumberingClient:
         final_short_page_offset: int | None = None
 
         while next_offset <= 5_000_000:
-            sem = asyncio.Semaphore(concurrency)
-
-            async def _one(off: int) -> tuple[int, list[Any], RawHttpResult, int]:
-                async with sem:
-                    return await self._fetch_page(filters, offset=off, limit=limit)
-
             wave = [next_offset + i * limit for i in range(concurrency)]
-            results = await asyncio.gather(
-                *[_one(off) for off in wave],
-                return_exceptions=True,
-            )
-            failures = [r for r in results if isinstance(r, BaseException)]
-            if failures:
-                raise ProviderTransportError(
-                    f"Runexis Numbering parallel page failed: {failures[0]}"
-                ) from failures[0]
+            tasks: dict[int, asyncio.Task[tuple[int, list[Any], RawHttpResult, int]]] = {
+                off: asyncio.create_task(
+                    self._fetch_page(filters, offset=off, limit=limit),
+                    name=f"runexis-numbering-off-{off}",
+                )
+                for off in wave
+            }
+            pending = set(tasks.values())
+            end_signal_offset: int | None = None
+            typed: list[tuple[int, list[Any], RawHttpResult, int]] = []
 
-            typed = sorted(
-                (r for r in results if not isinstance(r, BaseException)),
-                key=lambda row: row[0],
+            while pending:
+                done, pending = await asyncio.wait(
+                    pending, return_when=asyncio.FIRST_COMPLETED
+                )
+                for task in done:
+                    try:
+                        off, chunk, raw, elapsed_ms = task.result()
+                    except asyncio.CancelledError:
+                        continue
+                    except Exception as exc:
+                        for t in pending:
+                            t.cancel()
+                        if pending:
+                            await asyncio.gather(*pending, return_exceptions=True)
+                        raise ProviderTransportError(
+                            f"Runexis Numbering parallel page failed: {exc}"
+                        ) from exc
+
+                    typed.append((off, chunk, raw, elapsed_ms))
+                    short = (not chunk) or (len(chunk) < limit)
+                    if short:
+                        if end_signal_offset is None or off < end_signal_offset:
+                            end_signal_offset = off
+                        # Cancel only higher offsets; never treat cancel as empty page.
+                        to_cancel = [
+                            t
+                            for o, t in tasks.items()
+                            if o > off and not t.done()
+                        ]
+                        for t in to_cancel:
+                            t.cancel()
+                            pending.discard(t)
+                        if to_cancel:
+                            logger.warning(
+                                "Runexis Numbering cancel offsets>%s after short/empty "
+                                "(cancelled=%s)",
+                                off,
+                                len(to_cancel),
+                            )
+                            await asyncio.gather(*to_cancel, return_exceptions=True)
+
+            typed.sort(key=lambda row: row[0])
+            progress_total = (
+                None
+                if end_signal_offset is not None
+                else (count_hint if count_hint > 0 else None)
             )
             for off, chunk, raw, elapsed_ms in typed:
                 page_num += 1
@@ -432,7 +470,7 @@ class RunexisNumberingClient:
                     on_progress,
                     f"Numbering: страница {page_num}",
                     total_fetched,
-                    count_hint if count_hint > 0 else None,
+                    progress_total if progress_total is not None else total_fetched,
                 )
 
             ordered = sorted(pages.keys())
@@ -480,6 +518,7 @@ class RunexisNumberingClient:
 
             if seen_end:
                 final_short_page_offset = first_short
+                # Always sequential-verify after parallel end — API may false-short.
                 if not sequential_resume_used and first_short is not None:
                     total_fetched = sum(len(c) for c in pages.values())
                     logger.warning(
