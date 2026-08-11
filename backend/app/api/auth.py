@@ -24,10 +24,6 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
         if any(path == p or path.startswith(p + "/") for p in PUBLIC_API_PREFIXES):
             return await call_next(request)
         auth_header = request.headers.get("Authorization")
-        if not auth_header:
-            q = request.query_params.get("access_token")
-            if q:
-                auth_header = f"Bearer {q}"
         if is_authorized_bearer(auth_header):
             return await call_next(request)
         return JSONResponse(

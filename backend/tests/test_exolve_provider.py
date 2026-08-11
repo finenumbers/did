@@ -239,7 +239,8 @@ def test_map_number_prices_and_class():
     assert num.status_raw == contract.STATUS_FREE
 
 
-def test_iter_free_slice_stops_on_short_page():
+def test_iter_free_slice_short_page_continues_until_empty():
+    """Short page is not end-of-list; confirm with empty next offset."""
     client = ExolveClient(_conn(), page_limit=2)
     calls: list[int] = []
 
@@ -250,7 +251,9 @@ def test_iter_free_slice_stops_on_short_page():
         raw = _raw()
         if offset == 0:
             return [{"number_code": "79001111111"}, {"number_code": "79002222222"}], raw
-        return [{"number_code": "79003333333"}], raw
+        if offset == 2:
+            return [{"number_code": "79003333333"}], raw
+        return [], raw
 
     client.get_free_page = fake_page  # type: ignore[method-assign]
     items, _envs = asyncio.run(
@@ -259,7 +262,45 @@ def test_iter_free_slice_stops_on_short_page():
         )
     )
     assert len(items) == 3
-    assert calls == [0, 2]
+    # short at 2 → advance to 3 → empty → one empty-retry at 3 → stop
+    assert calls == [0, 2, 3, 3]
+
+
+def test_iter_free_slice_recovers_after_transient_empty():
+    client = ExolveClient(_conn(), page_limit=2)
+    calls: list[int] = []
+    empties_at_2 = 0
+
+    async def fake_page(
+        *, type_id, region_id, offset, limit=None, random_mode=None, category_id=None
+    ):
+        nonlocal empties_at_2
+        calls.append(offset)
+        raw = _raw()
+        if offset == 0:
+            return [{"number_code": "79001111111"}, {"number_code": "79002222222"}], raw
+        if offset == 2:
+            empties_at_2 += 1
+            if empties_at_2 == 1:
+                return [], raw
+            return [{"number_code": "79003333333"}, {"number_code": "79004444444"}], raw
+        if offset == 4:
+            return [], raw
+        return [], raw
+
+    client.get_free_page = fake_page  # type: ignore[method-assign]
+    items, _envs = asyncio.run(
+        client.iter_free_slice(
+            type_id=1104, region_id=10230, category_id=10000, type_label="DEF"
+        )
+    )
+    assert [i["number_code"] for i in items] == [
+        "79001111111",
+        "79002222222",
+        "79003333333",
+        "79004444444",
+    ]
+    assert calls == [0, 2, 2, 4, 4]
 
 
 def _empty_probes() -> list[dict]:

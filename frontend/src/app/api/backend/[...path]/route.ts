@@ -30,13 +30,6 @@ async function proxy(req: NextRequest, pathParts: string[]): Promise<NextRespons
     headers.set("Authorization", incoming);
   }
 
-  // Legacy download path: ?access_token= → Authorization (strip from upstream URL)
-  const qToken = url.searchParams.get("access_token");
-  if (qToken && !headers.has("Authorization")) {
-    headers.set("Authorization", `Bearer ${qToken}`);
-    url.searchParams.delete("access_token");
-  }
-
   const init: RequestInit = {
     method: req.method,
     headers,

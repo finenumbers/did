@@ -1,13 +1,14 @@
 # Production-style compose using GHCR images (linux/amd64).
 # Example:
 #   docker compose -f docker-compose.ghcr.yml --env-file .env up -d
+# Requires ADMIN_PASSWORD and ADMIN_SESSION_SECRET in the env file (no weak defaults).
 
 services:
   db:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-did}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-did}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-did}
     volumes:
       - did_pgdata:/var/lib/postgresql/data
@@ -27,9 +28,10 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://did:did@db:5432/did}
       BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:3000}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
-      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-changeme-session-secret}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:?set ADMIN_SESSION_SECRET}
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
+      DID_REQUIRE_AUTH: ${DID_REQUIRE_AUTH:-1}
       SYNC_DROPPED_XLSX_PATH: /data/sync/sync_dropped_latest.xlsx
       SYNC_DEBUG_LOG_PATH: /data/sync/sync_latest.log
       NUMBERS_EXPORT_DIR: /data/exports
@@ -41,6 +43,18 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 40s
 
   frontend:
     image: ghcr.io/finenumbers/did-frontend:${DID_IMAGE_TAG:-latest}
@@ -53,7 +67,14 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/login >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 40s
 
 volumes:
   did_pgdata:

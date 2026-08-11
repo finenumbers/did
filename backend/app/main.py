@@ -11,6 +11,7 @@ from app.api.errors import register_exception_handlers
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.db import SessionLocal
+from app.core.security import auth_enabled
 from app.models.enums import ProviderCode, SyncJobStatus
 from app.models.providers import Provider, ProviderConnection
 from app.models.sync import SyncRun
@@ -123,6 +124,13 @@ async def lifespan(_app: FastAPI):
 
 
 settings = get_settings()
+if settings.did_require_auth and not auth_enabled():
+    raise SystemExit(
+        "DID_REQUIRE_AUTH is set but ADMIN_USERNAME/ADMIN_PASSWORD are missing. "
+        "Login credentials are required (ADMIN_API_TOKEN alone is not enough)."
+    )
+
+_hide_docs = settings.did_require_auth
 app = FastAPI(
     title="DID Numbering Analytics API",
     description=(
@@ -131,6 +139,9 @@ app = FastAPI(
     ),
     version="0.1.0",
     lifespan=lifespan,
+    docs_url=None if _hide_docs else "/docs",
+    redoc_url=None if _hide_docs else "/redoc",
+    openapi_url=None if _hide_docs else "/openapi.json",
 )
 register_exception_handlers(app)
 app.add_middleware(AdminAuthMiddleware)

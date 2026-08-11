@@ -19,8 +19,9 @@
 - Per-provider jobs inside a run (`sync_jobs`)
 - Stage into UNLOGGED tables (recreated each run), then atomic wipe+cutover per `(provider, inventory_kind)`; `reload_allowed` only blocks empty wipe (size may shrink or grow). Sync UI shows was/became via `stats.inventory_summary`.
 - Schedule at/after 00:00 Europe/Moscow when enabled and min PSTN INN cache is ready (`last_fired` after lock acquire; fail-closed if mark fails)
-- Postgres advisory lock + unique partial index: one active sync at a time (single backend replica assumed)
-- Orphan reclaim: `running` SyncRun with free advisory lock is marked failed so schedule can retry
+- Postgres advisory lock + unique partial index: one active sync at a time (single backend replica assumed; DB pool_size=10 / max_overflow=20 leaves API headroom while sync holds one connection)
+- Orphan reclaim: `running` SyncRun with free advisory lock is marked failed (`/latest` and `/active`); age-stale for `running` also requires free lock
+- `stats.inventory_split` / `inventory_split_providers` on the unified run when free cutover committed but purchased failed for a provider
 - Unlock failure detaches the DB connection (never return a locked conn to the pool; no pool-wide unlock_all on checkin)
 - Providers in unified order: SipOut, Runexis, UIS, Aurora, Exolve, Voximplant, MCN, Finenumbers
 - UIS: hard-fail if `total_items` exceeds what pagination can fetch within `MAX_OFFSET` (no silent truncate)

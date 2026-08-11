@@ -4,11 +4,12 @@ import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ApiError, apiFetch } from "@/lib/api/client";
 import { getAccessToken, setSession } from "@/lib/auth";
+import { safeNextPath } from "@/lib/auth-redirect";
 
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next") || "/free-numbers";
+  const next = safeNextPath(params.get("next"));
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);

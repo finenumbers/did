@@ -304,12 +304,13 @@ class ExolveClient:
         type_label: str = "",
         on_first_raw: Any | None = None,
     ) -> tuple[list[dict[str, Any]], list[RawHttpResult]]:
-        """Paginate one (type_id, region_id[, category_id]) slice until short/empty page."""
+        """Paginate one slice until an empty page (short page is not end-of-list)."""
         items: list[dict[str, Any]] = []
         envelopes: list[RawHttpResult] = []
         offset = 0
         page_limit = self.page_limit
         first_logged = False
+        empty_retried = False
         cat_part = f" category={category_id}" if category_id is not None else ""
         while offset <= contract.MAX_OFFSET:
             await emit_progress(
@@ -333,10 +334,18 @@ class ExolveClient:
                 first_logged = True
                 on_first_raw(raw)
             if not page:
+                # Transient empty guard: one same-offset retry after we already have items.
+                if items and not empty_retried:
+                    empty_retried = True
+                    logger.warning(
+                        "Exolve GetFree empty at offset=%s after %s items; retrying once",
+                        offset,
+                        len(items),
+                    )
+                    continue
                 break
+            empty_retried = False
             items.extend(page)
-            if len(page) < page_limit:
-                break
             offset += len(page)
             if offset > contract.MAX_OFFSET:
                 raise ProviderError(

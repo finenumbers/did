@@ -6,7 +6,14 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.config import get_settings
 
 settings = get_settings()
-engine = create_engine(settings.database_url, pool_pre_ping=True)
+# Single backend replica: one connection may be held for the whole sync (advisory lock).
+# Leave headroom for API/facets/export while sync runs (~25–40 min).
+engine = create_engine(
+    settings.database_url,
+    pool_pre_ping=True,
+    pool_size=10,
+    max_overflow=20,
+)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 

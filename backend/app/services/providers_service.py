@@ -97,7 +97,7 @@ class ProvidersService:
         elif code == ProviderCode.aurora.value:
             notice = (
                 "Aurora Telecom: public free CSV over HTTP (no auth). "
-                "base_url is the full CSV URL. See aurora-contract.md. Free inventory only."
+                "base_url is the CSV directory prefix (regional files). See aurora-contract.md. Free inventory only."
             )
         elif code == ProviderCode.exolve.value:
             notice = (

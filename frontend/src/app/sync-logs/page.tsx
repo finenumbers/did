@@ -207,6 +207,10 @@ export default function SyncPage() {
   const droppedExport = (run?.stats?.dropped_export || null) as DroppedExportMeta | null;
   const inventorySummary = (run?.stats?.inventory_summary || []) as InventorySummaryRow[];
   const catalogChecksum = (run?.stats?.catalog_checksum || null) as CatalogChecksum | null;
+  const inventorySplit = Boolean(run?.stats?.inventory_split);
+  const inventorySplitProviders = Array.isArray(run?.stats?.inventory_split_providers)
+    ? (run?.stats?.inventory_split_providers as string[])
+    : [];
   const canDownloadDropped =
     !isActive && Boolean(droppedExport?.available) && !downloadingDropped;
   const canDownloadDebugLog = Boolean(run) && !downloadingDebugLog;
@@ -410,6 +414,15 @@ export default function SyncPage() {
 
       {run && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {inventorySplit && (
+            <div className="state error" role="alert">
+              Разрыв каталога (inventory split): free уже обновлён, purchased нет
+              {inventorySplitProviders.length
+                ? ` — ${inventorySplitProviders.join(", ")}`
+                : ""}
+              . Перезапустите синхронизацию или проверьте purchased у этих провайдеров.
+            </div>
+          )}
           <div className="panel">
             <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>Этапы</h2>
             {run.error_summary && (

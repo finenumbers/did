@@ -61,37 +61,64 @@ def _now() -> datetime:
 
 
 def mark_stale_runs(db: Session) -> int:
+    """Age-out pending always; age-out running only when sync advisory lock is free."""
+    from app.modules.sync_engine.locks import SYNC_LOCK_KEY, advisory_unlock, try_advisory_lock
+
     cutoff_running = _now() - timedelta(minutes=STALE_RUNNING_MINUTES)
     cutoff_pending = _now() - timedelta(minutes=STALE_PENDING_MINUTES)
-    running = db.scalars(
-        select(SyncRun).where(
-            SyncRun.status == SyncJobStatus.running,
-            SyncRun.started_at.is_not(None),
-            SyncRun.started_at < cutoff_running,
-        )
-    ).all()
-    pending = db.scalars(
-        select(SyncRun).where(
-            SyncRun.status == SyncJobStatus.pending,
-            SyncRun.created_at < cutoff_pending,
-        )
-    ).all()
-    rows = list(running) + list(pending)
-    for run in rows:
+    pending = list(
+        db.scalars(
+            select(SyncRun).where(
+                SyncRun.status == SyncJobStatus.pending,
+                SyncRun.created_at < cutoff_pending,
+            )
+        ).all()
+    )
+    running = list(
+        db.scalars(
+            select(SyncRun).where(
+                SyncRun.status == SyncJobStatus.running,
+                SyncRun.started_at.is_not(None),
+                SyncRun.started_at < cutoff_running,
+            )
+        ).all()
+    )
+
+    marked = 0
+    for run in pending:
         run.status = SyncJobStatus.failed
-        if run.started_at is not None:
-            run.error_summary = (
-                f"Marked stale: running longer than {STALE_RUNNING_MINUTES} minutes"
-            )
-        else:
-            run.error_summary = (
-                f"Marked stale: pending longer than {STALE_PENDING_MINUTES} minutes"
-            )
+        run.error_summary = (
+            f"Marked stale: pending longer than {STALE_PENDING_MINUTES} minutes"
+        )
         run.finished_at = _now()
         log_run(db, run.id, SyncLogLevel.error, run.error_summary)
-    if rows:
+        marked += 1
+
+    if running:
+        if try_advisory_lock(db, SYNC_LOCK_KEY):
+            try:
+                for run in running:
+                    # Re-check status in case reclaim raced; only fail still-running rows.
+                    db.refresh(run)
+                    if run.status != SyncJobStatus.running:
+                        continue
+                    run.status = SyncJobStatus.failed
+                    run.error_summary = (
+                        f"Marked stale: running longer than {STALE_RUNNING_MINUTES} minutes"
+                    )
+                    run.finished_at = _now()
+                    log_run(db, run.id, SyncLogLevel.error, run.error_summary)
+                    marked += 1
+            finally:
+                try:
+                    advisory_unlock(db, SYNC_LOCK_KEY)
+                except Exception:
+                    logger.exception("Failed to release lock after stale running mark")
+        # else: live worker holds the lock — leave running rows alone
+
+    if marked:
         db.commit()
-    return len(rows)
+    return marked
 
 
 def reclaim_orphaned_running_runs(db: Session) -> int:
@@ -138,6 +165,7 @@ def get_active_run(db: Session) -> SyncRun | None:
 
 
 def get_latest_run(db: Session) -> SyncRun | None:
+    reclaim_orphaned_running_runs(db)
     mark_stale_runs(db)
     return db.scalars(select(SyncRun).order_by(SyncRun.created_at.desc()).limit(1)).first()
 
@@ -282,6 +310,7 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
         provider_failures: list[str] = []
         provider_ok = 0
         category_stats: dict[str, Any] = {}
+        inventory_split_providers: list[str] = []
 
         for code in PROVIDER_ORDER:
             provider = providers[code]
@@ -320,6 +349,7 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
                 tracker=tracker,
                 provider=provider,
                 category_stats=category_stats,
+                inventory_split_providers=inventory_split_providers,
             )
             if ok:
                 provider_ok += 1
@@ -350,6 +380,8 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
             "catalog_checksum": catalog_checksum,
             "dropped_export": dropped_meta,
             "stage_timings": stage_timings,
+            "inventory_split": bool(inventory_split_providers),
+            "inventory_split_providers": list(inventory_split_providers),
         }
         run.stats = summary
         db.commit()
@@ -467,6 +499,7 @@ async def _sync_provider(
     tracker: SyncProgressTracker,
     provider: Provider,
     category_stats: dict[str, Any],
+    inventory_split_providers: list[str],
 ) -> bool:
     code = provider.code
     adapter = get_provider(code)
@@ -546,6 +579,8 @@ async def _sync_provider(
 
     db.refresh(run)
     category_stats[code.value] = (job.stats or {}).get("categories") or {}
+    if (job.stats or {}).get("inventory_split"):
+        inventory_split_providers.append(code.value)
 
     if job.status == SyncJobStatus.failed:
         log_run(

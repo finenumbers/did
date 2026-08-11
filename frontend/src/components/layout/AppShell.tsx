@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api/client";
 import { clearSession, getAccessToken, getUsername } from "@/lib/auth";
 import type { ProviderHealth } from "@/lib/types/api";
@@ -21,14 +21,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [health, setHealth] = useState<ProviderHealth[]>([]);
   const [user, setUser] = useState<string | null>(null);
   const [ready, setReady] = useState(isLogin);
+  const [gateError, setGateError] = useState<string | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
 
-  useEffect(() => {
+  const checkAuthGate = useCallback(() => {
     if (isLogin) {
       setReady(true);
+      setGateError(null);
       return;
     }
     const token = getAccessToken();
     setUser(getUsername());
+    setReady(false);
+    setGateError(null);
     void apiFetch<{ auth_required: boolean }>("/api/v1/auth/status")
       .then((st) => {
         if (st.auth_required && !token) {
@@ -37,8 +42,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         }
         setReady(true);
       })
-      .catch(() => setReady(true));
+      .catch(() => {
+        setReady(false);
+        setGateError(
+          token
+            ? "Не удалось проверить авторизацию (backend недоступен). Повторите попытку."
+            : "Не удалось проверить авторизацию. Повторите попытку или войдите снова.",
+        );
+      });
   }, [pathname, isLogin, router]);
+
+  useEffect(() => {
+    checkAuthGate();
+  }, [checkAuthGate, retryTick]);
 
   useEffect(() => {
     if (isLogin || !ready) return;
@@ -49,6 +65,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (isLogin) {
     return <>{children}</>;
+  }
+
+  if (gateError) {
+    return (
+      <div className="state error" style={{ padding: "2rem", maxWidth: 480, margin: "4rem auto" }}>
+        <p>{gateError}</p>
+        <button type="button" onClick={() => setRetryTick((n) => n + 1)} style={{ marginTop: "1rem" }}>
+          Повторить
+        </button>
+        {!getAccessToken() ? (
+          <button
+            type="button"
+            className="secondary"
+            style={{ marginTop: "0.5rem", marginLeft: "0.5rem" }}
+            onClick={() => router.replace(`/login?next=${encodeURIComponent(pathname)}`)}
+          >
+            Войти
+          </button>
+        ) : null}
+      </div>
+    );
   }
 
   if (!ready) {

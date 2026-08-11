@@ -1,4 +1,4 @@
-"""Persist phase: stage into TEMP tables, then atomic wipe+cutover."""
+"""Persist phase: stage into UNLOGGED tables, then atomic wipe+cutover."""
 
 from __future__ import annotations
 
@@ -681,7 +681,7 @@ def persist_sipout_numbers(
     numbers: list[NormalizedNumber],
     on_progress: Callable[[str, int | None, int | None], Any] | None = None,
 ) -> dict[str, int]:
-    """Stage into TEMP tables, then atomic wipe+cutover (live untouched until cutover)."""
+    """Stage into UNLOGGED tables, then atomic wipe+cutover (live untouched until cutover)."""
     deduped: dict[str, NormalizedNumber] = {}
     for num in numbers:
         if num.provider_number_key:
@@ -828,7 +828,7 @@ def persist_runexis_numbers(
     numbers: list[NormalizedNumber],
     on_progress: Callable[[str, int | None, int | None], Any] | None = None,
 ) -> dict[str, int]:
-    """Stage into TEMP tables, then atomic wipe+cutover."""
+    """Stage into UNLOGGED tables, then atomic wipe+cutover."""
     deduped: dict[str, NormalizedNumber] = {}
     for num in numbers:
         if num.provider_number_key:
@@ -1472,7 +1472,7 @@ def persist_voximplant_numbers(
     numbers: list[NormalizedNumber],
     on_progress: Callable[[str, int | None, int | None], Any] | None = None,
 ) -> dict[str, int]:
-    """Stage into TEMP tables, then atomic wipe+cutover (free only)."""
+    """Stage into UNLOGGED tables, then atomic wipe+cutover (free only)."""
     if inventory_kind != InventoryKind.free:
         raise ValueError("Voximplant persist supports free inventory only")
 
@@ -1589,7 +1589,7 @@ def persist_mcn_numbers(
     numbers: list[NormalizedNumber],
     on_progress: Callable[[str, int | None, int | None], Any] | None = None,
 ) -> dict[str, int]:
-    """Stage into TEMP tables, then atomic wipe+cutover (free only)."""
+    """Stage into UNLOGGED tables, then atomic wipe+cutover (free only)."""
     if inventory_kind != InventoryKind.free:
         raise ValueError("MCN persist supports free inventory only")
 

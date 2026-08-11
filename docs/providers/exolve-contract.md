@@ -48,7 +48,7 @@ Sync rules (completeness):
    - DEF `1104` × all GetList region_ids
    - ABC `1105` × all GetList region_ids
    - KDU `1106` × Russia `10084` only
-4. Paginate each slice until short/empty page (`DEFAULT_PAGE_LIMIT = 500`; docs do not state a max); `offset > MAX_OFFSET` → fail `EXOLVE_PAGINATION_TRUNCATED` (no wipe).
+4. Paginate each slice until an **empty** page (`DEFAULT_PAGE_LIMIT = 500`; docs do not state a max). A short (non-full) page advances `offset` by `len(page)` and continues — do not treat short as end. If a page is empty after the slice already has items, retry the **same** offset once (transient empty guard); still empty → end. `offset > MAX_OFFSET` → fail `EXOLVE_PAGINATION_TRUNCATED` (no wipe).
 5. Merge slices; dedupe by normalized `number_code`.
 6. If all slices empty **and** docs-example canary is also 0 → fail with explicit LK inventory/balance message.
 

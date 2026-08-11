@@ -46,6 +46,7 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD}
       ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:?set ADMIN_SESSION_SECRET}
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
+      DID_REQUIRE_AUTH: ${DID_REQUIRE_AUTH:-1}
       SYNC_DROPPED_XLSX_PATH: /data/sync/sync_dropped_latest.xlsx
       SYNC_DEBUG_LOG_PATH: /data/sync/sync_latest.log
       NUMBERS_EXPORT_DIR: /data/exports
@@ -58,6 +59,18 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 40s
 
   frontend:
     image: ghcr.io/finenumbers/did-frontend:${DID_IMAGE_TAG:-latest}
@@ -74,7 +87,14 @@ services:
       - did_internal
       - proxy
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/login >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 40s
 
 networks:
   proxy:

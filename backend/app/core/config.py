@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     admin_session_secret: str = ""
     # Optional machine token (Bearer) in addition to login sessions
     admin_api_token: str = ""
+    # When true, refuse to start without ADMIN_USERNAME + ADMIN_PASSWORD (token alone is not enough)
+    did_require_auth: bool = False
     # Latest-only XLSX of sync unmapped/duplicate rows (overwritten each unified sync)
     sync_dropped_xlsx_path: str = "/data/sync/sync_dropped_latest.xlsx"
     # Latest-only detailed sync debug log (truncated at each new unified sync)

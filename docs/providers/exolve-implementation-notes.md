@@ -19,8 +19,8 @@ See completeness/API rules in [`exolve-contract.md`](exolve-contract.md). This f
 ## Operational
 
 1. **test_connection:** short GetList probe; UI message `Exolve OK` on success.
-2. Free sync walks **all** GetList types × regions (not a single category canary).
-3. Persist: TEMP staging → wipe free → cutover (`persist_exolve_numbers`); wipe-guard on empty/collapsed fetch.
+2. Free sync walks docs SYNC types × regions (canary chooses type×region vs type×region×category).
+3. Persist: UNLOGGED staging → wipe free → cutover (`persist_exolve_numbers`); wipe-guard refuses empty incoming only (no size-ratio).
 4. Purchased / Lock / Buy never called.
 5. After provider cutovers, Contour B (Finenumbers) operator enrichment still runs.
 
