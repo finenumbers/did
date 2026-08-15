@@ -61,16 +61,24 @@ def detach_session_connection(db: Session) -> None:
 
 
 def clear_advisory_locks_dbapi(dbapi_conn) -> None:
-    """Best-effort unlock of all session advisory locks on a raw DBAPI connection."""
+    """Best-effort unlock of all session advisory locks on a raw DBAPI connection.
+
+    Must leave the connection idle (not INTRANS): pool_pre_ping sets autocommit and
+    fails if a prior checkin SELECT left an open transaction.
+    """
     try:
         cursor = dbapi_conn.cursor()
         try:
             cursor.execute("SELECT pg_advisory_unlock_all()")
         finally:
             cursor.close()
+        dbapi_conn.commit()
     except Exception:
+        try:
+            dbapi_conn.rollback()
+        except Exception:
+            pass
         # Non-Postgres (sqlite tests) or closed connection — ignore.
-        pass
 
 
 def acquire_sync_lock(

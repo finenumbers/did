@@ -42,6 +42,8 @@ def test_clear_advisory_locks_dbapi_runs_unlock_all():
 
     cursor.execute.assert_called_once_with("SELECT pg_advisory_unlock_all()")
     cursor.close.assert_called_once()
+    dbapi.commit.assert_called_once()
+    dbapi.rollback.assert_not_called()
 
 
 def test_clear_advisory_locks_dbapi_swallows_errors():
@@ -49,6 +51,17 @@ def test_clear_advisory_locks_dbapi_swallows_errors():
     dbapi.cursor.side_effect = RuntimeError("not postgres")
 
     locks.clear_advisory_locks_dbapi(dbapi)  # must not raise
+    dbapi.rollback.assert_called_once()
+
+
+def test_clear_advisory_locks_dbapi_rollback_when_commit_fails():
+    dbapi = MagicMock()
+    cursor = MagicMock()
+    dbapi.cursor.return_value = cursor
+    dbapi.commit.side_effect = RuntimeError("commit failed")
+
+    locks.clear_advisory_locks_dbapi(dbapi)
+    dbapi.rollback.assert_called_once()
 
 
 def test_acquire_sync_lock_succeeds_first_try():
