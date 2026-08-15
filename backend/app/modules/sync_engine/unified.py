@@ -9,10 +9,10 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session, joinedload
 
-from app.core.db import SessionLocal
+from app.core.db import SessionLocal, dispose_engine_pool
 from app.models.enums import ProviderCode, SyncJobStatus, SyncJobType, SyncLogLevel
 from app.models.providers import Provider
 from app.models.sync import SyncJob, SyncRun
@@ -21,6 +21,12 @@ from app.modules.sync_engine.dropped_export import (
     end_dropped_export,
     get_collector,
     write_dropped_xlsx,
+)
+from app.modules.sync_engine.locks import (
+    SYNC_LOCK_KEY,
+    acquire_sync_lock,
+    advisory_unlock,
+    detach_session_connection,
 )
 from app.modules.sync_engine.modes import SyncMode
 from app.modules.sync_engine.progress import (
@@ -42,6 +48,8 @@ from app.providers.finenumbers.enrich import enrich_catalog_operators
 from app.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
+
+LOCK_KEEPALIVE_SECONDS = 30
 
 STALE_RUNNING_MINUTES = 180
 STALE_PENDING_MINUTES = 30
@@ -209,8 +217,39 @@ def create_run(db: Session, *, triggered_by: str = "api") -> SyncRun:
     return run
 
 
+def _other_active_sync_run(db: Session, run_id: uuid.UUID) -> bool:
+    """True if another pending/running SyncRun exists (excluding this run_id)."""
+    return (
+        db.scalar(
+            select(SyncRun.id)
+            .where(SyncRun.status.in_(ACTIVE_STATUSES), SyncRun.id != run_id)
+            .limit(1)
+        )
+        is not None
+    )
+
+
+async def _lock_db_keepalive(lock_db: Session, stop: asyncio.Event) -> None:
+    """Keep the lock session alive so idle TCP/Postgres timeouts do not drop the advisory lock."""
+    while not stop.is_set():
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=LOCK_KEEPALIVE_SECONDS)
+            return
+        except asyncio.TimeoutError:
+            pass
+        try:
+            await asyncio.to_thread(_ping_lock_db, lock_db)
+        except Exception:
+            logger.exception("lock_db keepalive failed; lock session may be dead")
+            return
+
+
+def _ping_lock_db(lock_db: Session) -> None:
+    lock_db.execute(text("SELECT 1"))
+    lock_db.commit()
+
+
 async def execute_unified_run(run_id: uuid.UUID) -> None:
-    from app.modules.sync_engine.locks import SYNC_LOCK_KEY, advisory_unlock, try_advisory_lock
     from app.modules.sync_engine.progress import SyncAborted, apply_progress_abort
     from app.modules.sync_engine.scheduler import _set_last_fired_date
     from zoneinfo import ZoneInfo
@@ -220,17 +259,29 @@ async def execute_unified_run(run_id: uuid.UUID) -> None:
     lock_db = SessionLocal()
     work_db = SessionLocal()
     locked = False
+    stop_keepalive = asyncio.Event()
+    keepalive_task: asyncio.Task[None] | None = None
     try:
-        if not try_advisory_lock(lock_db, SYNC_LOCK_KEY):
+        acquired, lock_db, lock_err = acquire_sync_lock(
+            lock_db,
+            other_active_run=lambda: _other_active_sync_run(work_db, run_id),
+            new_lock_session=SessionLocal,
+            dispose_pool=dispose_engine_pool,
+        )
+        if not acquired:
             run = work_db.get(SyncRun, run_id)
             if run is not None and run.status in ACTIVE_STATUSES:
                 run.status = SyncJobStatus.failed
-                run.error_summary = "Синхронизация уже выполняется (lock)"
+                run.error_summary = lock_err or "Синхронизация уже выполняется (lock)"
                 run.finished_at = _now()
                 work_db.commit()
             return
         locked = True
         lock_db.commit()
+        keepalive_task = asyncio.create_task(
+            _lock_db_keepalive(lock_db, stop_keepalive),
+            name=f"sync-lock-keepalive-{run_id}",
+        )
         run = work_db.get(SyncRun, run_id)
         if run is not None and (run.triggered_by or "") == "schedule":
             day_key = datetime.now(ZoneInfo("Europe/Moscow")).date().isoformat()
@@ -274,13 +325,28 @@ async def execute_unified_run(run_id: uuid.UUID) -> None:
         except Exception:
             work_db.rollback()
     finally:
+        stop_keepalive.set()
+        if keepalive_task is not None:
+            try:
+                await keepalive_task
+            except Exception:
+                logger.exception("lock_db keepalive task failed on shutdown")
         if locked:
             try:
                 advisory_unlock(lock_db, SYNC_LOCK_KEY)
             except Exception:
-                pass
-        lock_db.close()
-        work_db.close()
+                logger.exception(
+                    "Failed to unlock sync lock; detaching connection so it cannot re-enter pool"
+                )
+                detach_session_connection(lock_db)
+        try:
+            lock_db.close()
+        except Exception:
+            logger.exception("Failed to close lock_db")
+        try:
+            work_db.close()
+        except Exception:
+            logger.exception("Failed to close work_db")
 
 
 def spawn_unified_run(run_id: uuid.UUID) -> None:

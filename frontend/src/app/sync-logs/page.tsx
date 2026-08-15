@@ -185,10 +185,17 @@ function triggeredByLabel(triggeredBy: string | null | undefined): string {
   return triggeredBy;
 }
 
-/** Extra operator hint when run was aborted by reclaim / restart / stale. */
+/** Extra operator hint when run was aborted by reclaim / restart / stale / stuck lock. */
 function abortHint(errorSummary: string | null | undefined): string | null {
   if (!errorSummary) return null;
   const s = errorSummary.toLowerCase();
+  if (s.includes("(lock)") || s.includes("устаревшим lock") || s.includes("sync_lock")) {
+    return (
+      "Advisory lock в Postgres всё ещё занят (часто после обрыва/рестарта). " +
+      "Перезапустите контейнер did-backend, дождитесь healthy, затем запустите синхронизацию снова. " +
+      "Не делайте redeploy во время активной синхронизации."
+    );
+  }
   if (
     s.includes("orphan") ||
     s.includes("interrupted by server restart") ||
