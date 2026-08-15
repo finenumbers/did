@@ -262,12 +262,18 @@ async def execute_unified_run(run_id: uuid.UUID) -> None:
     stop_keepalive = asyncio.Event()
     keepalive_task: asyncio.Task[None] | None = None
     try:
-        acquired, lock_db, lock_err = acquire_sync_lock(
+        acquired, lock_db, lock_err, pool_disposed = acquire_sync_lock(
             lock_db,
             other_active_run=lambda: _other_active_sync_run(work_db, run_id),
             new_lock_session=SessionLocal,
             dispose_pool=dispose_engine_pool,
         )
+        if pool_disposed:
+            try:
+                work_db.close()
+            except Exception:
+                logger.exception("Failed to close work_db after pool dispose heal")
+            work_db = SessionLocal()
         if not acquired:
             run = work_db.get(SyncRun, run_id)
             if run is not None and run.status in ACTIVE_STATUSES:

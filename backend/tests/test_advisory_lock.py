@@ -58,7 +58,7 @@ def test_acquire_sync_lock_succeeds_first_try():
 
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(locks, "try_advisory_lock", lambda _db, _k: True)
-        ok, session, err = locks.acquire_sync_lock(
+        ok, session, err, disposed = locks.acquire_sync_lock(
             lock_db,
             other_active_run=lambda: True,
             new_lock_session=new_session,
@@ -68,6 +68,7 @@ def test_acquire_sync_lock_succeeds_first_try():
     assert ok is True
     assert session is lock_db
     assert err is None
+    assert disposed is False
     dispose.assert_not_called()
     new_session.assert_not_called()
 
@@ -78,7 +79,7 @@ def test_acquire_sync_lock_busy_when_other_active():
 
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(locks, "try_advisory_lock", lambda _db, _k: False)
-        ok, session, err = locks.acquire_sync_lock(
+        ok, session, err, disposed = locks.acquire_sync_lock(
             lock_db,
             other_active_run=lambda: True,
             new_lock_session=MagicMock(),
@@ -88,6 +89,7 @@ def test_acquire_sync_lock_busy_when_other_active():
     assert ok is False
     assert session is lock_db
     assert err == locks.SYNC_LOCK_BUSY_MSG
+    assert disposed is False
     dispose.assert_not_called()
 
 
@@ -104,7 +106,7 @@ def test_acquire_sync_lock_heals_via_dispose_when_no_other_active():
 
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(locks, "try_advisory_lock", try_lock)
-        ok, session, err = locks.acquire_sync_lock(
+        ok, session, err, disposed = locks.acquire_sync_lock(
             lock_db,
             other_active_run=lambda: False,
             new_lock_session=new_session,
@@ -114,6 +116,7 @@ def test_acquire_sync_lock_heals_via_dispose_when_no_other_active():
     assert ok is True
     assert session is healed_db
     assert err is None
+    assert disposed is True
     lock_db.close.assert_called_once()
     dispose.assert_called_once()
     new_session.assert_called_once()
@@ -128,7 +131,7 @@ def test_acquire_sync_lock_stuck_after_failed_heal():
 
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(locks, "try_advisory_lock", lambda _db, _k: False)
-        ok, session, err = locks.acquire_sync_lock(
+        ok, session, err, disposed = locks.acquire_sync_lock(
             lock_db,
             other_active_run=lambda: False,
             new_lock_session=new_session,
@@ -138,4 +141,5 @@ def test_acquire_sync_lock_stuck_after_failed_heal():
     assert ok is False
     assert session is healed_db
     assert err == locks.SYNC_LOCK_STUCK_MSG
+    assert disposed is True
     dispose.assert_called_once()

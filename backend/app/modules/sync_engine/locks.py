@@ -79,17 +79,19 @@ def acquire_sync_lock(
     other_active_run: Callable[[], bool],
     new_lock_session: Callable[[], SessionT],
     dispose_pool: Callable[[], None],
-) -> tuple[bool, SessionT, str | None]:
+) -> tuple[bool, SessionT, str | None, bool]:
     """Try SYNC_LOCK_KEY; if held with no other active run, dispose pool and retry once.
 
-    Returns (acquired, lock_db, error_message). On heal, lock_db may be a new session.
+    Returns (acquired, lock_db, error_message, pool_disposed).
+    On heal, lock_db is a new session and pool_disposed is True (caller must recreate
+    any other sessions that were open across dispose).
     error_message is SYNC_LOCK_BUSY_MSG or SYNC_LOCK_STUCK_MSG when not acquired.
     """
     if try_advisory_lock(lock_db, SYNC_LOCK_KEY):
-        return True, lock_db, None
+        return True, lock_db, None, False
 
     if other_active_run():
-        return False, lock_db, SYNC_LOCK_BUSY_MSG
+        return False, lock_db, SYNC_LOCK_BUSY_MSG, False
 
     logger.warning(
         "Sync lock held with no other active run; disposing engine pool to clear leaked locks"
@@ -104,7 +106,7 @@ def acquire_sync_lock(
 
     if try_advisory_lock(lock_db, SYNC_LOCK_KEY):
         logger.info("Sync lock acquired after pool dispose heal")
-        return True, lock_db, None
+        return True, lock_db, None, True
 
     logger.error("Sync lock still held after pool dispose heal")
-    return False, lock_db, SYNC_LOCK_STUCK_MSG
+    return False, lock_db, SYNC_LOCK_STUCK_MSG, True
