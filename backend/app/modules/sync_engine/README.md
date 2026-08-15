@@ -20,6 +20,7 @@
 - Stage into UNLOGGED tables (recreated each run), then atomic wipe+cutover per `(provider, inventory_kind)`; `reload_allowed` only blocks empty wipe (size may shrink or grow). Sync UI shows was/became via `stats.inventory_summary`.
 - Schedule at/after 00:00 Europe/Moscow when enabled and min PSTN INN cache is ready (`last_fired` after lock acquire; fail-closed if mark fails). Catch-up: first claim later the same calendar day if backend was down at midnight — not a second run after `last_fired`.
 - Postgres advisory lock on a **dedicated** DB session (separate from staging/work session) + unique partial index: one active sync at a time (single backend replica assumed; DB pool_size=10 / max_overflow=20 leaves API headroom while sync holds one lock connection)
+- Lock session keepalive (`SELECT 1` ~30s) while sync runs; pool checkin runs `pg_advisory_unlock_all()` so locked connections never re-enter the pool; if lock is held with no other active run, dispose the pool once and retry (`SYNC_LOCK_STUCK` if still blocked)
 - Cooperative cancel: progress writes stop if run was marked failed (orphan/reclaim); worker exits instead of overwriting aborted stages
 - Orphan reclaim: `running` SyncRun with free advisory lock is marked failed (`/latest` and `/active`); age-stale for `running` also requires free lock
 - Do not redeploy backend during an active sync — kills the worker and orphans the run
