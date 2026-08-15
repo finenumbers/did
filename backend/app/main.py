@@ -29,6 +29,8 @@ from app.providers.uis import contract as uis_contract
 
 def mark_interrupted_runs() -> None:
     """Background sync dies with the process; clear orphaned active runs on boot."""
+    from app.modules.sync_engine.progress import apply_progress_abort
+
     db = SessionLocal()
     try:
         rows = db.scalars(
@@ -37,10 +39,12 @@ def mark_interrupted_runs() -> None:
             )
         ).all()
         now = datetime.now(timezone.utc)
+        reason = "Interrupted by server restart"
         for run in rows:
             run.status = SyncJobStatus.failed
-            run.error_summary = "Interrupted by server restart"
+            run.error_summary = reason
             run.finished_at = now
+            apply_progress_abort(run, reason)
         if rows:
             db.commit()
         from app.modules.pstn_inn_cache.service import mark_refresh_interrupted

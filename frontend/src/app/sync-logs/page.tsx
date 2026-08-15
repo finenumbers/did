@@ -178,6 +178,30 @@ function statusLabel(status: string): string {
   return map[status] || status;
 }
 
+function triggeredByLabel(triggeredBy: string | null | undefined): string {
+  if (triggeredBy === "api") return "вручную";
+  if (triggeredBy === "schedule") return "по расписанию";
+  if (!triggeredBy) return "—";
+  return triggeredBy;
+}
+
+/** Extra operator hint when run was aborted by reclaim / restart / stale. */
+function abortHint(errorSummary: string | null | undefined): string | null {
+  if (!errorSummary) return null;
+  const s = errorSummary.toLowerCase();
+  if (
+    s.includes("orphan") ||
+    s.includes("interrupted by server restart") ||
+    s.includes("marked stale")
+  ) {
+    return (
+      "Воркер синхронизации остановился (рестарт контейнера или сбой). " +
+      "Этапы ниже — состояние на момент обрыва; можно запустить синхронизацию снова."
+    );
+  }
+  return null;
+}
+
 function groupStages(stages: SyncStage[]): { group: string; stages: SyncStage[] }[] {
   const order: string[] = [];
   const map = new Map<string, SyncStage[]>();
@@ -211,6 +235,7 @@ export default function SyncPage() {
   const inventorySplitProviders = Array.isArray(run?.stats?.inventory_split_providers)
     ? (run?.stats?.inventory_split_providers as string[])
     : [];
+  const runAbortHint = abortHint(run?.error_summary);
   const canDownloadDropped =
     !isActive && Boolean(droppedExport?.available) && !downloadingDropped;
   const canDownloadDebugLog = Boolean(run) && !downloadingDebugLog;
@@ -398,6 +423,7 @@ export default function SyncPage() {
             <span className={`badge ${statusBadgeClass(run.status)}`}>
               {statusLabel(run.status)}
             </span>
+            {` · ${triggeredByLabel(run.triggered_by)}`}
             {run.started_at ? ` · ${new Date(run.started_at).toLocaleString()}` : ""}
           </span>
         )}
@@ -428,6 +454,9 @@ export default function SyncPage() {
             {run.error_summary && (
               <div className="state error" style={{ marginBottom: "0.75rem" }}>
                 {run.error_summary}
+                {runAbortHint && (
+                  <div style={{ marginTop: "0.5rem", fontWeight: 400 }}>{runAbortHint}</div>
+                )}
               </div>
             )}
             {groups.map(({ group, stages }) => (

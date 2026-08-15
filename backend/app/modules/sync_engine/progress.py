@@ -90,6 +90,59 @@ def stage_status(progress: dict[str, Any] | None, stage_id: str) -> str | None:
     return None
 
 
+def finalize_progress_on_abort(
+    progress: dict[str, Any] | None,
+    reason: str,
+) -> dict[str, Any] | None:
+    """Close open stages when a run is aborted (orphan / stale / restart).
+
+    ``running`` → ``failed``; ``pending`` → ``skipped``. Finished stages unchanged.
+    """
+    if not progress or not isinstance(progress, dict):
+        return progress
+    stages = progress.get("stages")
+    if not isinstance(stages, list):
+        return progress
+    now = _now_iso()
+    detail = f"aborted: {reason}"
+    changed = False
+    for stage in stages:
+        if not isinstance(stage, dict):
+            continue
+        status = stage.get("status")
+        if status == "running":
+            stage["status"] = "failed"
+            stage["finished_at"] = now
+            prev = (stage.get("detail") or "").strip()
+            stage["detail"] = f"{prev} · {detail}" if prev else detail
+            stage["substage"] = ""
+            changed = True
+        elif status == "pending":
+            stage["status"] = "skipped"
+            stage["finished_at"] = now
+            stage["detail"] = detail
+            changed = True
+    if changed:
+        progress = deepcopy(progress)
+        progress["current_stage_id"] = None
+    return progress
+
+
+def apply_progress_abort(run: SyncRun, reason: str) -> None:
+    """Mutate ``run.progress`` open stages and mark the column dirty for ORM."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    updated = finalize_progress_on_abort(getattr(run, "progress", None), reason)
+    if updated is None:
+        return
+    run.progress = updated
+    try:
+        flag_modified(run, "progress")
+    except (AttributeError, TypeError):
+        # Plain namespace / unmapped object in unit tests.
+        pass
+
+
 def build_stage_timings(progress: dict[str, Any] | None) -> list[dict[str, Any]]:
     """Per-stage wall times from progress started_at/finished_at (ISO UTC)."""
     if not progress:

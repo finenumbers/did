@@ -18,7 +18,7 @@
 - Unified sync runs (`sync_runs`) with stage progress
 - Per-provider jobs inside a run (`sync_jobs`)
 - Stage into UNLOGGED tables (recreated each run), then atomic wipe+cutover per `(provider, inventory_kind)`; `reload_allowed` only blocks empty wipe (size may shrink or grow). Sync UI shows was/became via `stats.inventory_summary`.
-- Schedule at/after 00:00 Europe/Moscow when enabled and min PSTN INN cache is ready (`last_fired` after lock acquire; fail-closed if mark fails)
+- Schedule at/after 00:00 Europe/Moscow when enabled and min PSTN INN cache is ready (`last_fired` after lock acquire; fail-closed if mark fails). Catch-up: first claim later the same calendar day if backend was down at midnight — not a second run after `last_fired`.
 - Postgres advisory lock + unique partial index: one active sync at a time (single backend replica assumed; DB pool_size=10 / max_overflow=20 leaves API headroom while sync holds one connection)
 - Orphan reclaim: `running` SyncRun with free advisory lock is marked failed (`/latest` and `/active`); age-stale for `running` also requires free lock
 - `stats.inventory_split` / `inventory_split_providers` on the unified run when free cutover committed but purchased failed for a provider

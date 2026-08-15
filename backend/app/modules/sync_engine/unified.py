@@ -25,6 +25,7 @@ from app.modules.sync_engine.dropped_export import (
 from app.modules.sync_engine.modes import SyncMode
 from app.modules.sync_engine.progress import (
     SyncProgressTracker,
+    apply_progress_abort,
     build_initial_progress,
     build_stage_timings,
     stage_for_provider_phase,
@@ -86,11 +87,11 @@ def mark_stale_runs(db: Session) -> int:
 
     marked = 0
     for run in pending:
+        reason = f"Marked stale: pending longer than {STALE_PENDING_MINUTES} minutes"
         run.status = SyncJobStatus.failed
-        run.error_summary = (
-            f"Marked stale: pending longer than {STALE_PENDING_MINUTES} minutes"
-        )
+        run.error_summary = reason
         run.finished_at = _now()
+        apply_progress_abort(run, reason)
         log_run(db, run.id, SyncLogLevel.error, run.error_summary)
         marked += 1
 
@@ -102,11 +103,13 @@ def mark_stale_runs(db: Session) -> int:
                     db.refresh(run)
                     if run.status != SyncJobStatus.running:
                         continue
-                    run.status = SyncJobStatus.failed
-                    run.error_summary = (
+                    reason = (
                         f"Marked stale: running longer than {STALE_RUNNING_MINUTES} minutes"
                     )
+                    run.status = SyncJobStatus.failed
+                    run.error_summary = reason
                     run.finished_at = _now()
+                    apply_progress_abort(run, reason)
                     log_run(db, run.id, SyncLogLevel.error, run.error_summary)
                     marked += 1
             finally:
@@ -138,9 +141,11 @@ def reclaim_orphaned_running_runs(db: Session) -> int:
     reclaimed = 0
     try:
         for run in running:
+            reason = "Marked orphan: running but sync lock was free"
             run.status = SyncJobStatus.failed
-            run.error_summary = "Marked orphan: running but sync lock was free"
+            run.error_summary = reason
             run.finished_at = _now()
+            apply_progress_abort(run, reason)
             log_run(db, run.id, SyncLogLevel.error, run.error_summary)
             reclaimed += 1
         if reclaimed:

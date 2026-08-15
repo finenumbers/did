@@ -426,7 +426,9 @@ export default function SettingsPage() {
               disabled={!schedule || scheduleSaving}
               onChange={(e) => void saveSchedule(e.target.checked)}
             />
-            Ежедневно в 00:00 (Europe/Moscow), только если кеш операторов готов
+            Ежедневно не раньше 00:00 (Europe/Moscow): первый запуск в тот же день после
+            этого времени (догон, если backend был выключен). Повтор в тот же день не
+            делается. Нужен готовый кеш операторов.
           </label>
         </div>
 

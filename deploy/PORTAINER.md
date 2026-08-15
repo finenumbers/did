@@ -59,6 +59,8 @@ BACKEND_INTERNAL_URL=http://backend:8000
 
 **Auth:** keep a **single** `backend` replica for schedule/sync/export jobs. Set `DID_REQUIRE_AUTH=1` (default in compose) so the API refuses to start without `ADMIN_USERNAME` + `ADMIN_PASSWORD`. Optional `ADMIN_API_TOKEN` is additive for machine/CI clients calling `did-backend` directly — it does **not** replace login for the UI. Do **not** set the machine token on `frontend` — the Next `/api/backend` proxy never injects it.
 
+**Daily sync:** when schedule is enabled, the first claim at/after 00:00 Europe/Moscow **that calendar day** runs (catch-up if the host was down at midnight). Not a second run after `last_fired` for the day.
+
 With `DID_REQUIRE_AUTH=1`, OpenAPI (`/docs`) is disabled on the backend.
 
 ## 4. Optional: separate API host
