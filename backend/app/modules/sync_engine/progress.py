@@ -13,6 +13,14 @@ from sqlalchemy.orm.attributes import flag_modified
 from app.models.sync import SyncRun
 from app.modules.sync_engine.run_file_log import get_sync_debug_log
 
+# Run is still allowed to mutate progress while in these statuses.
+_ACTIVE_RUN_STATUSES = frozenset({"pending", "running"})
+
+
+class SyncAborted(Exception):
+    """Run was cancelled externally (orphan reclaim / restart) — stop the worker."""
+
+
 STAGE_DEFS: list[dict[str, str]] = [
     {"id": "prepare", "group": "Общее", "label": "Подготовка"},
     {"id": "sipout_dictionaries", "group": "SipOut", "label": "Справочники"},
@@ -185,6 +193,18 @@ class SyncProgressTracker:
             run.progress = build_initial_progress()
         return run
 
+    def _ensure_active(self, run: SyncRun) -> None:
+        """Refuse progress writes after reclaim/interrupt marked the run failed."""
+        self.db.refresh(run)
+        raw = getattr(run, "status", None)
+        if raw is None:
+            return
+        status = raw.value if hasattr(raw, "value") else str(raw)
+        if status not in _ACTIVE_RUN_STATUSES:
+            raise SyncAborted(
+                f"Sync run stopped externally (status={status})"
+            )
+
     def _save(self, run: SyncRun) -> None:
         flag_modified(run, "progress")
         self.db.commit()
@@ -197,6 +217,7 @@ class SyncProgressTracker:
 
     def begin(self, stage_id: str, detail: str = "") -> None:
         run = self._load()
+        self._ensure_active(run)
         stage = self._find(run, stage_id)
         stage["status"] = "running"
         stage["started_at"] = _now_iso()
@@ -212,6 +233,7 @@ class SyncProgressTracker:
 
     def detail(self, stage_id: str, detail: str) -> None:
         run = self._load()
+        self._ensure_active(run)
         stage = self._find(run, stage_id)
         stage["detail"] = detail
         run.progress = deepcopy(run.progress)
@@ -231,6 +253,7 @@ class SyncProgressTracker:
         unit: str = "",
     ) -> None:
         run = self._load()
+        self._ensure_active(run)
         stage = self._find(run, stage_id)
         if detail is not None:
             stage["detail"] = detail
@@ -259,6 +282,7 @@ class SyncProgressTracker:
 
     def end(self, stage_id: str, detail: str = "", *, status: str = "done") -> None:
         run = self._load()
+        self._ensure_active(run)
         stage = self._find(run, stage_id)
         stage["status"] = status
         stage["finished_at"] = _now_iso()

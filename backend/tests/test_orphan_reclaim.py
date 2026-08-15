@@ -6,6 +6,8 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
+import pytest
+
 from app.models.enums import SyncJobStatus
 from app.modules.sync_engine import unified
 from app.modules.sync_engine.progress import (
@@ -84,3 +86,28 @@ def test_apply_progress_abort_noop_without_progress():
     run = SimpleNamespace(progress=None)
     apply_progress_abort(run, "Interrupted by server restart")
     assert run.progress is None
+
+
+def test_progress_tracker_raises_when_run_failed():
+    from app.modules.sync_engine.progress import SyncAborted, SyncProgressTracker
+
+    progress = build_initial_progress()
+    for stage in progress["stages"]:
+        if stage["id"] == "sipout_free":
+            stage["status"] = "failed"
+            stage["detail"] = "aborted: orphan"
+
+    run = SimpleNamespace(
+        id=uuid4(),
+        status=SyncJobStatus.failed,
+        progress=progress,
+    )
+    db = MagicMock()
+    db.get.return_value = run
+
+    tracker = SyncProgressTracker(db, run.id)
+    with pytest.raises(SyncAborted):
+        tracker.progress("sipout_free", detail="should not stick", current=1, total=10)
+
+    # Status must remain failed — zombie overwrite blocked.
+    assert stage_status(run.progress, "sipout_free") == "failed"

@@ -34,7 +34,7 @@ from app.modules.sync_engine.persist import (
     persist_uis_numbers,
     preserve_operators_on_numbers,
 )
-from app.modules.sync_engine.progress import SyncProgressTracker, stage_for_provider_phase
+from app.modules.sync_engine.progress import SyncAborted, SyncProgressTracker, stage_for_provider_phase
 from app.modules.sync_engine.safety import count_unique_provider_keys, reload_allowed
 from app.providers.dto.common import ConnectionConfig
 from app.providers.dto.numbers import NormalizedNumber
@@ -125,6 +125,8 @@ def _throttled_persist_progress(
                     total=total,
                     unit="numbers",
                 )
+        except SyncAborted:
+            raise
         except Exception:
             try:
                 side_db.rollback()

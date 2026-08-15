@@ -18,7 +18,7 @@ def test_stage_end_clears_inflight_progress_counters():
     stage["substage"] = "Буфер → каталог"
     stage["progress"] = {"current": 100, "total": 1000, "unit": "numbers"}
 
-    run = SimpleNamespace(id=run_id, progress=progress)
+    run = SimpleNamespace(id=run_id, progress=progress, status="running")
     db = MagicMock()
     db.get.return_value = run
 

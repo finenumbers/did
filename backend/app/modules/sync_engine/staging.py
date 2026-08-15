@@ -14,6 +14,8 @@ from typing import Any
 from sqlalchemy import Column, MetaData, Table, insert, text
 from sqlalchemy.orm import Session
 
+from app.modules.sync_engine.progress import SyncAborted
+
 logger = logging.getLogger(__name__)
 
 
@@ -68,6 +70,8 @@ def insert_staging_batches(
     if on_progress:
         try:
             on_progress(f"{progress_label} start", 0, total)
+        except SyncAborted:
+            raise
         except Exception:
             logger.exception("staging on_progress failed")
     cols = {c.name for c in stg.columns}
@@ -80,6 +84,8 @@ def insert_staging_batches(
         if on_progress:
             try:
                 on_progress(f"{progress_label} batch", upserted, total)
+            except SyncAborted:
+                raise
             except Exception:
                 logger.exception("staging on_progress failed")
     return upserted

@@ -24,6 +24,7 @@ from app.modules.sync_engine.dropped_export import (
 )
 from app.modules.sync_engine.modes import SyncMode
 from app.modules.sync_engine.progress import (
+    SyncAborted,
     SyncProgressTracker,
     apply_progress_abort,
     build_initial_progress,
@@ -141,6 +142,9 @@ def reclaim_orphaned_running_runs(db: Session) -> int:
     reclaimed = 0
     try:
         for run in running:
+            db.refresh(run)
+            if run.status != SyncJobStatus.running:
+                continue
             reason = "Marked orphan: running but sync lock was free"
             run.status = SyncJobStatus.failed
             run.error_summary = reason
@@ -207,27 +211,31 @@ def create_run(db: Session, *, triggered_by: str = "api") -> SyncRun:
 
 async def execute_unified_run(run_id: uuid.UUID) -> None:
     from app.modules.sync_engine.locks import SYNC_LOCK_KEY, advisory_unlock, try_advisory_lock
+    from app.modules.sync_engine.progress import SyncAborted, apply_progress_abort
     from app.modules.sync_engine.scheduler import _set_last_fired_date
     from zoneinfo import ZoneInfo
 
-    db = SessionLocal()
+    # Hold the advisory lock on a dedicated session so heavy staging commits on
+    # work_db cannot drop the lock if that connection is recycled/dies.
+    lock_db = SessionLocal()
+    work_db = SessionLocal()
     locked = False
     try:
-        if not try_advisory_lock(db, SYNC_LOCK_KEY):
-            run = db.get(SyncRun, run_id)
+        if not try_advisory_lock(lock_db, SYNC_LOCK_KEY):
+            run = work_db.get(SyncRun, run_id)
             if run is not None and run.status in ACTIVE_STATUSES:
                 run.status = SyncJobStatus.failed
                 run.error_summary = "Синхронизация уже выполняется (lock)"
                 run.finished_at = _now()
-                db.commit()
+                work_db.commit()
             return
         locked = True
-        db.commit()
-        run = db.get(SyncRun, run_id)
+        lock_db.commit()
+        run = work_db.get(SyncRun, run_id)
         if run is not None and (run.triggered_by or "") == "schedule":
             day_key = datetime.now(ZoneInfo("Europe/Moscow")).date().isoformat()
             try:
-                _set_last_fired_date(db, day_key)
+                _set_last_fired_date(work_db, day_key)
             except Exception:
                 logger.exception(
                     "Failed to mark schedule last_fired for run_id=%s; aborting run",
@@ -236,28 +244,43 @@ async def execute_unified_run(run_id: uuid.UUID) -> None:
                 run.status = SyncJobStatus.failed
                 run.error_summary = "Failed to mark schedule last_fired"
                 run.finished_at = _now()
-                db.commit()
+                work_db.commit()
                 return
-        await _execute_unified_run(db, run_id)
+        await _execute_unified_run(work_db, run_id)
+    except SyncAborted as exc:
+        logger.warning("Unified sync cooperatively aborted run_id=%s: %s", run_id, exc)
+        try:
+            work_db.rollback()
+            run = work_db.get(SyncRun, run_id)
+            if run is not None and run.status in ACTIVE_STATUSES:
+                reason = str(exc) or "Sync aborted"
+                run.status = SyncJobStatus.failed
+                run.error_summary = reason
+                run.finished_at = _now()
+                apply_progress_abort(run, reason)
+                work_db.commit()
+        except Exception:
+            work_db.rollback()
     except Exception:
         logger.exception("Unified sync crashed run_id=%s", run_id)
         try:
-            db.rollback()
-            run = db.get(SyncRun, run_id)
+            work_db.rollback()
+            run = work_db.get(SyncRun, run_id)
             if run is not None:
                 run.status = SyncJobStatus.failed
                 run.error_summary = "Unexpected sync failure"
                 run.finished_at = _now()
-                db.commit()
+                work_db.commit()
         except Exception:
-            db.rollback()
+            work_db.rollback()
     finally:
         if locked:
             try:
-                advisory_unlock(db, SYNC_LOCK_KEY)
+                advisory_unlock(lock_db, SYNC_LOCK_KEY)
             except Exception:
                 pass
-        db.close()
+        lock_db.close()
+        work_db.close()
 
 
 def spawn_unified_run(run_id: uuid.UUID) -> None:
@@ -318,6 +341,12 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
         inventory_split_providers: list[str] = []
 
         for code in PROVIDER_ORDER:
+            db.refresh(run)
+            if run.status not in ACTIVE_STATUSES:
+                raise SyncAborted(
+                    run.error_summary
+                    or f"Sync run stopped externally (status={run.status.value})"
+                )
             provider = providers[code]
             if not provider.is_enabled:
                 for phase in ("dictionaries", "free", "purchased"):
@@ -360,6 +389,13 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
                 provider_ok += 1
             else:
                 provider_failures.append(code.value)
+
+        db.refresh(run)
+        if run.status not in ACTIVE_STATUSES:
+            raise SyncAborted(
+                run.error_summary
+                or f"Sync run stopped externally (status={run.status.value})"
+            )
 
         await _run_operator_enrichment(
             db, run=run, tracker=tracker, category_stats=category_stats
@@ -573,6 +609,8 @@ async def _sync_provider(
             job.id,
             phase_hook=phase_hook,
         )
+    except SyncAborted:
+        raise
     except ProviderCapabilityLimitedError as exc:
         log_run(db, run.id, SyncLogLevel.error, f"{code.value}: capability limited: {exc}")
         _fail_remaining_provider_stages(db, tracker, code.value, str(exc))
