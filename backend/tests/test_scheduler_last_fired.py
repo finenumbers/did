@@ -110,14 +110,15 @@ def test_execute_marks_last_fired_after_lock_for_schedule():
     run = SimpleNamespace(id=run_id, triggered_by="schedule", status=SyncJobStatus.pending)
     db.get.return_value = run
     set_fired = MagicMock()
+    lock_conn = MagicMock()
 
     with (
         patch.object(unified, "SessionLocal", return_value=db),
         patch(
-            "app.modules.sync_engine.locks.try_advisory_lock",
-            return_value=True,
+            "app.modules.sync_engine.unified.acquire_sync_lock",
+            return_value=(True, lock_conn, None, False),
         ),
-        patch("app.modules.sync_engine.locks.advisory_unlock"),
+        patch("app.modules.sync_engine.unified.advisory_unlock_conn"),
         patch(
             "app.modules.sync_engine.scheduler._set_last_fired_date",
             set_fired,
@@ -143,11 +144,15 @@ def test_execute_aborts_when_last_fired_mark_fails():
         finished_at=None,
     )
     db.get.return_value = run
+    lock_conn = MagicMock()
 
     with (
         patch.object(unified, "SessionLocal", return_value=db),
-        patch("app.modules.sync_engine.locks.try_advisory_lock", return_value=True),
-        patch("app.modules.sync_engine.locks.advisory_unlock"),
+        patch(
+            "app.modules.sync_engine.unified.acquire_sync_lock",
+            return_value=(True, lock_conn, None, False),
+        ),
+        patch("app.modules.sync_engine.unified.advisory_unlock_conn"),
         patch(
             "app.modules.sync_engine.scheduler._set_last_fired_date",
             side_effect=RuntimeError("settings write failed"),
@@ -175,8 +180,8 @@ def test_execute_skips_last_fired_when_lock_fails():
     with (
         patch.object(unified, "SessionLocal", return_value=db),
         patch(
-            "app.modules.sync_engine.locks.try_advisory_lock",
-            return_value=False,
+            "app.modules.sync_engine.unified.acquire_sync_lock",
+            return_value=(False, None, "Синхронизация уже выполняется (lock)", False),
         ),
         patch(
             "app.modules.sync_engine.scheduler._set_last_fired_date",

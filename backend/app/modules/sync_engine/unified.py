@@ -9,7 +9,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import select, text
+from sqlalchemy import select
+from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.db import SessionLocal, dispose_engine_pool
@@ -25,8 +26,8 @@ from app.modules.sync_engine.dropped_export import (
 from app.modules.sync_engine.locks import (
     SYNC_LOCK_KEY,
     acquire_sync_lock,
-    advisory_unlock,
-    detach_session_connection,
+    advisory_unlock_conn,
+    ping_lock_conn,
 )
 from app.modules.sync_engine.modes import SyncMode
 from app.modules.sync_engine.progress import (
@@ -229,8 +230,12 @@ def _other_active_sync_run(db: Session, run_id: uuid.UUID) -> bool:
     )
 
 
-async def _lock_db_keepalive(lock_db: Session, stop: asyncio.Event) -> None:
-    """Keep the lock session alive so idle TCP/Postgres timeouts do not drop the advisory lock."""
+async def _lock_conn_keepalive(
+    lock_conn: Connection,
+    stop: asyncio.Event,
+    gate: threading.Lock,
+) -> None:
+    """Keep the lock connection alive so idle TCP/Postgres timeouts do not drop the advisory lock."""
     while not stop.is_set():
         try:
             await asyncio.wait_for(stop.wait(), timeout=LOCK_KEEPALIVE_SECONDS)
@@ -238,15 +243,15 @@ async def _lock_db_keepalive(lock_db: Session, stop: asyncio.Event) -> None:
         except asyncio.TimeoutError:
             pass
         try:
-            await asyncio.to_thread(_ping_lock_db, lock_db)
+            await asyncio.to_thread(_ping_lock_conn_gated, lock_conn, gate)
         except Exception:
-            logger.exception("lock_db keepalive failed; lock session may be dead")
+            logger.exception("lock_conn keepalive failed; lock session may be dead")
             return
 
 
-def _ping_lock_db(lock_db: Session) -> None:
-    lock_db.execute(text("SELECT 1"))
-    lock_db.commit()
+def _ping_lock_conn_gated(lock_conn: Connection, gate: threading.Lock) -> None:
+    with gate:
+        ping_lock_conn(lock_conn)
 
 
 async def execute_unified_run(run_id: uuid.UUID) -> None:
@@ -254,25 +259,25 @@ async def execute_unified_run(run_id: uuid.UUID) -> None:
     from app.modules.sync_engine.scheduler import _set_last_fired_date
     from zoneinfo import ZoneInfo
 
-    # Hold the advisory lock on a dedicated session so heavy staging commits on
-    # work_db cannot drop the lock if that connection is recycled/dies.
-    lock_db = SessionLocal()
+    # Hold SYNC_LOCK_KEY on a lock_engine Connection for the whole run. Never use a
+    # Session for this: Session.commit() returns the connection to the main pool where
+    # checkin runs pg_advisory_unlock_all() and reclaim would false-orphan the run.
     work_db = SessionLocal()
+    lock_conn: Connection | None = None
     locked = False
+    lock_gate = threading.Lock()
     stop_keepalive = asyncio.Event()
     keepalive_task: asyncio.Task[None] | None = None
     try:
-        acquired, lock_db, lock_err, pool_disposed = acquire_sync_lock(
-            lock_db,
+        acquired, lock_conn, lock_err, main_disposed = acquire_sync_lock(
             other_active_run=lambda: _other_active_sync_run(work_db, run_id),
-            new_lock_session=SessionLocal,
-            dispose_pool=dispose_engine_pool,
+            dispose_main_pool=dispose_engine_pool,
         )
-        if pool_disposed:
+        if main_disposed:
             try:
                 work_db.close()
             except Exception:
-                logger.exception("Failed to close work_db after pool dispose heal")
+                logger.exception("Failed to close work_db after main pool dispose heal")
             work_db = SessionLocal()
         if not acquired:
             run = work_db.get(SyncRun, run_id)
@@ -283,9 +288,8 @@ async def execute_unified_run(run_id: uuid.UUID) -> None:
                 work_db.commit()
             return
         locked = True
-        lock_db.commit()
         keepalive_task = asyncio.create_task(
-            _lock_db_keepalive(lock_db, stop_keepalive),
+            _lock_conn_keepalive(lock_conn, stop_keepalive, lock_gate),
             name=f"sync-lock-keepalive-{run_id}",
         )
         run = work_db.get(SyncRun, run_id)
@@ -336,19 +340,20 @@ async def execute_unified_run(run_id: uuid.UUID) -> None:
             try:
                 await keepalive_task
             except Exception:
-                logger.exception("lock_db keepalive task failed on shutdown")
-        if locked:
+                logger.exception("lock_conn keepalive task failed on shutdown")
+        if locked and lock_conn is not None:
+            with lock_gate:
+                try:
+                    advisory_unlock_conn(lock_conn, SYNC_LOCK_KEY)
+                except Exception:
+                    logger.exception(
+                        "Failed to unlock sync lock; connection invalidated if possible"
+                    )
+        if lock_conn is not None:
             try:
-                advisory_unlock(lock_db, SYNC_LOCK_KEY)
+                lock_conn.close()
             except Exception:
-                logger.exception(
-                    "Failed to unlock sync lock; detaching connection so it cannot re-enter pool"
-                )
-                detach_session_connection(lock_db)
-        try:
-            lock_db.close()
-        except Exception:
-            logger.exception("Failed to close lock_db")
+                logger.exception("Failed to close lock_conn")
         try:
             work_db.close()
         except Exception:

@@ -202,7 +202,7 @@ function abortHint(errorSummary: string | null | undefined): string | null {
     s.includes("marked stale")
   ) {
     return (
-      "Воркер синхронизации остановился (рестарт контейнера или сбой). " +
+      "Воркер синхронизации потерял advisory lock или был остановлен (сбой, обрыв соединения или redeploy). " +
       "Не делайте redeploy backend во время синхронизации. " +
       "Этапы ниже — состояние на момент обрыва; можно запустить синхронизацию снова."
     );

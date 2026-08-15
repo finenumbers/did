@@ -1,12 +1,17 @@
-"""Postgres session-level advisory locks for single-flight sync / cache refresh."""
+"""Postgres session-level advisory locks for single-flight sync / cache refresh.
+
+Long-held locks (sync, PSTN cache refresh) MUST use Connections from ``lock_engine``
+(NullPool). Never hold them via Session on the main engine: Session.commit() returns
+the connection to the pool, and main-pool checkin runs pg_advisory_unlock_all().
+"""
 
 from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from typing import TypeVar
 
 from sqlalchemy import text
+from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -14,8 +19,6 @@ logger = logging.getLogger(__name__)
 # Stable int keys (arbitrary, unique within this DB)
 SYNC_LOCK_KEY = 88221001
 CACHE_REFRESH_LOCK_KEY = 88221002
-
-SessionT = TypeVar("SessionT", bound=Session)
 
 SYNC_LOCK_BUSY_MSG = "Синхронизация уже выполняется (lock)"
 SYNC_LOCK_STUCK_MSG = (
@@ -25,6 +28,7 @@ SYNC_LOCK_STUCK_CODE = "SYNC_LOCK_STUCK"
 
 
 def try_advisory_lock(db: Session, key: int) -> bool:
+    """Short-lived try on a Session (reclaim/stale). Do not hold across Session.commit()."""
     return bool(db.scalar(text("SELECT pg_try_advisory_lock(:k)"), {"k": key}))
 
 
@@ -48,16 +52,41 @@ def advisory_unlock(db: Session, key: int) -> None:
         raise
 
 
-def detach_session_connection(db: Session) -> None:
-    """Drop the DBAPI connection so it cannot re-enter the pool while locked."""
+def try_advisory_lock_conn(conn: Connection, key: int) -> bool:
+    """Acquire advisory lock on a held Connection; commit ends the txn but keeps the checkout."""
+    acquired = bool(
+        conn.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": key}).scalar()
+    )
+    conn.commit()
+    return acquired
+
+
+def advisory_unlock_conn(conn: Connection, key: int) -> None:
+    """Release advisory lock on a held Connection. On failure, invalidate the connection."""
     try:
-        db.rollback()
+        unlocked = conn.execute(
+            text("SELECT pg_advisory_unlock(:k)"), {"k": key}
+        ).scalar()
+        conn.commit()
+        if unlocked is False:
+            raise RuntimeError(f"pg_advisory_unlock returned false for key={key}")
     except Exception:
-        pass
-    try:
-        db.connection().detach()
-    except Exception:
-        logger.exception("Failed to detach session connection")
+        logger.exception("advisory_unlock_conn failed for key=%s; invalidating", key)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        try:
+            conn.invalidate()
+        except Exception:
+            logger.exception("Failed to invalidate connection after unlock failure")
+        raise
+
+
+def ping_lock_conn(conn: Connection) -> None:
+    """Keepalive on the same held Connection (does not return it to any pool)."""
+    conn.execute(text("SELECT 1"))
+    conn.commit()
 
 
 def clear_advisory_locks_dbapi(dbapi_conn) -> None:
@@ -82,39 +111,73 @@ def clear_advisory_locks_dbapi(dbapi_conn) -> None:
 
 
 def acquire_sync_lock(
-    lock_db: SessionT,
     *,
     other_active_run: Callable[[], bool],
-    new_lock_session: Callable[[], SessionT],
-    dispose_pool: Callable[[], None],
-) -> tuple[bool, SessionT, str | None, bool]:
-    """Try SYNC_LOCK_KEY; if held with no other active run, dispose pool and retry once.
+    dispose_main_pool: Callable[[], None],
+    connect: Callable[[], Connection] | None = None,
+) -> tuple[bool, Connection | None, str | None, bool]:
+    """Try SYNC_LOCK_KEY on lock_engine; if held with no other active run, dispose main pool once.
 
-    Returns (acquired, lock_db, error_message, pool_disposed).
-    On heal, lock_db is a new session and pool_disposed is True (caller must recreate
-    any other sessions that were open across dispose).
-    error_message is SYNC_LOCK_BUSY_MSG or SYNC_LOCK_STUCK_MSG when not acquired.
+    Returns (acquired, lock_conn, error_message, main_pool_disposed).
+    Caller must keep lock_conn open until unlock+close. Never Session.commit the lock.
     """
-    if try_advisory_lock(lock_db, SYNC_LOCK_KEY):
-        return True, lock_db, None, False
+    from app.core.db import lock_engine
 
-    if other_active_run():
-        return False, lock_db, SYNC_LOCK_BUSY_MSG, False
-
-    logger.warning(
-        "Sync lock held with no other active run; disposing engine pool to clear leaked locks"
-    )
+    open_conn = connect or lock_engine.connect
+    conn = open_conn()
     try:
-        lock_db.close()
+        if try_advisory_lock_conn(conn, SYNC_LOCK_KEY):
+            return True, conn, None, False
+
+        if other_active_run():
+            conn.close()
+            return False, None, SYNC_LOCK_BUSY_MSG, False
+
+        logger.warning(
+            "Sync lock held with no other active run; disposing main engine pool to clear leaked locks"
+        )
+        try:
+            conn.close()
+        except Exception:
+            logger.exception("Failed to close probe lock connection before main pool dispose")
+
+        dispose_main_pool()
+        conn = open_conn()
+        if try_advisory_lock_conn(conn, SYNC_LOCK_KEY):
+            logger.info("Sync lock acquired after main pool dispose heal")
+            return True, conn, None, True
+
+        logger.error("Sync lock still held after main pool dispose heal")
+        try:
+            conn.close()
+        except Exception:
+            logger.exception("Failed to close lock connection after stuck acquire")
+        return False, None, SYNC_LOCK_STUCK_MSG, True
     except Exception:
-        logger.exception("Failed to close lock session before pool dispose")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        raise
 
-    dispose_pool()
-    lock_db = new_lock_session()
 
-    if try_advisory_lock(lock_db, SYNC_LOCK_KEY):
-        logger.info("Sync lock acquired after pool dispose heal")
-        return True, lock_db, None, True
+def acquire_cache_refresh_lock(
+    *,
+    connect: Callable[[], Connection] | None = None,
+) -> tuple[bool, Connection | None]:
+    """Try CACHE_REFRESH_LOCK_KEY on lock_engine. Caller holds conn until unlock+close."""
+    from app.core.db import lock_engine
 
-    logger.error("Sync lock still held after pool dispose heal")
-    return False, lock_db, SYNC_LOCK_STUCK_MSG, True
+    open_conn = connect or lock_engine.connect
+    conn = open_conn()
+    try:
+        if try_advisory_lock_conn(conn, CACHE_REFRESH_LOCK_KEY):
+            return True, conn
+        conn.close()
+        return False, None
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        raise

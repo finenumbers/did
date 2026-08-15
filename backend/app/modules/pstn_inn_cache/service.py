@@ -501,14 +501,16 @@ def spawn_cache_refresh() -> None:
         def _runner() -> None:
             from app.modules.sync_engine.locks import (
                 CACHE_REFRESH_LOCK_KEY,
-                advisory_unlock,
-                try_advisory_lock,
+                acquire_cache_refresh_lock,
+                advisory_unlock_conn,
             )
 
             session = SessionLocal()
+            lock_conn = None
             locked = False
             try:
-                if not try_advisory_lock(session, CACHE_REFRESH_LOCK_KEY):
+                acquired, lock_conn = acquire_cache_refresh_lock()
+                if not acquired:
                     _set_refresh_status(
                         session,
                         status="failed",
@@ -518,7 +520,6 @@ def spawn_cache_refresh() -> None:
                     )
                     return
                 locked = True
-                session.commit()
                 asyncio.run(refresh_enabled_caches(session))
             except Exception as exc:
                 logger.exception("Cache refresh crashed")
@@ -534,11 +535,16 @@ def spawn_cache_refresh() -> None:
                 except Exception:
                     session.rollback()
             finally:
-                if locked:
+                if locked and lock_conn is not None:
                     try:
-                        advisory_unlock(session, CACHE_REFRESH_LOCK_KEY)
+                        advisory_unlock_conn(lock_conn, CACHE_REFRESH_LOCK_KEY)
                     except Exception:
-                        pass
+                        logger.exception("Failed to unlock cache refresh advisory lock")
+                if lock_conn is not None:
+                    try:
+                        lock_conn.close()
+                    except Exception:
+                        logger.exception("Failed to close cache refresh lock connection")
                 session.close()
 
         _refresh_thread = threading.Thread(target=_runner, name="pstn-inn-cache-refresh", daemon=True)
