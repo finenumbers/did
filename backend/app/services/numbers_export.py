@@ -55,6 +55,7 @@ EXPORT_COLUMNS: list[tuple[str, str]] = [
 ]
 
 RTU_NOT_CONNECTED_FILL = "#FFC7CE"
+RTU_EXTERNAL_FILL = "#FFEB9C"
 
 _BATCH = 5_000
 DEFAULT_SORT_BY = "abc_code"
@@ -211,11 +212,12 @@ class NumbersExportService:
             for row, code in result:
                 provider_code = code.value if hasattr(code, "value") else str(code)
                 fill = None
-                if (
-                    inventory_kind == InventoryKind.purchased
-                    and (row.rtu_connected or "") == "Не подключено"
-                ):
-                    fill = RTU_NOT_CONNECTED_FILL
+                if inventory_kind == InventoryKind.purchased:
+                    rtu = row.rtu_connected or ""
+                    if rtu == "Не подключено":
+                        fill = RTU_NOT_CONNECTED_FILL
+                    elif rtu == "Внешняя нумерация":
+                        fill = RTU_EXTERNAL_FILL
                 writer.write_row(
                     [_cell_value(key, row, provider_code) for key in keys],
                     fill_color=fill,

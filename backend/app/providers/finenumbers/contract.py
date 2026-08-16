@@ -29,5 +29,6 @@ REG_MAX_PAGE_SIZE = 200
 REG_RATE_LIMIT_SAFE_PER_MINUTE = 9000
 
 # Catalog column «Подключено в РТУ» (purchased only)
-RTU_CONNECTED = "Подключено"
+RTU_OWN = "Своя нумерация"
+RTU_EXTERNAL = "Внешняя нумерация"
 RTU_NOT_CONNECTED = "Не подключено"

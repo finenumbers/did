@@ -433,7 +433,9 @@ export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
                 className={
                   kind === "purchased" && row.rtu_connected === "Не подключено"
                     ? "row-rtu-not-connected"
-                    : undefined
+                    : kind === "purchased" && row.rtu_connected === "Внешняя нумерация"
+                      ? "row-rtu-external"
+                      : undefined
                 }
               >
                 {columns.map((col) => (

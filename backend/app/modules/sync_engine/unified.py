@@ -542,6 +542,31 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
             category_stats=category_stats,
             only_missing=False,
         )
+        # Reclassify RTU after enrich — Finenumbers labels depend on final operator.
+        fn_cats = category_stats.get("finenumbers")
+        purch_stats = (
+            fn_cats.get("purchased_numbers") if isinstance(fn_cats, dict) else None
+        )
+        if isinstance(purch_stats, dict) and "reg_keys" in purch_stats:
+            from app.modules.sync_engine.persist import apply_rtu_connected_flags
+
+            rtu_stats = apply_rtu_connected_flags(
+                db, reg_keys=set(purch_stats.get("reg_keys") or [])
+            )
+            purch_stats.update(rtu_stats)
+            db.commit()
+            log_run(
+                db,
+                run.id,
+                SyncLogLevel.info,
+                (
+                    "RTU flags re-applied after operator enrichment "
+                    f"own={rtu_stats.get('rtu_own')} "
+                    f"external={rtu_stats.get('rtu_external')} "
+                    f"not_connected={rtu_stats.get('rtu_not_connected')}"
+                ),
+                rtu_stats,
+            )
         db.refresh(run)
         summary = dict(run.stats or summary)
         summary["categories"] = category_stats

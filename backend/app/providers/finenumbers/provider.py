@@ -71,8 +71,6 @@ class FinenumbersProvider(AbstractProvider):
         finally:
             await client.aclose()
         mapped, unmapped = map_reg_endpoints(rows)
-        for num in mapped:
-            num.rtu_connected = contract.RTU_CONNECTED
         self._reg_numbers = mapped
         self._reg_keys = reg_key_set(mapped)
         self._reg_envelopes = envelopes

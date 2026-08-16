@@ -48,44 +48,53 @@ def test_reg_key_set_dedupes():
 
 
 def test_apply_rtu_connected_flags_semantics():
-    early = {"900|1234567"}
-    reg = {"900|9999999"}
-    row_early_missing = SimpleNamespace(
-        abc_code="900",
-        number_local="1234567",
-        msisdn="79001234567",
-        rtu_connected=None,
-    )
-    row_reg_only = SimpleNamespace(
-        abc_code="900",
-        number_local="9999999",
-        msisdn="79009999999",
-        rtu_connected=None,
-    )
-    row_early_confirmed = SimpleNamespace(
+    """Four product rules for purchased RTU column."""
+    row_fn_frontier = SimpleNamespace(
         abc_code="900",
         number_local="1111111",
         msisdn="79001111111",
+        operator=contract.OPERATOR_DISPLAY_NAME,
         rtu_connected=None,
     )
-    # early key that is also in reg — should be Подключено
-    early2 = {"900|1234567", "900|1111111"}
-    reg2 = {"900|1111111", "900|9999999"}
+    row_fn_other = SimpleNamespace(
+        abc_code="900",
+        number_local="2222222",
+        msisdn="79002222222",
+        operator="MegaFon",
+        rtu_connected=None,
+    )
+    row_other_in_reg = SimpleNamespace(
+        abc_code="900",
+        number_local="3333333",
+        msisdn="79003333333",
+        operator="SipOut Op",
+        rtu_connected=None,
+    )
+    row_other_missing = SimpleNamespace(
+        abc_code="900",
+        number_local="4444444",
+        msisdn="79004444444",
+        operator="SipOut Op",
+        rtu_connected=None,
+    )
+    reg = {"900|3333333", "900|1111111"}
 
     db = MagicMock()
-    db.scalars.return_value.all.return_value = [
-        row_early_missing,
-        row_reg_only,
-        row_early_confirmed,
+    result = MagicMock()
+    result.all.return_value = [
+        (row_fn_frontier, "finenumbers"),
+        (row_fn_other, "finenumbers"),
+        (row_other_in_reg, "sipout"),
+        (row_other_missing, "sipout"),
     ]
-    stats = persist.apply_rtu_connected_flags(
-        db, reg_keys=reg2, early_purchased_keys=early2
-    )
-    assert row_early_missing.rtu_connected == contract.RTU_NOT_CONNECTED
-    assert row_reg_only.rtu_connected == contract.RTU_CONNECTED
-    assert row_early_confirmed.rtu_connected == contract.RTU_CONNECTED
-    assert stats["rtu_not_connected"] == 1
-    assert stats["rtu_connected"] == 2
+    db.execute.return_value = result
+
+    stats = persist.apply_rtu_connected_flags(db, reg_keys=reg)
+    assert row_fn_frontier.rtu_connected == contract.RTU_OWN
+    assert row_fn_other.rtu_connected == contract.RTU_EXTERNAL
+    assert row_other_in_reg.rtu_connected == contract.RTU_EXTERNAL
+    assert row_other_missing.rtu_connected == contract.RTU_NOT_CONNECTED
+    assert stats == {"rtu_own": 1, "rtu_external": 2, "rtu_not_connected": 1}
 
 
 def test_normalized_number_carries_rtu_field():
@@ -103,6 +112,6 @@ def test_normalized_number_carries_rtu_field():
         mapping_confidence=MappingConfidence.high,
         normalized_payload={},
         raw_payload={},
-        rtu_connected=contract.RTU_CONNECTED,
+        rtu_connected=contract.RTU_OWN,
     )
-    assert n.rtu_connected == contract.RTU_CONNECTED
+    assert n.rtu_connected == contract.RTU_OWN

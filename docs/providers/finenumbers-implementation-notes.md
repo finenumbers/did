@@ -14,9 +14,18 @@ Nav: [`finenumbers/SOURCE.md`](finenumbers/SOURCE.md) · [`finenumbers-contract.
 | Stage id | Phase |
 |---|---|
 | `finenumbers_free` | Contour A by-inn expand → catalog (no dictionaries stage) |
-| `finenumbers_purchased` | Contour C REG → purchased + RTU flags |
+| `finenumbers_purchased` | Contour C REG → purchased + provisional RTU flags |
 | `finalize` | Dropped XLSX, inventory summary, catalog checksum |
-| `operator_enrichment` | **Last** stage: Contour B fills `operator` on all present rows |
+| `operator_enrichment` | **Last** stage: Contour B fills `operator` on all present rows; then RTU flags re-applied |
+
+## Contour C — REG / RTU (purchased)
+
+- REG-only inserts under provider `finenumbers`; duplicates already purchased elsewhere are skipped (no second row).
+- Column **Подключено в РТУ**:
+  - **Своя нумерация** — Finenumbers + operator Frontier
+  - **Внешняя нумерация** — Finenumbers + non-Frontier operator, or other provider present in REG
+  - **Не подключено** — other provider absent from REG
+- Yellow row = Внешняя; red row = Не подключено.
 
 ## Contour A — free inventory
 

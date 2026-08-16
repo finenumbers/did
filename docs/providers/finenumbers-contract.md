@@ -22,7 +22,12 @@ Same INN may appear in A/B (e.g. Frontier). Contour C uses a separate REG API ke
 - Read-only: `GET /api/phones?kind=endpoints_registered|endpoints_unregistered|endpoints_error`
 - Number field: `endpointNumber`
 - Free inventory = PSTN expand minus REG keys
-- `rtu_connected`: «Не подключено» only for purchased from earlier providers not in REG; else «Подключено»
+- `rtu_connected` (purchased):
+  - Finenumbers + operator `ООО «Фронтир Нетворк»` → **Своя нумерация**
+  - Finenumbers + other/empty operator → **Внешняя нумерация** (yellow)
+  - Other provider + number in REG → **Внешняя нумерация** (yellow; no duplicate catalog row)
+  - Other provider + number not in REG → **Не подключено** (red)
+- Flags are re-applied after Contour B operator enrichment (final operator SoT)
 - **Never** call REG mutating endpoints (`POST …/request`, `rtu-import`, `regs/poll`, …)
 
 ## Auth — VERIFIED (code)

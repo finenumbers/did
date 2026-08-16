@@ -1322,33 +1322,52 @@ def apply_rtu_connected_flags(
     db: Session,
     *,
     reg_keys: set[str],
-    early_purchased_keys: set[str],
 ) -> dict[str, int]:
-    """Set rtu_connected on all purchased rows.
+    """Set rtu_connected on all present purchased rows.
 
-    Не подключено — only early purchased keys (other providers) not confirmed by REG.
-    Everything else purchased → Подключено.
+    Finenumbers + Frontier operator → Своя нумерация.
+    Finenumbers + other/empty operator → Внешняя нумерация.
+    Other provider + key in REG → Внешняя нумерация.
+    Other provider + key not in REG → Не подключено.
     """
+    from app.models.providers import Provider
     from app.providers.finenumbers import contract
 
-    rows = db.scalars(
-        select(NumbersCatalogNormalized).where(
+    rows = db.execute(
+        select(NumbersCatalogNormalized, Provider.code).join(
+            Provider, Provider.id == NumbersCatalogNormalized.provider_id
+        ).where(
             NumbersCatalogNormalized.inventory_kind == InventoryKind.purchased,
             NumbersCatalogNormalized.is_currently_present.is_(True),
         )
     ).all()
+    own = 0
+    external = 0
     not_connected = 0
-    connected = 0
-    for row in rows:
+    for row, provider_code in rows:
+        code = provider_code.value if hasattr(provider_code, "value") else str(provider_code)
+        if code == ProviderCode.finenumbers.value:
+            op = (row.operator or "").strip()
+            if op == contract.OPERATOR_DISPLAY_NAME:
+                row.rtu_connected = contract.RTU_OWN
+                own += 1
+            else:
+                row.rtu_connected = contract.RTU_EXTERNAL
+                external += 1
+            continue
         key = _purchased_match_key_row(row)
-        if key and key in early_purchased_keys and key not in reg_keys:
+        if key and key in reg_keys:
+            row.rtu_connected = contract.RTU_EXTERNAL
+            external += 1
+        else:
             row.rtu_connected = contract.RTU_NOT_CONNECTED
             not_connected += 1
-        else:
-            row.rtu_connected = contract.RTU_CONNECTED
-            connected += 1
     db.flush()
-    return {"rtu_connected": connected, "rtu_not_connected": not_connected}
+    return {
+        "rtu_own": own,
+        "rtu_external": external,
+        "rtu_not_connected": not_connected,
+    }
 
 
 def persist_finenumbers_reg_purchased(
@@ -1358,7 +1377,7 @@ def persist_finenumbers_reg_purchased(
     job_id: uuid.UUID,
     numbers: list[NormalizedNumber],
     on_progress: Callable[[str, int | None, int | None], Any] | None = None,
-) -> dict[str, int]:
+) -> dict[str, Any]:
     """Wipe+cutover finenumbers purchased for REG-only rows; then apply RTU flags.
 
     Duplicates already purchased by other providers are not inserted.
@@ -1384,15 +1403,15 @@ def persist_finenumbers_reg_purchased(
         numbers=only_reg,
         on_progress=on_progress,
     )
-    rtu_stats = apply_rtu_connected_flags(
-        db, reg_keys=reg_keys, early_purchased_keys=early_keys
-    )
+    rtu_stats = apply_rtu_connected_flags(db, reg_keys=reg_keys)
     return {
         **persist_stats,
         **rtu_stats,
         "reg_total": len(reg_keys),
         "reg_inserted": len(only_reg),
         "early_purchased_keys": len(early_keys),
+        # Serializable for re-apply after operator enrichment.
+        "reg_keys": sorted(reg_keys),
     }
 
 

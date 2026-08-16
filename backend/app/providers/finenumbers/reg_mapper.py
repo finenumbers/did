@@ -59,7 +59,6 @@ def map_reg_endpoint(row: dict[str, Any]) -> NormalizedNumber | None:
             "source": "finenumbers_reg_phones",
             "reg_id": row.get("id"),
             "reg_name": row.get("name"),
-            "rtu_connected": contract.RTU_CONNECTED,
         },
         raw_payload=dict(row),
         abc_code=abc,

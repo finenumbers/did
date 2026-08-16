@@ -680,12 +680,16 @@ class SyncService:
                         ),
                         "reg_total": persist_stats.get("reg_total"),
                         "reg_inserted": persist_stats.get("reg_inserted"),
-                        "rtu_connected": persist_stats.get("rtu_connected"),
+                        "reg_keys": persist_stats.get("reg_keys") or [],
+                        "rtu_own": persist_stats.get("rtu_own"),
+                        "rtu_external": persist_stats.get("rtu_external"),
                         "rtu_not_connected": persist_stats.get("rtu_not_connected"),
                     }
                     purch_detail = (
                         f"{_number_reload_detail(fetched=fetched, parsed=parsed, upserted=int(persist_stats.get('upserted') or 0))}; "
                         f"reg_inserted={persist_stats.get('reg_inserted')}, "
+                        f"rtu_own={persist_stats.get('rtu_own')}, "
+                        f"rtu_external={persist_stats.get('rtu_external')}, "
                         f"rtu_not_connected={persist_stats.get('rtu_not_connected')}"
                     )
                     log_job(
