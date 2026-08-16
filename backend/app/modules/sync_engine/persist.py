@@ -1347,8 +1347,7 @@ def apply_rtu_connected_flags(
     for row, provider_code in rows:
         code = provider_code.value if hasattr(provider_code, "value") else str(provider_code)
         if code == ProviderCode.finenumbers.value:
-            op = (row.operator or "").strip()
-            if op == contract.OPERATOR_DISPLAY_NAME:
+            if contract.is_frontier_operator(row.operator):
                 row.rtu_connected = contract.RTU_OWN
                 own += 1
             else:

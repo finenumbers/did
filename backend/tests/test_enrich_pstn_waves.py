@@ -131,6 +131,44 @@ def test_filled_operator_still_looks_up_on_cache_miss(monkeypatch):
     assert written == [(cat_id, "FromApi")]
 
 
+def test_failed_lookup_clears_interim_operator(monkeypatch):
+    calls: list[str] = []
+    written: list[tuple] = []
+
+    async def fake_lookup(self, phone: str) -> RawHttpResult:
+        calls.append(phone)
+        return _raw(body={"found": False})
+
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich.load_enabled_ranges_for_enrich",
+        lambda db: [],
+    )
+    monkeypatch.setattr(
+        "app.providers.finenumbers.client.FinenumbersClient.lookup_phone",
+        fake_lookup,
+    )
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich._bulk_update_operators",
+        lambda db, pairs: written.extend(pairs) or len(pairs),
+    )
+
+    cat_id = uuid.uuid4()
+    db = _mock_db([(cat_id, "79005555555", 'ООО «Фронтир Нетворк»', "900", 5555555)])
+
+    stats = asyncio.run(
+        enrich_catalog_operators(
+            db,
+            connection=_conn(),
+            require_full_coverage=False,
+            concurrency=2,
+        )
+    )
+    assert calls == ["9005555555"]
+    assert written == [(cat_id, None)]
+    assert stats["cleared_unresolved"] == 1
+    assert stats["missing"] >= 1
+
+
 def test_failed_lookup_not_retried_in_next_wave(monkeypatch):
     calls: list[str] = []
 

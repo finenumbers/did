@@ -2,7 +2,7 @@
 
 Contour B: local cache is used ONLY to fill catalog.operator (no region/inventory).
 RULE: every currently present catalog MSISDN goes through cache → PSTN lookup when needed;
-final operator SoT is this last sync stage (overwrite when cache/API returns a value).
+final operator SoT is this last sync stage — only PSTN cache/API values (clear interim on miss).
 """
 
 from __future__ import annotations
@@ -141,6 +141,7 @@ async def enrich_catalog_operators(
     Primary: local pstn_inn_ranges_cache (enabled INNs) — writes ONLY operator.
     Secondary: PSTN lookup API for cache misses (always queued; overwrites existing operator).
     With only_missing=False (default / production): every present row is enriched.
+    If cache and API yield no operator, clear any interim value (final SoT is PSTN only).
     """
     client = FinenumbersClient(connection)
     cache = OperatorRangeCache()
@@ -248,6 +249,7 @@ async def _enrich_catalog_operators_inner(
     cache_hits = 0
     lookups = 0
     errors = 0
+    cleared_unresolved = 0
 
     # (id, msisdn, phone, current_operator)
     pending: list[tuple] = []
@@ -272,6 +274,9 @@ async def _enrich_catalog_operators_inner(
             phone = phone_for_lookup(msisdn_s)
             if not phone:
                 invalid_msisdns.append(msisdn_s)
+                if current_operator and str(current_operator).strip():
+                    pending_updates.append((catalog_id, None))
+                    cleared_unresolved += 1
             else:
                 pending.append((catalog_id, msisdn_s, phone, current_operator))
         if (idx + 1) % _PROGRESS_EVERY == 0:
@@ -405,7 +410,6 @@ async def _enrich_catalog_operators_inner(
         )
 
     uncovered_msisdns: list[str] = list(invalid_msisdns)
-    unresolved_kept_existing = 0
     for item in pending:
         catalog_id, msisdn_s, phone, current_operator = item
         operator = cache.resolve(msisdn_s) or lookup_result.get(phone)
@@ -413,10 +417,11 @@ async def _enrich_catalog_operators_inner(
             cache_hits += 1
             if current_operator != operator:
                 pending_updates.append((catalog_id, operator))
-        elif current_operator and str(current_operator).strip():
-            # Cache+API empty: keep existing operator; do not fail coverage for this row.
-            unresolved_kept_existing += 1
         else:
+            # No PSTN value: clear interim (REG/provider) so final SoT is PSTN-only.
+            if current_operator and str(current_operator).strip():
+                pending_updates.append((catalog_id, None))
+                cleared_unresolved += 1
             uncovered_msisdns.append(msisdn_s)
 
     updated = 0
@@ -475,7 +480,7 @@ async def _enrich_catalog_operators_inner(
         "lookups": lookups,
         "cache_hits": cache_hits,
         "skipped_already_have_operator": 0,
-        "unresolved_kept_existing": unresolved_kept_existing,
+        "cleared_unresolved": cleared_unresolved,
         "missing": max(len(uncovered_msisdns), global_missing),
         "invalid_msisdn": len(invalid_msisdns),
         "errors": errors,

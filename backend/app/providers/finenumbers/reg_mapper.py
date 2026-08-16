@@ -6,7 +6,6 @@ from typing import Any
 
 from app.models.enums import InventoryKind, MappingConfidence
 from app.providers.dto.numbers import NormalizedNumber
-from app.providers.finenumbers import contract
 from app.providers.finenumbers.mapper import msisdn_from_abc_local, parse_msisdn_parts
 
 
@@ -63,7 +62,7 @@ def map_reg_endpoint(row: dict[str, Any]) -> NormalizedNumber | None:
         raw_payload=dict(row),
         abc_code=abc,
         number_local=number_local,
-        operator=contract.OPERATOR_DISPLAY_NAME,
+        operator=None,
     )
 
 

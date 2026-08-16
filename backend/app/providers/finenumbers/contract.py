@@ -5,6 +5,23 @@ EXAMPLE_BASE_URL = "https://pstn.finenumbers.com"
 AUTH_SETTINGS_KEY = "key"
 OPERATOR_INN = "5406978329"
 OPERATOR_DISPLAY_NAME = "ООО «Фронтир Нетворк»"
+
+
+def normalize_operator_name(name: str | None) -> str:
+    """Canonical form for operator equality (quotes/case/whitespace)."""
+    if not name:
+        return ""
+    s = str(name).strip().casefold()
+    for q in ("«", "»", '"', "'", "“", "”"):
+        s = s.replace(q, "")
+    return " ".join(s.split())
+
+
+def is_frontier_operator(name: str | None) -> bool:
+    """True if name is ООО «Фронтир Нетворк» in any PSTN/code spelling."""
+    return normalize_operator_name(name) == normalize_operator_name(OPERATOR_DISPLAY_NAME)
+
+
 BY_INN_PATH = "/api/v1/lookup/by-inn"
 LOOKUP_PATH = "/api/v1/lookup"
 DEFAULT_PAGE_SIZE = 100
