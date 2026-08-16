@@ -30,7 +30,7 @@ Nav: [`finenumbers/SOURCE.md`](finenumbers/SOURCE.md) · [`finenumbers-contract.
 ## Contour A — free inventory
 
 - Provider code: `finenumbers`.
-- Unified sync mode: `free_only` (no dictionaries / purchased).
+- Unified sync mode: `full` (Contour A free + Contour C purchased/RTU; no dictionaries API).
 - Flow: `lookup/by-inn` pages → expand ranges → wipe `(finenumbers, free)` if `reload_allowed` → catalog insert (no raw table).
 - Operator column for these rows is filled later by Contour B enrichment (same as other providers).
 

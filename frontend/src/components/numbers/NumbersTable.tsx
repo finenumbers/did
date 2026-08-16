@@ -203,8 +203,8 @@ export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
   const [filters, setFilters] = useState<ColumnFilters>({});
   const [numberLocalInput, setNumberLocalInput] = useState("");
   const [numberLocalQ, setNumberLocalQ] = useState("");
-  const [sortBy] = useState("abc_code");
-  const [sortDir] = useState<"asc" | "desc">("asc");
+  const sortBy = "abc_code";
+  const sortDir: "asc" | "desc" = "asc";
   const [openColumn, setOpenColumn] = useState<string | null>(null);
   const [scrollRoot, setScrollRoot] = useState<HTMLElement | null>(null);
   const [exporting, setExporting] = useState(false);

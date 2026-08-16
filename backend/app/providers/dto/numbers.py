@@ -19,8 +19,6 @@ class ParsedNumberItem:
     buy_price: Decimal | None = None
     period_price: Decimal | None = None
     status_raw: str | None = None
-    # Kept for SipOut purchased raw typed column; not mapped to catalog
-    has_sms: bool | None = None
     mask: str | None = None
     display_mask: str | None = None
     book_date: str | None = None

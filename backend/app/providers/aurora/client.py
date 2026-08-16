@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import time
 from typing import Any
 
@@ -12,8 +11,6 @@ from app.providers.aurora import contract
 from app.providers.dto.common import ConnectionConfig, RawHttpResult
 from app.providers.errors import ProviderTransportError
 from app.providers.retry import RetryPolicy, TimeoutConfig, request_with_retries
-
-logger = logging.getLogger(__name__)
 
 PROBE_MAX_BYTES = 65_536
 

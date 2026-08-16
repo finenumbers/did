@@ -104,56 +104,50 @@ def wipe_provider_numbers(
         )
     )
 
-    wiped_raw = 0
     if provider_code == ProviderCode.sipout:
         raw_cls = (
             SipoutFreeNumberRaw
             if inventory_kind == InventoryKind.free
             else SipoutPurchasedNumberRaw
         )
-        wiped_raw = db.execute(delete(raw_cls)).rowcount or 0
+        db.execute(delete(raw_cls))
     elif provider_code == ProviderCode.runexis:
         raw_cls = (
             RunexisFreeNumberRaw
             if inventory_kind == InventoryKind.free
             else RunexisPurchasedNumberRaw
         )
-        wiped_raw = db.execute(delete(raw_cls)).rowcount or 0
+        db.execute(delete(raw_cls))
     elif provider_code == ProviderCode.uis:
         raw_cls = (
             UisFreeNumberRaw
             if inventory_kind == InventoryKind.free
             else UisPurchasedNumberRaw
         )
-        wiped_raw = db.execute(delete(raw_cls)).rowcount or 0
+        db.execute(delete(raw_cls))
     elif provider_code == ProviderCode.aurora:
         if inventory_kind != InventoryKind.free:
             raise ValueError("Aurora supports free inventory wipe only")
-        wiped_raw = db.execute(delete(AuroraFreeNumberRaw)).rowcount or 0
+        db.execute(delete(AuroraFreeNumberRaw))
     elif provider_code == ProviderCode.exolve:
         if inventory_kind != InventoryKind.free:
             raise ValueError("Exolve supports free inventory wipe only")
-        wiped_raw = db.execute(delete(ExolveFreeNumberRaw)).rowcount or 0
+        db.execute(delete(ExolveFreeNumberRaw))
     elif provider_code == ProviderCode.voximplant:
         if inventory_kind != InventoryKind.free:
             raise ValueError("Voximplant supports free inventory wipe only")
-        wiped_raw = db.execute(delete(VoximplantFreeNumberRaw)).rowcount or 0
+        db.execute(delete(VoximplantFreeNumberRaw))
     elif provider_code == ProviderCode.mcn:
         if inventory_kind != InventoryKind.free:
             raise ValueError("MCN supports free inventory wipe only")
-        wiped_raw = db.execute(delete(McnFreeNumberRaw)).rowcount or 0
+        db.execute(delete(McnFreeNumberRaw))
     elif provider_code == ProviderCode.finenumbers:
-        wiped_raw = 0
+        pass
     else:
         raise ValueError(f"Unsupported provider for wipe: {provider_code}")
 
     db.flush()
-    return {
-        "wiped_catalog": catalog_del.rowcount or 0,
-        "wiped_raw": wiped_raw,
-        "wiped_price_history": price_del.rowcount or 0,
-        "wiped_status_history": status_del.rowcount or 0,
-    }
+    return {}
 
 
 def _catalog_extra_fields(num: NormalizedNumber) -> dict[str, Any]:
@@ -810,12 +804,7 @@ def persist_sipout_numbers(
 
     return {
         "upserted": upserted,
-        "marked_absent": 0,
-        "price_history": 0,
-        "status_history": 0,
         "deduped_input": len(deduped),
-        "bulk_insert": 1,
-        "staged_cutover": 1,
         **wipe_holder,
     }
 
@@ -947,12 +936,7 @@ def persist_runexis_numbers(
 
     return {
         "upserted": upserted,
-        "marked_absent": 0,
-        "price_history": 0,
-        "status_history": 0,
         "deduped_input": len(deduped),
-        "bulk_insert": 1,
-        "staged_cutover": 1,
         **wipe_holder,
     }
 
@@ -1082,12 +1066,7 @@ def persist_uis_numbers(
 
     return {
         "upserted": upserted,
-        "marked_absent": 0,
-        "price_history": 0,
-        "status_history": 0,
         "deduped_input": len(deduped),
-        "bulk_insert": 1,
-        "staged_cutover": 1,
         **wipe_holder,
     }
 
@@ -1208,12 +1187,7 @@ def persist_aurora_numbers(
 
     return {
         "upserted": upserted,
-        "marked_absent": 0,
-        "price_history": 0,
-        "status_history": 0,
         "deduped_input": len(deduped),
-        "bulk_insert": 1,
-        "staged_cutover": 1,
         **wipe_holder,
     }
 
@@ -1286,7 +1260,6 @@ def persist_finenumbers_numbers(
     return {
         "upserted": upserted,
         "deduped_input": len(deduped),
-        "staged_cutover": 1,
         **wipe_holder,
     }
 
@@ -1408,7 +1381,6 @@ def persist_finenumbers_reg_purchased(
         **rtu_stats,
         "reg_total": len(reg_keys),
         "reg_inserted": len(only_reg),
-        "early_purchased_keys": len(early_keys),
         # Serializable for re-apply after operator enrichment.
         "reg_keys": sorted(reg_keys),
     }
@@ -1577,12 +1549,7 @@ def persist_exolve_numbers(
             logger.exception("persist on_progress failed")
     return {
         "upserted": upserted,
-        "marked_absent": 0,
-        "price_history": 0,
-        "status_history": 0,
         "deduped_input": len(deduped),
-        "bulk_insert": 1,
-        "staged_cutover": 1,
         **wipe_holder,
     }
 
@@ -1694,12 +1661,7 @@ def persist_voximplant_numbers(
             logger.exception("persist on_progress failed")
     return {
         "upserted": upserted,
-        "marked_absent": 0,
-        "price_history": 0,
-        "status_history": 0,
         "deduped_input": len(deduped),
-        "bulk_insert": 1,
-        "staged_cutover": 1,
         **wipe_holder,
     }
 
@@ -1811,11 +1773,6 @@ def persist_mcn_numbers(
             logger.exception("persist on_progress failed")
     return {
         "upserted": upserted,
-        "marked_absent": 0,
-        "price_history": 0,
-        "status_history": 0,
         "deduped_input": len(deduped),
-        "bulk_insert": 1,
-        "staged_cutover": 1,
         **wipe_holder,
     }

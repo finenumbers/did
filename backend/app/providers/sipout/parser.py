@@ -87,20 +87,6 @@ def _parse_price(value: Any) -> Decimal | None:
         return None
 
 
-def _parse_has_sms(value: Any) -> bool | None:
-    # EXAMPLE-CONFIRMED encoding uncertain — TODO: VERIFY_WITH_DOC_FILE
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return value
-    s = str(value).strip().lower()
-    if s in {"1", "true", "yes"}:
-        return True
-    if s in {"0", "false", "no"}:
-        return False
-    return None
-
-
 def parse_number_list(raw: RawHttpResult) -> list[ParsedNumberItem]:
     payload = _require_ok(raw)
     data = payload.get("data") or {}
@@ -134,7 +120,6 @@ def parse_number_list(raw: RawHttpResult) -> list[ParsedNumberItem]:
                 period_price=_parse_price(item.get("price")),
                 buy_price=None,
                 status_raw=_as_text(item.get("status")),
-                has_sms=_parse_has_sms(item.get("has_sms")),
                 order_id=order_id,
                 doc_status=doc_status,
                 doc_required=doc_required,

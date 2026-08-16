@@ -19,7 +19,6 @@ _SEED_FILENAMES: tuple[tuple[str, bool], ...] = (
     ("Simferopol.csv", False),
     ("SPb.csv", False),
 )
-EXAMPLE_BASE_URL = DEFAULT_CSV_BASE
 
 PRIMARY_ENCODING = "cp1251"
 FALLBACK_ENCODING = "utf-8-sig"
