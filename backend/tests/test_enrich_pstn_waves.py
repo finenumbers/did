@@ -80,7 +80,6 @@ def test_cache_hit_does_not_call_lookup(monkeypatch):
     assert calls == []
     assert stats["lookups"] == 0
     assert stats["cache_hits"] >= 1
-    assert stats["skipped_already_have_operator"] == 0
 
 
 def test_filled_operator_still_looks_up_on_cache_miss(monkeypatch):
@@ -127,7 +126,6 @@ def test_filled_operator_still_looks_up_on_cache_miss(monkeypatch):
     )
     assert calls == ["9002222222"]
     assert stats["lookups"] == 1
-    assert stats["skipped_already_have_operator"] == 0
     assert written == [(cat_id, "FromApi")]
 
 

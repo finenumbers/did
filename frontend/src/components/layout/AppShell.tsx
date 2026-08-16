@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api/client";
 import { clearSession, getAccessToken, getUsername } from "@/lib/auth";
 import type { ProviderHealth } from "@/lib/types/api";
@@ -14,12 +14,13 @@ const links = [
   { href: "/sync-logs", label: "Синхронизация" },
 ];
 
-const externalLinks = [
+const externalLinks: { href: string; label: string; dividerBefore?: boolean }[] = [
   { href: "https://reg.finenumbers.com/", label: "OSS Platform" },
   { href: "https://pstn.finenumbers.com/", label: "PSTN Platform" },
   { href: "https://sms-adm.finenumbers.com/", label: "SMS Platform" },
-  { href: "https://admin.finenumbers.cloud/", label: "iTooLabs Platform" },
-  { href: "https://5.227.161.180:8445/", label: "Satel RTU" },
+  { href: "https://check.finenumbers.com/", label: "Check Platform" },
+  { href: "https://admin.finenumbers.cloud/", label: "iTooLabs Platform", dividerBefore: true },
+  { href: "https://5.227.161.180:8445/", label: "RTU Softswitch" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -120,14 +121,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ))}
           <div className="nav-divider" role="separator" />
           {externalLinks.map((l) => (
-            <a
-              key={l.href}
-              href={l.href}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {l.label}
-            </a>
+            <Fragment key={l.href}>
+              {l.dividerBefore ? <div className="nav-divider" role="separator" /> : null}
+              <a href={l.href} target="_blank" rel="noopener noreferrer">
+                {l.label}
+              </a>
+            </Fragment>
           ))}
         </nav>
         <div style={{ marginTop: "auto", fontSize: "0.8rem", color: "#9aabba" }}>

@@ -85,7 +85,7 @@ Sync does **not** auto-refresh Contour B. Cache refresh is manual from Settings.
 | Capability | Supported |
 |---|---|
 | free numbers (by-inn expand) | yes |
-| purchased numbers | no |
+| purchased numbers | yes (REG Contour C) |
 | dictionaries (regions/cities) | no |
 | test connection | yes (`by-inn` page=1) |
 | operator enrichment | yes (local cache first, then lookup) |

@@ -479,7 +479,6 @@ async def _enrich_catalog_operators_inner(
         "updated": updated,
         "lookups": lookups,
         "cache_hits": cache_hits,
-        "skipped_already_have_operator": 0,
         "cleared_unresolved": cleared_unresolved,
         "missing": max(len(uncovered_msisdns), global_missing),
         "invalid_msisdn": len(invalid_msisdns),

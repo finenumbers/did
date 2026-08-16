@@ -608,8 +608,8 @@ def preserve_operators_on_numbers(
 ) -> int:
     """Copy previous catalog.operator onto incoming numbers when incoming has none.
 
-    Survives wipe+cutover so Contour B enrich does not rewrite the whole catalog
-    every sync when the local INN cache already knows the operator.
+    Interim buffer across wipe+cutover until Contour B PSTN enrich (last stage)
+    overwrites or clears operator from cache/lookup.
     """
     prev = load_present_operators(
         db, provider_id=provider_id, inventory_kind=inventory_kind
