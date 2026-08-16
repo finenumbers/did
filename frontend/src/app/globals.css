@@ -126,17 +126,6 @@ button.nav-logout:hover {
   overflow: hidden;
 }
 
-.topbar {
-  background: var(--panel);
-  border-bottom: 1px solid var(--line);
-  padding: 0.75rem 1.25rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  flex-shrink: 0;
-}
-
 .content {
   padding: 1.25rem;
   flex: 1;

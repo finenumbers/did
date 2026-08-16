@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api/client";
 import { clearSession, getAccessToken, getUsername } from "@/lib/auth";
-import type { ProviderHealth } from "@/lib/types/api";
 
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || "dev";
 
@@ -34,7 +33,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathnameRef = useRef(pathname);
   pathnameRef.current = pathname;
 
-  const [health, setHealth] = useState<ProviderHealth[]>([]);
   const [hasSession, setHasSession] = useState(false);
   const [ready, setReady] = useState(isLogin);
   const [authRequired, setAuthRequired] = useState<boolean | null>(null);
@@ -97,13 +95,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [pathname, isLogin, ready, authRequired, router]);
 
-  useEffect(() => {
-    if (isLogin || !ready) return;
-    apiFetch<ProviderHealth[]>("/api/v1/providers/health")
-      .then(setHealth)
-      .catch(() => setHealth([]));
-  }, [isLogin, ready]);
-
   if (isLogin) {
     return <>{children}</>;
   }
@@ -132,8 +123,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (!ready) {
     return <div className="state">Загрузка…</div>;
   }
-
-  const limited = health.flatMap((h) => h.limitations).length;
 
   return (
     <div className="app-shell">
@@ -183,13 +172,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
       <div className="main">
-        <header className="topbar">
-          <div>Внутренняя панель нумерации</div>
-          <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
-            Провайдеров: {health.length}
-            {limited > 0 ? ` · ограничений docs: ${limited}` : ""}
-          </div>
-        </header>
         <main className="content">{children}</main>
       </div>
     </div>
