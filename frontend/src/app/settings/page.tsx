@@ -478,10 +478,6 @@ export default function SettingsPage() {
 
         {PROVIDERS.map(({ code, title }) => {
           const d = drafts[code];
-          const hasToken = Boolean(d.settings?.auth_settings_masked?.token);
-          const hasNumberingSession = Boolean(
-            d.settings?.auth_settings_masked?.numbering_session_id,
-          );
           return (
             <div className="panel" key={code}>
               <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>{title}</h2>
@@ -529,12 +525,6 @@ export default function SettingsPage() {
 
                 {code === "aurora" ? (
                   <>
-                    <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
-                      Список CSV свободных номеров (HTTP, host bill.auroratelecom.ru). Auth не
-                      требуется. Файл all_free.csv запрещён. Галочка «6 столбцов (статус)» — для
-                      схемы как у MSK: phone; статус; тип; цена; гео; маска. Купленные и справочники
-                      не поддерживаются.
-                    </div>
                     {d.csvFiles.map((file, idx) => (
                       <div
                         key={`aurora-csv-${idx}`}
@@ -628,14 +618,6 @@ export default function SettingsPage() {
                         style={{ width: "100%" }}
                       />
                     </label>
-                    <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
-                      Bearer API-ключ приложения (ЛК Exolve → Приложения → API-ключи). Read-only:
-                      GetList (справочник) и GetFree (свободные). Купленные / Lock / Buy не
-                      вызываются.
-                      {d.settings?.auth_settings_masked?.api_key
-                        ? " Ключ сохранён."
-                        : " Ключ ещё не задан."}
-                    </div>
                   </>
                 ) : code === "voximplant" ? (
                   <>
@@ -653,14 +635,6 @@ export default function SettingsPage() {
                         style={{ width: "100%", fontFamily: "monospace", fontSize: "0.85rem" }}
                       />
                     </label>
-                    <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
-                      ЛК Voximplant → Settings → Service accounts → Generate key. Read-only: все
-                      свободные RU-номера (Categories → Regions → GetNewPhoneNumbers). Купленные /
-                      Attach не вызываются.
-                      {d.settings?.auth_settings_masked?.private_key
-                        ? " Credentials сохранены."
-                        : " Credentials ещё не заданы."}
-                    </div>
                   </>
                 ) : code === "mcn" ? (
                   <>
@@ -678,14 +652,6 @@ export default function SettingsPage() {
                         style={{ width: "100%" }}
                       />
                     </label>
-                    <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
-                      ЛК MCN → Интеграции → Токены (роль администратора Integrations). Read-only
-                      Витрина: countries / regions / cities / numbers (RU). Checkout и NNP не
-                      вызываются.
-                      {d.settings?.auth_settings_masked?.api_key
-                        ? " Токен сохранён."
-                        : " Токен ещё не задан."}
-                    </div>
                   </>
                 ) : code === "sipout" ? (
                   <label>
@@ -747,10 +713,6 @@ export default function SettingsPage() {
                         style={{ width: "100%" }}
                       />
                     </label>
-                    <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
-                      Contour A: PSTN by-inn (свободные). Contour C: REG GET /api/phones
-                      (купленные / «Подключено в РТУ»). Только read-only.
-                    </div>
                   </>
                 ) : code === "uis" ? (
                   <>
@@ -768,13 +730,6 @@ export default function SettingsPage() {
                         style={{ width: "100%" }}
                       />
                     </label>
-                    <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
-                      Auth только через API-ключ (access_token). Read-only: get.available_virtual_numbers /
-                      get.virtual_numbers. IP whitelist в ЛК UIS обязателен.
-                      {d.settings?.auth_settings_masked?.access_token
-                        ? " Access token сохранён."
-                        : " Access token ещё не задан."}
-                    </div>
                   </>
                 ) : (
                   <>
@@ -807,16 +762,6 @@ export default function SettingsPage() {
                         style={{ width: "100%" }}
                       />
                     </label>
-                    <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
-                      Bearer через login/refresh.
-                      {hasToken
-                        ? ` Токен сохранён${
-                            d.settings?.auth_settings_masked?.token_expire
-                              ? `, expire: ${String(d.settings.auth_settings_masked.token_expire)}`
-                              : ""
-                          }.`
-                        : " Токен ещё не получен."}
-                    </div>
 
                     <h3 style={{ margin: "0.75rem 0 0", fontSize: "0.95rem" }}>
                       Numbering API — свободные номера
@@ -854,12 +799,6 @@ export default function SettingsPage() {
                         style={{ width: "100%" }}
                       />
                     </label>
-                    <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
-                      Отдельные credentials. Только чтение: connect + search_numbers.
-                      {hasNumberingSession
-                        ? " Session id сохранён."
-                        : " Session ещё не получен — Test connection."}
-                    </div>
                   </>
                 )}
 
