@@ -210,12 +210,21 @@ export default function SettingsPage() {
       auth_settings = d.accessToken ? { access_token: d.accessToken } : undefined;
     } else if (code === "aurora") {
       auth_settings = undefined;
-      extra_settings = {
-        csv_files: d.csvFiles.map((f) => ({
+      const csv_files = d.csvFiles
+        .map((f) => ({
           url: f.url.trim(),
           has_status_column: f.has_status_column,
-        })),
-      };
+        }))
+        .filter((f) => f.url.length > 0);
+      if (csv_files.length === 0) {
+        setDraft(code, {
+          saving: false,
+          error: "Добавьте хотя бы один URL CSV-файла",
+          message: null,
+        });
+        return;
+      }
+      extra_settings = { csv_files };
     } else {
       const next: Record<string, string> = {};
       if (d.email) next.email = d.email;

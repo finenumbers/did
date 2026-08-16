@@ -776,16 +776,12 @@ def persist_sipout_numbers(
         db, stg_cat, cat_rows, on_progress=on_progress, progress_label="SipOut staging catalog"
     )
 
-    wipe_holder: dict[str, int] = {}
-
     def _wipe() -> None:
-        wipe_holder.update(
-            wipe_provider_numbers(
-                db,
-                provider_id=provider_id,
-                provider_code=ProviderCode.sipout,
-                inventory_kind=inventory_kind,
-            )
+        wipe_provider_numbers(
+            db,
+            provider_id=provider_id,
+            provider_code=ProviderCode.sipout,
+            inventory_kind=inventory_kind,
         )
 
     cutover_from_staging(
@@ -805,7 +801,6 @@ def persist_sipout_numbers(
     return {
         "upserted": upserted,
         "deduped_input": len(deduped),
-        **wipe_holder,
     }
 
 
@@ -908,16 +903,12 @@ def persist_runexis_numbers(
         db, stg_cat, cat_rows, on_progress=on_progress, progress_label="Runexis staging catalog"
     )
 
-    wipe_holder: dict[str, int] = {}
-
     def _wipe() -> None:
-        wipe_holder.update(
-            wipe_provider_numbers(
-                db,
-                provider_id=provider_id,
-                provider_code=ProviderCode.runexis,
-                inventory_kind=inventory_kind,
-            )
+        wipe_provider_numbers(
+            db,
+            provider_id=provider_id,
+            provider_code=ProviderCode.runexis,
+            inventory_kind=inventory_kind,
         )
 
     cutover_from_staging(
@@ -937,7 +928,6 @@ def persist_runexis_numbers(
     return {
         "upserted": upserted,
         "deduped_input": len(deduped),
-        **wipe_holder,
     }
 
 
@@ -1038,16 +1028,12 @@ def persist_uis_numbers(
         db, stg_cat, cat_rows, on_progress=on_progress, progress_label="UIS staging catalog"
     )
 
-    wipe_holder: dict[str, int] = {}
-
     def _wipe() -> None:
-        wipe_holder.update(
-            wipe_provider_numbers(
-                db,
-                provider_id=provider_id,
-                provider_code=ProviderCode.uis,
-                inventory_kind=inventory_kind,
-            )
+        wipe_provider_numbers(
+            db,
+            provider_id=provider_id,
+            provider_code=ProviderCode.uis,
+            inventory_kind=inventory_kind,
         )
 
     cutover_from_staging(
@@ -1067,7 +1053,6 @@ def persist_uis_numbers(
     return {
         "upserted": upserted,
         "deduped_input": len(deduped),
-        **wipe_holder,
     }
 
 
@@ -1159,16 +1144,12 @@ def persist_aurora_numbers(
         progress_label="Aurora staging catalog",
     )
 
-    wipe_holder: dict[str, int] = {}
-
     def _wipe() -> None:
-        wipe_holder.update(
-            wipe_provider_numbers(
-                db,
-                provider_id=provider_id,
-                provider_code=ProviderCode.aurora,
-                inventory_kind=inventory_kind,
-            )
+        wipe_provider_numbers(
+            db,
+            provider_id=provider_id,
+            provider_code=ProviderCode.aurora,
+            inventory_kind=inventory_kind,
         )
 
     cutover_from_staging(
@@ -1188,7 +1169,6 @@ def persist_aurora_numbers(
     return {
         "upserted": upserted,
         "deduped_input": len(deduped),
-        **wipe_holder,
     }
 
 
@@ -1232,16 +1212,12 @@ def persist_finenumbers_numbers(
         progress_label="Finenumbers staging catalog",
     )
 
-    wipe_holder: dict[str, int] = {}
-
     def _wipe() -> None:
-        wipe_holder.update(
-            wipe_provider_numbers(
-                db,
-                provider_id=provider_id,
-                provider_code=ProviderCode.finenumbers,
-                inventory_kind=inventory_kind,
-            )
+        wipe_provider_numbers(
+            db,
+            provider_id=provider_id,
+            provider_code=ProviderCode.finenumbers,
+            inventory_kind=inventory_kind,
         )
 
     cutover_from_staging(
@@ -1260,7 +1236,6 @@ def persist_finenumbers_numbers(
     return {
         "upserted": upserted,
         "deduped_input": len(deduped),
-        **wipe_holder,
     }
 
 
@@ -1522,16 +1497,12 @@ def persist_exolve_numbers(
         progress_label="Exolve staging catalog",
     )
 
-    wipe_holder: dict[str, int] = {}
-
     def _wipe() -> None:
-        wipe_holder.update(
-            wipe_provider_numbers(
-                db,
-                provider_id=provider_id,
-                provider_code=ProviderCode.exolve,
-                inventory_kind=inventory_kind,
-            )
+        wipe_provider_numbers(
+            db,
+            provider_id=provider_id,
+            provider_code=ProviderCode.exolve,
+            inventory_kind=inventory_kind,
         )
 
     cutover_from_staging(
@@ -1550,7 +1521,6 @@ def persist_exolve_numbers(
     return {
         "upserted": upserted,
         "deduped_input": len(deduped),
-        **wipe_holder,
     }
 
 
@@ -1634,16 +1604,12 @@ def persist_voximplant_numbers(
         progress_label="Voximplant staging catalog",
     )
 
-    wipe_holder: dict[str, int] = {}
-
     def _wipe() -> None:
-        wipe_holder.update(
-            wipe_provider_numbers(
-                db,
-                provider_id=provider_id,
-                provider_code=ProviderCode.voximplant,
-                inventory_kind=inventory_kind,
-            )
+        wipe_provider_numbers(
+            db,
+            provider_id=provider_id,
+            provider_code=ProviderCode.voximplant,
+            inventory_kind=inventory_kind,
         )
 
     cutover_from_staging(
@@ -1662,7 +1628,6 @@ def persist_voximplant_numbers(
     return {
         "upserted": upserted,
         "deduped_input": len(deduped),
-        **wipe_holder,
     }
 
 
@@ -1746,16 +1711,12 @@ def persist_mcn_numbers(
         progress_label="MCN staging catalog",
     )
 
-    wipe_holder: dict[str, int] = {}
-
     def _wipe() -> None:
-        wipe_holder.update(
-            wipe_provider_numbers(
-                db,
-                provider_id=provider_id,
-                provider_code=ProviderCode.mcn,
-                inventory_kind=inventory_kind,
-            )
+        wipe_provider_numbers(
+            db,
+            provider_id=provider_id,
+            provider_code=ProviderCode.mcn,
+            inventory_kind=inventory_kind,
         )
 
     cutover_from_staging(
@@ -1774,5 +1735,4 @@ def persist_mcn_numbers(
     return {
         "upserted": upserted,
         "deduped_input": len(deduped),
-        **wipe_holder,
     }

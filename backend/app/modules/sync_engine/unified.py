@@ -542,7 +542,34 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
             category_stats=category_stats,
             only_missing=False,
         )
-        # Reclassify RTU after enrich — Finenumbers labels depend on final operator.
+        # Rebuild checksum after enrich so enrich_rows_scanned / enrich_matches_catalog
+        # reflect real PSTN stats (including partial-fail details when present).
+        if "operator_enrichment" in category_stats:
+            catalog_checksum = build_catalog_checksum(category_stats)
+            db.refresh(run)
+            summary = dict(run.stats or summary)
+            summary["categories"] = category_stats
+            summary["catalog_checksum"] = catalog_checksum
+            summary["inventory_summary"] = build_inventory_summary(category_stats)
+            run.stats = summary
+            db.commit()
+            log_run(
+                db,
+                run.id,
+                SyncLogLevel.info,
+                (
+                    "Catalog checksum after enrich "
+                    f"sum_free={catalog_checksum.get('sum_free')} "
+                    f"sum_purchased={catalog_checksum.get('sum_purchased')} "
+                    f"sum_total={catalog_checksum.get('sum_total')} "
+                    f"enrich_rows_scanned={catalog_checksum.get('enrich_rows_scanned')} "
+                    f"enrich_matches_catalog={catalog_checksum.get('enrich_matches_catalog')}"
+                ),
+                catalog_checksum,
+            )
+        # Always re-apply RTU after enrich — even if enrichment failed: batches may
+        # already be committed, and skipping would leave stale Своя/Внешняя flags.
+        # Finenumbers labels depend on final (post-enrich) operator.
         fn_cats = category_stats.get("finenumbers")
         purch_stats = (
             fn_cats.get("purchased_numbers") if isinstance(fn_cats, dict) else None
@@ -857,6 +884,17 @@ async def _run_operator_enrichment(
             f"updated={enrich_stats.get('updated')}, lookups={enrich_stats.get('lookups')}, "
             f"cache_hits={enrich_stats.get('cache_hits')}",
         )
+    except ProviderError as exc:
+        if isinstance(exc.details, dict) and exc.details:
+            category_stats["operator_enrichment"] = dict(exc.details)
+        log_run(
+            db,
+            run.id,
+            SyncLogLevel.error,
+            f"Operator enrichment failed: {exc}",
+            {"code": exc.code, "details": exc.details or {}},
+        )
+        tracker.fail("operator_enrichment", str(exc))
     except Exception as exc:
         log_run(db, run.id, SyncLogLevel.error, f"Operator enrichment failed: {exc}")
         tracker.fail("operator_enrichment", str(exc))
