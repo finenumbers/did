@@ -12,6 +12,7 @@ import logging
 from bisect import bisect_right
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import Enum
 
 from sqlalchemy import bindparam, func, or_, select, text
 from sqlalchemy.dialects.postgresql import ARRAY, UUID as PGUUID
@@ -20,7 +21,7 @@ from sqlalchemy.types import Text
 
 from app.models.catalog import NumbersCatalogNormalized
 from app.modules.pstn_inn_cache.service import load_enabled_ranges_for_enrich
-from app.providers.dto.common import ConnectionConfig
+from app.providers.dto.common import ConnectionConfig, RawHttpResult
 from app.providers.errors import ProviderError
 from app.providers.finenumbers import contract
 from app.providers.finenumbers.client import FinenumbersClient
@@ -31,6 +32,45 @@ logger = logging.getLogger(__name__)
 ProgressCb = Callable[[str, int | None, int | None], None]
 _PROGRESS_EVERY = 50_000
 _WAVE_PROGRESS_EVERY = 200
+
+# Client 4xx that mean "phone absent / invalid", not auth or transport failure.
+_ABSENT_HTTP_STATUSES = frozenset({400, 404, 422})
+
+
+class LookupClass(str, Enum):
+    found = "found"
+    absent = "absent"
+    error = "error"
+
+
+def classify_lookup_response(raw: RawHttpResult) -> LookupClass:
+    """
+    Classify PSTN lookup outcome for operator SoT.
+
+    absent — confirmed not in registry (write «Нет в реестре»).
+    error — transport/auth/5xx (do not write sentinel; may retry).
+    found — HTTP 200 with found+data (caller extracts operator via cache).
+    """
+    status = int(raw.status_code or 0)
+    if status in _ABSENT_HTTP_STATUSES:
+        return LookupClass.absent
+    if status >= 400:
+        # 401/403/other 4xx and 5xx: not a confirmed registry miss
+        return LookupClass.error
+    body = raw.body_json if isinstance(raw.body_json, dict) else {}
+    data = body.get("data") if body.get("found") else None
+    if isinstance(data, dict) and str(data.get("operator") or "").strip():
+        return LookupClass.found
+    return LookupClass.absent
+
+
+def _body_snippet(raw: RawHttpResult, limit: int = 200) -> str:
+    text_body = (raw.body_text or "").strip()
+    if text_body:
+        return text_body[:limit]
+    if isinstance(raw.body_json, dict):
+        return str(raw.body_json)[:limit]
+    return ""
 
 
 @dataclass(frozen=True)
@@ -142,8 +182,9 @@ async def enrich_catalog_operators(
     Primary: local pstn_inn_ranges_cache (enabled INNs) — writes ONLY operator.
     Secondary: PSTN lookup API for cache misses (always queued; overwrites existing operator).
     With only_missing=False (default / production): every present row is enriched.
-    Terminal PSTN miss (found=false / empty / invalid MSISDN) → «Нет в реестре».
-    HTTP/transport errors remain uncovered and fail require_full_coverage.
+    Terminal PSTN miss (found=false / empty / invalid MSISDN / HTTP 400|404|422)
+    → «Нет в реестре». Transport/5xx/auth errors are retried; unresolved ones remain
+    uncovered (do not write sentinel, do not clear existing operator) and fail coverage.
     """
     client = FinenumbersClient(connection)
     cache = OperatorRangeCache()
@@ -310,8 +351,8 @@ async def _enrich_catalog_operators_inner(
     error_phones: set[str] = set()
     progress_lock = asyncio.Lock()
 
-    def _phone_attempted(phone: str) -> bool:
-        return phone in lookup_result or phone in absent_phones or phone in error_phones
+    def _phone_resolved(phone: str) -> bool:
+        return phone in lookup_result or phone in absent_phones
 
     async def lookup_phone_row(
         phone: str,
@@ -326,21 +367,30 @@ async def _enrich_catalog_operators_inner(
             try:
                 raw = await client.lookup_phone(phone)
                 lookups += 1
-                if raw.status_code >= 400:
+                kind = classify_lookup_response(raw)
+                if kind is LookupClass.absent:
+                    absent_phones.add(phone)
+                    error_phones.discard(phone)
+                elif kind is LookupClass.error:
                     errors += 1
                     error_phones.add(phone)
+                    logger.warning(
+                        "Finenumbers lookup error phone=%s status=%s body=%s",
+                        phone,
+                        raw.status_code,
+                        _body_snippet(raw),
+                    )
                 else:
                     body = raw.body_json if isinstance(raw.body_json, dict) else {}
-                    data = body.get("data") if body.get("found") else None
-                    if isinstance(data, dict):
-                        op = cache.add_from_api_row(data)
-                        cache.finalize()
-                        if op:
-                            lookup_result[phone] = op
-                        else:
-                            absent_phones.add(phone)
+                    data = body.get("data") if isinstance(body.get("data"), dict) else {}
+                    op = cache.add_from_api_row(data)
+                    cache.finalize()
+                    if op:
+                        lookup_result[phone] = op
+                        error_phones.discard(phone)
                     else:
                         absent_phones.add(phone)
+                        error_phones.discard(phone)
             except Exception:
                 errors += 1
                 error_phones.add(phone)
@@ -382,14 +432,12 @@ async def _enrich_catalog_operators_inner(
                     not_in_registry += 1
                 continue
 
-            if phone in error_phones:
-                still.append(item)
-                continue
-
+            # Unresolved: first attempt or retry previous transport/5xx error.
             still.append(item)
-            if phone not in phone_seen and not _phone_attempted(phone):
+            if phone not in phone_seen and not _phone_resolved(phone):
                 phone_seen.add(phone)
                 phones_needed.append(phone)
+                error_phones.discard(phone)
 
         pending = still
         if not phones_needed:
@@ -441,8 +489,15 @@ async def _enrich_catalog_operators_inner(
                 pending_updates.append((catalog_id, contract.OPERATOR_NOT_IN_REGISTRY))
                 not_in_registry += 1
         else:
-            # Transport/HTTP error or unresolved after max rounds.
+            # Transport/HTTP error after retries — keep existing operator, do not write sentinel.
             uncovered_msisdns.append(msisdn_s)
+            if phone in error_phones:
+                logger.warning(
+                    "PSTN enrich unresolved after retries msisdn=%s phone=%s "
+                    "(existing operator preserved)",
+                    msisdn_s,
+                    phone,
+                )
 
     updated = 0
     write_total = len(pending_updates)

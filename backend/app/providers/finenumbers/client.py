@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from typing import Any
 from urllib.parse import urljoin
@@ -13,6 +14,8 @@ from app.providers.dto.common import ConnectionConfig, RawHttpResult
 from app.providers.errors import ProviderAuthError, ProviderTransportError
 from app.providers.finenumbers import contract
 from app.providers.retry import RetryPolicy, TimeoutConfig
+
+logger = logging.getLogger(__name__)
 
 
 class FinenumbersClient:
@@ -107,6 +110,20 @@ class FinenumbersClient:
                     last_exc = ProviderTransportError(
                         f"Finenumbers rate limited: {(response.text or '')[:200]}"
                     )
+                    continue
+
+                # Retry transient server errors; return last response if attempts exhausted.
+                if response.status_code >= 500 and attempt + 1 < self.retry.max_attempts:
+                    delay = 0.5 * (attempt + 1)
+                    logger.warning(
+                        "Finenumbers HTTP %s for %s; retrying in %.1fs (attempt %s/%s)",
+                        response.status_code,
+                        url,
+                        delay,
+                        attempt + 1,
+                        self.retry.max_attempts,
+                    )
+                    await asyncio.sleep(delay)
                     continue
 
                 return RawHttpResult(

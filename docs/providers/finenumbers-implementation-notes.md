@@ -42,8 +42,8 @@ Nav: [`finenumbers/SOURCE.md`](finenumbers/SOURCE.md) · [`finenumbers-contract.
 - Enrichment (`enrich_catalog_operators`) runs as the **last** unified-sync stage after `finalize`.
 - Every currently present free/purchased row: local ranges first; cache miss → always `lookup?phone=` (no skip for already-filled operator).
 - Successful cache/API value **overwrites** existing `operator`.
-- Terminal PSTN miss (`found=false` / empty / invalid MSISDN) → **`Нет в реестре`** (blue row in UI/XLSX); counts as covered for sync gate.
-- HTTP/transport lookup errors still fail `require_full_coverage`.
+- Terminal PSTN miss (`found=false` / empty / invalid MSISDN / HTTP 400|404|422) → **`Нет в реестре`** (blue row in UI/XLSX); counts as covered for sync gate.
+- Transport/5xx/auth lookup errors: client retries 5xx; enrich re-queues across waves; unresolved → do **not** write sentinel, do **not** clear existing operator, fail `require_full_coverage` with status/body in logs.
 - Final `operator` SoT is PSTN enrich (or the sentinel above).
 - Writes **only** `numbers_catalog_normalized.operator`. Never overwrites prices/geo/status from Contour B.
 

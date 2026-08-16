@@ -1,4 +1,4 @@
-"""PSTN enrich: cache hits, overwrite on miss, sentinel on terminal absence."""
+"""PSTN enrich: cache hits, overwrite on miss, sentinel on confirmed absence."""
 
 from __future__ import annotations
 
@@ -12,17 +12,22 @@ import pytest
 from app.providers.dto.common import ConnectionConfig, RawHttpResult
 from app.providers.errors import ProviderError
 from app.providers.finenumbers import contract
-from app.providers.finenumbers.enrich import enrich_catalog_operators
+from app.providers.finenumbers.enrich import (
+    LookupClass,
+    classify_lookup_response,
+    enrich_catalog_operators,
+)
 
 
 def _raw(
     *,
     status: int = 200,
     body: dict[str, Any] | None = None,
+    body_text: str = "",
 ) -> RawHttpResult:
     return RawHttpResult(
         status_code=status,
-        body_text="",
+        body_text=body_text,
         body_json=body,
         headers={},
         elapsed_ms=1.0,
@@ -41,6 +46,26 @@ def _mock_db(rows: list[tuple]) -> MagicMock:
     db.execute.return_value = result
     db.scalar.return_value = 0
     return db
+
+
+def test_classify_lookup_absent_and_error():
+    assert classify_lookup_response(_raw(body={"found": False})) is LookupClass.absent
+    assert classify_lookup_response(_raw(status=404, body={"error": "nf"})) is LookupClass.absent
+    assert classify_lookup_response(_raw(status=400, body={"error": "bad"})) is LookupClass.absent
+    assert classify_lookup_response(_raw(status=422)) is LookupClass.absent
+    assert classify_lookup_response(_raw(status=500, body={"error": "boom"})) is LookupClass.error
+    assert classify_lookup_response(_raw(status=401)) is LookupClass.error
+    assert (
+        classify_lookup_response(
+            _raw(
+                body={
+                    "found": True,
+                    "data": {"abc": "900", "rangeStart": 1, "rangeEnd": 1, "operator": "Op"},
+                }
+            )
+        )
+        is LookupClass.found
+    )
 
 
 def test_cache_hit_does_not_call_lookup(monkeypatch):
@@ -172,7 +197,45 @@ def test_found_false_writes_not_in_registry_and_passes_coverage(monkeypatch):
     assert stats["errors"] == 0
 
 
-def test_http_error_still_fails_coverage(monkeypatch):
+def test_http_404_writes_not_in_registry_and_passes_coverage(monkeypatch):
+    written: list[tuple] = []
+
+    async def fake_lookup(self, phone: str) -> RawHttpResult:
+        return _raw(status=404, body={"error": "not found"}, body_text='{"error":"not found"}')
+
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich.load_enabled_ranges_for_enrich",
+        lambda db: [],
+    )
+    monkeypatch.setattr(
+        "app.providers.finenumbers.client.FinenumbersClient.lookup_phone",
+        fake_lookup,
+    )
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich._bulk_update_operators",
+        lambda db, pairs: written.extend(pairs) or len(pairs),
+    )
+
+    cat_id = uuid.uuid4()
+    db = _mock_db([(cat_id, "73432888870", None, "343", 2888870)])
+
+    stats = asyncio.run(
+        enrich_catalog_operators(
+            db,
+            connection=_conn(),
+            require_full_coverage=True,
+            concurrency=2,
+        )
+    )
+    assert written == [(cat_id, contract.OPERATOR_NOT_IN_REGISTRY)]
+    assert stats["not_in_registry"] == 1
+    assert stats["errors"] == 0
+    assert stats["missing"] == 0
+
+
+def test_http_500_fails_coverage_without_sentinel(monkeypatch):
+    written: list[tuple] = []
+
     async def fake_lookup(self, phone: str) -> RawHttpResult:
         return _raw(status=500, body={"error": "boom"})
 
@@ -186,11 +249,11 @@ def test_http_error_still_fails_coverage(monkeypatch):
     )
     monkeypatch.setattr(
         "app.providers.finenumbers.enrich._bulk_update_operators",
-        lambda db, pairs: len(pairs),
+        lambda db, pairs: written.extend(pairs) or len(pairs),
     )
 
     cat_id = uuid.uuid4()
-    db = _mock_db([(cat_id, "79003333333", None, "900", 3333333)])
+    db = _mock_db([(cat_id, "79003333333", "KeepMe", "900", 3333333)])
 
     with pytest.raises(ProviderError) as exc:
         asyncio.run(
@@ -199,14 +262,15 @@ def test_http_error_still_fails_coverage(monkeypatch):
                 connection=_conn(),
                 require_full_coverage=True,
                 concurrency=2,
-                max_rounds=8,
+                max_rounds=3,
             )
         )
     assert exc.value.code == "OPERATOR_ENRICHMENT_INCOMPLETE"
-    assert "errors=1" in str(exc.value)
+    assert "errors=" in str(exc.value)
+    assert written == []
 
 
-def test_failed_lookup_not_retried_in_next_wave(monkeypatch):
+def test_failed_lookup_retried_across_waves(monkeypatch):
     calls: list[str] = []
 
     async def fake_lookup(self, phone: str) -> RawHttpResult:
@@ -235,17 +299,18 @@ def test_failed_lookup_not_retried_in_next_wave(monkeypatch):
             connection=_conn(),
             require_full_coverage=False,
             concurrency=2,
-            max_rounds=8,
+            max_rounds=3,
         )
     )
-    assert calls == ["9003333333"]
-    assert stats["lookups"] == 1
-    assert stats["errors"] == 1
-    assert stats["waves"] == 1
+    assert calls == ["9003333333", "9003333333", "9003333333"]
+    assert stats["lookups"] == 3
+    assert stats["errors"] == 3
+    assert stats["waves"] == 3
 
 
-def test_exception_lookup_not_retried(monkeypatch):
+def test_exception_lookup_retried_across_waves_preserves_operator(monkeypatch):
     calls: list[str] = []
+    written: list[tuple] = []
 
     async def fake_lookup(self, phone: str) -> RawHttpResult:
         calls.append(phone)
@@ -261,11 +326,11 @@ def test_exception_lookup_not_retried(monkeypatch):
     )
     monkeypatch.setattr(
         "app.providers.finenumbers.enrich._bulk_update_operators",
-        lambda db, pairs: len(pairs),
+        lambda db, pairs: written.extend(pairs) or len(pairs),
     )
 
     cat_id = uuid.uuid4()
-    db = _mock_db([(cat_id, "79004444444", None, "900", 4444444)])
+    db = _mock_db([(cat_id, "79004444444", "KeepMe", "900", 4444444)])
 
     stats = asyncio.run(
         enrich_catalog_operators(
@@ -273,11 +338,11 @@ def test_exception_lookup_not_retried(monkeypatch):
             connection=_conn(),
             require_full_coverage=False,
             concurrency=2,
-            max_rounds=5,
+            max_rounds=2,
         )
     )
-    assert calls == ["9004444444"]
+    assert calls == ["9004444444", "9004444444"]
     assert stats["lookups"] == 0
-    assert stats["errors"] == 1
-    assert stats["waves"] == 1
-    assert len(calls) == 1
+    assert stats["errors"] == 2
+    assert stats["waves"] == 2
+    assert written == []
