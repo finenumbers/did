@@ -45,6 +45,9 @@ REG_MAX_PAGE_SIZE = 200
 # Documented Reg API key limit 10000/min — stay under
 REG_RATE_LIMIT_SAFE_PER_MINUTE = 9000
 
+# Catalog column «Оператор» — terminal PSTN miss (not an HTTP error)
+OPERATOR_NOT_IN_REGISTRY = "Нет в реестре"
+
 # Catalog column «Подключено в РТУ» (purchased only)
 RTU_OWN = "Своя нумерация"
 RTU_EXTERNAL = "Внешняя нумерация"

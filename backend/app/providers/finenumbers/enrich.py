@@ -2,7 +2,7 @@
 
 Contour B: local cache is used ONLY to fill catalog.operator (no region/inventory).
 RULE: every currently present catalog MSISDN goes through cache → PSTN lookup when needed;
-final operator SoT is this last sync stage — only PSTN cache/API values (clear interim on miss).
+final operator SoT is this last sync stage — PSTN cache/API, or «Нет в реестре» on terminal miss.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from app.models.catalog import NumbersCatalogNormalized
 from app.modules.pstn_inn_cache.service import load_enabled_ranges_for_enrich
 from app.providers.dto.common import ConnectionConfig
 from app.providers.errors import ProviderError
+from app.providers.finenumbers import contract
 from app.providers.finenumbers.client import FinenumbersClient
 from app.providers.finenumbers.mapper import parse_msisdn_parts, phone_for_lookup
 
@@ -141,7 +142,8 @@ async def enrich_catalog_operators(
     Primary: local pstn_inn_ranges_cache (enabled INNs) — writes ONLY operator.
     Secondary: PSTN lookup API for cache misses (always queued; overwrites existing operator).
     With only_missing=False (default / production): every present row is enriched.
-    If cache and API yield no operator, clear any interim value (final SoT is PSTN only).
+    Terminal PSTN miss (found=false / empty / invalid MSISDN) → «Нет в реестре».
+    HTTP/transport errors remain uncovered and fail require_full_coverage.
     """
     client = FinenumbersClient(connection)
     cache = OperatorRangeCache()
@@ -249,7 +251,7 @@ async def _enrich_catalog_operators_inner(
     cache_hits = 0
     lookups = 0
     errors = 0
-    cleared_unresolved = 0
+    not_in_registry = 0
 
     # (id, msisdn, phone, current_operator)
     pending: list[tuple] = []
@@ -274,9 +276,9 @@ async def _enrich_catalog_operators_inner(
             phone = phone_for_lookup(msisdn_s)
             if not phone:
                 invalid_msisdns.append(msisdn_s)
-                if current_operator and str(current_operator).strip():
-                    pending_updates.append((catalog_id, None))
-                    cleared_unresolved += 1
+                if current_operator != contract.OPERATOR_NOT_IN_REGISTRY:
+                    pending_updates.append((catalog_id, contract.OPERATOR_NOT_IN_REGISTRY))
+                    not_in_registry += 1
             else:
                 pending.append((catalog_id, msisdn_s, phone, current_operator))
         if (idx + 1) % _PROGRESS_EVERY == 0:
@@ -302,9 +304,14 @@ async def _enrich_catalog_operators_inner(
     )
 
     sem = asyncio.Semaphore(concurrency)
-    # phone -> operator string, or None when attempted (found=false / error / empty)
-    lookup_result: dict[str, str | None] = {}
+    # Successful PSTN operators only. Terminal miss vs transport error are separate sets.
+    lookup_result: dict[str, str] = {}
+    absent_phones: set[str] = set()
+    error_phones: set[str] = set()
     progress_lock = asyncio.Lock()
+
+    def _phone_attempted(phone: str) -> bool:
+        return phone in lookup_result or phone in absent_phones or phone in error_phones
 
     async def lookup_phone_row(
         phone: str,
@@ -321,20 +328,22 @@ async def _enrich_catalog_operators_inner(
                 lookups += 1
                 if raw.status_code >= 400:
                     errors += 1
-                    # Mark attempted so later waves do not retry the same phone.
-                    lookup_result[phone] = None
+                    error_phones.add(phone)
                 else:
                     body = raw.body_json if isinstance(raw.body_json, dict) else {}
                     data = body.get("data") if body.get("found") else None
                     if isinstance(data, dict):
                         op = cache.add_from_api_row(data)
                         cache.finalize()
-                        lookup_result[phone] = op
+                        if op:
+                            lookup_result[phone] = op
+                        else:
+                            absent_phones.add(phone)
                     else:
-                        lookup_result[phone] = None
+                        absent_phones.add(phone)
             except Exception:
                 errors += 1
-                lookup_result[phone] = None
+                error_phones.add(phone)
                 logger.exception("Finenumbers lookup failed for %s", phone)
             finally:
                 async with progress_lock:
@@ -367,8 +376,18 @@ async def _enrich_catalog_operators_inner(
                     pending_updates.append((catalog_id, operator))
                 continue
 
+            if phone in absent_phones:
+                if current_operator != contract.OPERATOR_NOT_IN_REGISTRY:
+                    pending_updates.append((catalog_id, contract.OPERATOR_NOT_IN_REGISTRY))
+                    not_in_registry += 1
+                continue
+
+            if phone in error_phones:
+                still.append(item)
+                continue
+
             still.append(item)
-            if phone not in phone_seen and phone not in lookup_result:
+            if phone not in phone_seen and not _phone_attempted(phone):
                 phone_seen.add(phone)
                 phones_needed.append(phone)
 
@@ -409,7 +428,7 @@ async def _enrich_catalog_operators_inner(
             )
         )
 
-    uncovered_msisdns: list[str] = list(invalid_msisdns)
+    uncovered_msisdns: list[str] = []
     for item in pending:
         catalog_id, msisdn_s, phone, current_operator = item
         operator = cache.resolve(msisdn_s) or lookup_result.get(phone)
@@ -417,11 +436,12 @@ async def _enrich_catalog_operators_inner(
             cache_hits += 1
             if current_operator != operator:
                 pending_updates.append((catalog_id, operator))
+        elif phone in absent_phones:
+            if current_operator != contract.OPERATOR_NOT_IN_REGISTRY:
+                pending_updates.append((catalog_id, contract.OPERATOR_NOT_IN_REGISTRY))
+                not_in_registry += 1
         else:
-            # No PSTN value: clear interim (REG/provider) so final SoT is PSTN-only.
-            if current_operator and str(current_operator).strip():
-                pending_updates.append((catalog_id, None))
-                cleared_unresolved += 1
+            # Transport/HTTP error or unresolved after max rounds.
             uncovered_msisdns.append(msisdn_s)
 
     updated = 0
@@ -479,7 +499,7 @@ async def _enrich_catalog_operators_inner(
         "updated": updated,
         "lookups": lookups,
         "cache_hits": cache_hits,
-        "cleared_unresolved": cleared_unresolved,
+        "not_in_registry": not_in_registry,
         "missing": max(len(uncovered_msisdns), global_missing),
         "invalid_msisdn": len(invalid_msisdns),
         "errors": errors,

@@ -1,4 +1,4 @@
-"""PSTN enrich: cache hits, overwrite on miss, no retry storm on failures."""
+"""PSTN enrich: cache hits, overwrite on miss, sentinel on terminal absence."""
 
 from __future__ import annotations
 
@@ -7,7 +7,11 @@ import uuid
 from typing import Any
 from unittest.mock import MagicMock
 
+import pytest
+
 from app.providers.dto.common import ConnectionConfig, RawHttpResult
+from app.providers.errors import ProviderError
+from app.providers.finenumbers import contract
 from app.providers.finenumbers.enrich import enrich_catalog_operators
 
 
@@ -129,7 +133,7 @@ def test_filled_operator_still_looks_up_on_cache_miss(monkeypatch):
     assert written == [(cat_id, "FromApi")]
 
 
-def test_failed_lookup_clears_interim_operator(monkeypatch):
+def test_found_false_writes_not_in_registry_and_passes_coverage(monkeypatch):
     calls: list[str] = []
     written: list[tuple] = []
 
@@ -157,14 +161,49 @@ def test_failed_lookup_clears_interim_operator(monkeypatch):
         enrich_catalog_operators(
             db,
             connection=_conn(),
-            require_full_coverage=False,
+            require_full_coverage=True,
             concurrency=2,
         )
     )
     assert calls == ["9005555555"]
-    assert written == [(cat_id, None)]
-    assert stats["cleared_unresolved"] == 1
-    assert stats["missing"] >= 1
+    assert written == [(cat_id, contract.OPERATOR_NOT_IN_REGISTRY)]
+    assert stats["not_in_registry"] == 1
+    assert stats["missing"] == 0
+    assert stats["errors"] == 0
+
+
+def test_http_error_still_fails_coverage(monkeypatch):
+    async def fake_lookup(self, phone: str) -> RawHttpResult:
+        return _raw(status=500, body={"error": "boom"})
+
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich.load_enabled_ranges_for_enrich",
+        lambda db: [],
+    )
+    monkeypatch.setattr(
+        "app.providers.finenumbers.client.FinenumbersClient.lookup_phone",
+        fake_lookup,
+    )
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich._bulk_update_operators",
+        lambda db, pairs: len(pairs),
+    )
+
+    cat_id = uuid.uuid4()
+    db = _mock_db([(cat_id, "79003333333", None, "900", 3333333)])
+
+    with pytest.raises(ProviderError) as exc:
+        asyncio.run(
+            enrich_catalog_operators(
+                db,
+                connection=_conn(),
+                require_full_coverage=True,
+                concurrency=2,
+                max_rounds=8,
+            )
+        )
+    assert exc.value.code == "OPERATOR_ENRICHMENT_INCOMPLETE"
+    assert "errors=1" in str(exc.value)
 
 
 def test_failed_lookup_not_retried_in_next_wave(monkeypatch):
@@ -238,7 +277,6 @@ def test_exception_lookup_not_retried(monkeypatch):
         )
     )
     assert calls == ["9004444444"]
-    # Exception path marks phone attempted without incrementing successful HTTP counter
     assert stats["lookups"] == 0
     assert stats["errors"] == 1
     assert stats["waves"] == 1

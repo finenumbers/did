@@ -41,8 +41,10 @@ Nav: [`finenumbers/SOURCE.md`](finenumbers/SOURCE.md) · [`finenumbers-contract.
 - Refresh pulls `by-inn` ranges per enabled operator.
 - Enrichment (`enrich_catalog_operators`) runs as the **last** unified-sync stage after `finalize`.
 - Every currently present free/purchased row: local ranges first; cache miss → always `lookup?phone=` (no skip for already-filled operator).
-- Successful cache/API value **overwrites** existing `operator`. Empty cache+API **clears** interim values (`cleared_unresolved`); empty operator remains a coverage failure.
-- Final `operator` SoT is PSTN enrich only (REG does not seed operator).
+- Successful cache/API value **overwrites** existing `operator`.
+- Terminal PSTN miss (`found=false` / empty / invalid MSISDN) → **`Нет в реестре`** (blue row in UI/XLSX); counts as covered for sync gate.
+- HTTP/transport lookup errors still fail `require_full_coverage`.
+- Final `operator` SoT is PSTN enrich (or the sentinel above).
 - Writes **only** `numbers_catalog_normalized.operator`. Never overwrites prices/geo/status from Contour B.
 
 ## Sync gate

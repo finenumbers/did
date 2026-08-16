@@ -28,6 +28,7 @@ Same INN may appear in A/B (e.g. Frontier). Contour C uses a separate REG API ke
   - Other provider + number in REG → **Внешняя нумерация** (yellow; no duplicate catalog row)
   - Other provider + number not in REG → **Не подключено** (red)
 - Flags are re-applied after Contour B operator enrichment (final `operator` SoT is PSTN enrich only; REG does not seed operator)
+- Terminal PSTN miss → catalog `operator` = **`Нет в реестре`** (blue highlight); HTTP lookup errors still fail enrichment coverage
 - **Never** call REG mutating endpoints (`POST …/request`, `rtu-import`, `regs/poll`, …)
 
 ## Auth — VERIFIED (code)

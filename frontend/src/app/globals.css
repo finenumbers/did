@@ -279,6 +279,10 @@ mark.search-hit {
   background: #ffeb9c;
 }
 
+.table-scroll tbody tr.row-operator-not-in-registry td {
+  background: #bdd7ee;
+}
+
 .infinite-sentinel {
   padding: 0.75rem;
   text-align: center;
