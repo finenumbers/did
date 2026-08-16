@@ -7,9 +7,13 @@ import { apiFetch } from "@/lib/api/client";
 import { clearSession, getAccessToken, getUsername } from "@/lib/auth";
 import type { ProviderHealth } from "@/lib/types/api";
 
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || "dev";
+
 const links = [
   { href: "/free-numbers", label: "Свободные номера" },
   { href: "/purchased-numbers", label: "Купленные номера" },
+  { href: "/booking", label: "Бронирование" },
+  { href: "/regions", label: "Регионы" },
   { href: "/settings", label: "Настройки" },
   { href: "/sync-logs", label: "Синхронизация" },
 ];
@@ -28,7 +32,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const isLogin = pathname.startsWith("/login");
   const [health, setHealth] = useState<ProviderHealth[]>([]);
-  const [user, setUser] = useState<string | null>(null);
+  const [hasSession, setHasSession] = useState(false);
   const [ready, setReady] = useState(isLogin);
   const [gateError, setGateError] = useState<string | null>(null);
   const [retryTick, setRetryTick] = useState(0);
@@ -40,7 +44,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       return;
     }
     const token = getAccessToken();
-    setUser(getUsername());
+    setHasSession(Boolean(token || getUsername()));
     setReady(false);
     setGateError(null);
     void apiFetch<{ auth_required: boolean }>("/api/v1/auth/status")
@@ -134,22 +138,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Fragment>
           ))}
         </nav>
-        <div style={{ marginTop: "auto", fontSize: "0.8rem", color: "#9aabba" }}>
-          {user ? (
-            <>
-              <div style={{ marginBottom: "0.5rem" }}>{user}</div>
-              <button
-                type="button"
-                className="secondary"
-                style={{ width: "100%" }}
-                onClick={() => {
-                  clearSession();
-                  router.replace("/login");
-                }}
-              >
-                Выйти
-              </button>
-            </>
+        <div className="sidebar-footer">
+          <div className="sidebar-version">{APP_VERSION}</div>
+          {hasSession ? (
+            <button
+              type="button"
+              className="nav-logout"
+              onClick={() => {
+                clearSession();
+                router.replace("/login");
+              }}
+            >
+              Выйти
+            </button>
           ) : null}
         </div>
       </aside>
