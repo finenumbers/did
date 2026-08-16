@@ -19,6 +19,8 @@ type ProviderCode =
   | "voximplant"
   | "mcn";
 
+type AuroraCsvFile = { url: string; has_status_column: boolean };
+
 type Draft = {
   baseUrl: string;
   apiKey: string;
@@ -31,6 +33,7 @@ type Draft = {
   numberingBaseUrl: string;
   accessToken: string;
   credentialsJson: string;
+  csvFiles: AuroraCsvFile[];
   settings: ProviderSettings | null;
   message: string | null;
   error: string | null;
@@ -50,6 +53,7 @@ const EMPTY_DRAFT: Draft = {
   numberingBaseUrl: "",
   accessToken: "",
   credentialsJson: "",
+  csvFiles: [],
   settings: null,
   message: null,
   error: null,
@@ -68,6 +72,25 @@ const PROVIDERS: { code: ProviderCode; title: string }[] = [
   { code: "finenumbers", title: "Finenumbers" },
 ];
 
+function parseAuroraCsvFiles(extra: Record<string, unknown> | undefined): AuroraCsvFile[] {
+  const raw = extra?.csv_files;
+  if (!Array.isArray(raw)) return [];
+  const out: AuroraCsvFile[] = [];
+  for (const item of raw) {
+    if (typeof item === "string") {
+      out.push({ url: item, has_status_column: false });
+      continue;
+    }
+    if (item && typeof item === "object") {
+      const row = item as Record<string, unknown>;
+      const url = typeof row.url === "string" ? row.url : "";
+      if (!url) continue;
+      out.push({ url, has_status_column: Boolean(row.has_status_column) });
+    }
+  }
+  return out;
+}
+
 function draftFromSettings(code: ProviderCode, s: ProviderSettings): Draft {
   const auth = s.auth_settings_masked || {};
   return {
@@ -76,6 +99,7 @@ function draftFromSettings(code: ProviderCode, s: ProviderSettings): Draft {
     email: typeof auth.email === "string" ? auth.email : "",
     numberingLogin: typeof auth.numbering_login === "string" ? auth.numbering_login : "",
     numberingBaseUrl: typeof auth.numbering_base_url === "string" ? auth.numbering_base_url : "",
+    csvFiles: code === "aurora" ? parseAuroraCsvFiles(s.extra_settings) : [],
     settings: s,
   };
 }
@@ -165,7 +189,7 @@ export default function SettingsPage() {
     const d = drafts[code];
     setDraft(code, { saving: true, error: null, message: null });
     let auth_settings: Record<string, string> | undefined;
-    let extra_settings: Record<string, string> | undefined;
+    let extra_settings: Record<string, unknown> | undefined;
     if (code === "finenumbers") {
       const next: Record<string, string> = {};
       if (d.apiKey) next.key = d.apiKey;
@@ -186,6 +210,12 @@ export default function SettingsPage() {
       auth_settings = d.accessToken ? { access_token: d.accessToken } : undefined;
     } else if (code === "aurora") {
       auth_settings = undefined;
+      extra_settings = {
+        csv_files: d.csvFiles.map((f) => ({
+          url: f.url.trim(),
+          has_status_column: f.has_status_column,
+        })),
+      };
     } else {
       const next: Record<string, string> = {};
       if (d.email) next.email = d.email;
@@ -199,7 +229,7 @@ export default function SettingsPage() {
       const s = await apiFetch<ProviderSettings>(`/api/v1/providers/${code}/settings`, {
         method: "PUT",
         body: JSON.stringify({
-          base_url: d.baseUrl || null,
+          base_url: code === "aurora" ? null : d.baseUrl || null,
           auth_settings,
           extra_settings,
         }),
@@ -458,16 +488,15 @@ export default function SettingsPage() {
               {d.message && <div className="notice">{d.message}</div>}
               {d.error && <div className="state error">{d.error}</div>}
               <div className="filters" style={{ flexDirection: "column", alignItems: "stretch" }}>
-                <label>
-                  Base URL{" "}
-                  {code === "runexis"
-                    ? "(DIDAPI)"
-                    : code === "finenumbers"
-                      ? "(PSTN)"
-                      : code === "uis"
-                        ? "(Data API)"
-                        : code === "aurora"
-                          ? "(CSV directory)"
+                {code !== "aurora" ? (
+                  <label>
+                    Base URL{" "}
+                    {code === "runexis"
+                      ? "(DIDAPI)"
+                      : code === "finenumbers"
+                        ? "(PSTN)"
+                        : code === "uis"
+                          ? "(Data API)"
                           : code === "exolve"
                             ? "(Numbering API)"
                             : code === "voximplant"
@@ -475,19 +504,17 @@ export default function SettingsPage() {
                               : code === "mcn"
                                 ? "(Витрина)"
                                 : ""}
-                  <input
-                    value={d.baseUrl}
-                    onChange={(e) => setDraft(code, { baseUrl: e.target.value })}
-                    style={{ width: "100%" }}
-                    placeholder={
-                      code === "runexis"
-                        ? "https://didapi.runexis.ru"
-                        : code === "finenumbers"
-                          ? "https://pstn.finenumbers.com"
-                          : code === "uis"
-                            ? "https://dataapi.uiscom.ru/v2.0"
-                            : code === "aurora"
-                              ? "http://bill.auroratelecom.ru:8080/bgbilling/numbers/"
+                    <input
+                      value={d.baseUrl}
+                      onChange={(e) => setDraft(code, { baseUrl: e.target.value })}
+                      style={{ width: "100%" }}
+                      placeholder={
+                        code === "runexis"
+                          ? "https://didapi.runexis.ru"
+                          : code === "finenumbers"
+                            ? "https://pstn.finenumbers.com"
+                            : code === "uis"
+                              ? "https://dataapi.uiscom.ru/v2.0"
                               : code === "exolve"
                                 ? "https://api.exolve.ru"
                                 : code === "voximplant"
@@ -495,17 +522,96 @@ export default function SettingsPage() {
                                   : code === "mcn"
                                     ? "https://shop.mcn.ru"
                                     : undefined
-                    }
-                  />
-                </label>
+                      }
+                    />
+                  </label>
+                ) : null}
 
                 {code === "aurora" ? (
-                  <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
-                    Публичные региональные CSV свободных номеров (HTTP): Crimea, Grozny, MSK,
-                    Sevastopol, Simferopol, SPb. Файл all_free.csv не используется. Base URL —
-                    каталог (или legacy путь к .csv → берётся родительская папка). Auth не
-                    требуется. Купленные и справочники не поддерживаются.
-                  </div>
+                  <>
+                    <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
+                      Список CSV свободных номеров (HTTP, host bill.auroratelecom.ru). Auth не
+                      требуется. Файл all_free.csv запрещён. Галочка «6 столбцов (статус)» — для
+                      схемы как у MSK: phone; статус; тип; цена; гео; маска. Купленные и справочники
+                      не поддерживаются.
+                    </div>
+                    {d.csvFiles.map((file, idx) => (
+                      <div
+                        key={`aurora-csv-${idx}`}
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "0.35rem",
+                          padding: "0.5rem 0",
+                          borderBottom: "1px solid var(--line)",
+                        }}
+                      >
+                        <label>
+                          URL файла
+                          <input
+                            value={file.url}
+                            onChange={(e) => {
+                              const next = d.csvFiles.map((row, i) =>
+                                i === idx ? { ...row, url: e.target.value } : row,
+                              );
+                              setDraft(code, { csvFiles: next });
+                            }}
+                            style={{ width: "100%" }}
+                            placeholder="http://bill.auroratelecom.ru:8080/bgbilling/numbers/Crimea.csv"
+                          />
+                        </label>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: "0.75rem",
+                          }}
+                        >
+                          <label style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                            <input
+                              type="checkbox"
+                              checked={file.has_status_column}
+                              onChange={(e) => {
+                                const next = d.csvFiles.map((row, i) =>
+                                  i === idx
+                                    ? { ...row, has_status_column: e.target.checked }
+                                    : row,
+                                );
+                                setDraft(code, { csvFiles: next });
+                              }}
+                            />
+                            6 столбцов (статус)
+                          </label>
+                          <button
+                            type="button"
+                            className="secondary"
+                            onClick={() => {
+                              setDraft(code, {
+                                csvFiles: d.csvFiles.filter((_, i) => i !== idx),
+                              });
+                            }}
+                          >
+                            Удалить
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() =>
+                        setDraft(code, {
+                          csvFiles: [
+                            ...d.csvFiles,
+                            { url: "", has_status_column: false },
+                          ],
+                        })
+                      }
+                    >
+                      Добавить файл
+                    </button>
+                  </>
                 ) : code === "exolve" ? (
                   <>
                     <label>

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from decimal import Decimal
 from pathlib import Path
+
 import pytest
 
 from app.models.enums import InventoryKind
@@ -12,7 +13,7 @@ from app.providers.aurora import contract, mapper, parser
 from app.providers.aurora.client import AuroraClient
 from app.providers.aurora.provider import AuroraProvider
 from app.providers.dto.common import ConnectionConfig, RawHttpResult
-from app.providers.errors import ProviderTransportError
+from app.providers.errors import ProviderError, ProviderTransportError
 
 SAMPLE_PATH = (
     Path(__file__).resolve().parents[2]
@@ -22,6 +23,15 @@ SAMPLE_PATH = (
     / "raw"
     / "sample.csv"
 )
+
+
+def _cfg(files: list[dict] | None = None) -> ConnectionConfig:
+    entries = files if files is not None else [e.to_dict() for e in contract.seed_csv_files()]
+    return ConnectionConfig(
+        base_url=None,
+        auth_settings={},
+        extra_settings={"csv_files": entries},
+    )
 
 
 def _raw_from_bytes(data: bytes, status: int = 200, url: str = "") -> RawHttpResult:
@@ -115,16 +125,17 @@ def test_short_row_unmapped():
     assert meta["unmapped"] == 1
 
 
-def test_msk_six_column_row_drops_status():
+def test_status_column_flag_drops_sixth():
     text = (
         '"+7 (495) 2360003";СВОБОДЕН;ЗОЛОТОЙ;15990 Руб.;г. Москва;'
         "[ XXX-000-X - Первый десяток ]\n"
     )
     data = text.encode("cp1251")
     items, unmapped, meta = parser.parse_free_csv(
-        _raw_from_bytes(data, url="http://bill.auroratelecom.ru:8080/bgbilling/numbers/MSK.csv"),
+        _raw_from_bytes(data, url="http://bill.auroratelecom.ru:8080/bgbilling/numbers/other.csv"),
         raw_bytes=data,
-        filename="MSK.csv",
+        filename="other.csv",
+        has_status_column=True,
     )
     assert meta["unmapped"] == 0
     assert len(items) == 1
@@ -138,7 +149,7 @@ def test_msk_six_column_row_drops_status():
     assert item.raw_payload.get("column_count") == 6
 
 
-def test_six_column_row_unmapped_outside_msk():
+def test_six_column_unmapped_without_flag():
     text = (
         '"+7 (495) 2360003";СВОБОДЕН;ЗОЛОТОЙ;15990 Руб.;г. Москва;'
         "[ XXX-000-X - Первый десяток ]\n"
@@ -146,10 +157,11 @@ def test_six_column_row_unmapped_outside_msk():
     data = text.encode("cp1251")
     items, unmapped, meta = parser.parse_free_csv(
         _raw_from_bytes(
-            data, url="http://bill.auroratelecom.ru:8080/bgbilling/numbers/Crimea.csv"
+            data, url="http://bill.auroratelecom.ru:8080/bgbilling/numbers/MSK.csv"
         ),
         raw_bytes=data,
-        filename="Crimea.csv",
+        filename="MSK.csv",
+        has_status_column=False,
     )
     assert items == []
     assert len(unmapped) == 1
@@ -157,30 +169,60 @@ def test_six_column_row_unmapped_outside_msk():
     assert unmapped[0].get("column_count") == 6
 
 
-def test_resolve_csv_urls_default_has_six_no_all_free():
-    urls = contract.resolve_csv_urls(None)
-    assert len(urls) == 6
-    assert all(u.startswith(contract.DEFAULT_CSV_BASE) for u in urls)
-    names = [u.rsplit("/", 1)[-1] for u in urls]
-    assert names == list(contract.DEFAULT_CSV_FILES)
-    assert "all_free.csv" not in names
+def test_load_csv_files_from_settings():
+    entries = contract.load_csv_files(
+        {
+            "csv_files": [
+                {
+                    "url": "http://bill.auroratelecom.ru:8080/bgbilling/numbers/Crimea.csv",
+                    "has_status_column": False,
+                },
+                {
+                    "url": "http://bill.auroratelecom.ru:8080/bgbilling/numbers/MSK.csv",
+                    "has_status_column": True,
+                },
+            ]
+        }
+    )
+    assert len(entries) == 2
+    assert entries[1].has_status_column is True
 
 
-def test_resolve_csv_urls_legacy_all_free_uses_dirname():
-    urls = contract.resolve_csv_urls(
+def test_load_csv_files_empty_raises():
+    with pytest.raises(ProviderError, match="empty"):
+        contract.load_csv_files({"csv_files": []})
+
+
+def test_reject_all_free_url():
+    with pytest.raises(ProviderError, match="all_free"):
+        contract.validate_csv_url(
+            "http://bill.auroratelecom.ru:8080/bgbilling/numbers/all_free.csv"
+        )
+
+
+def test_legacy_backfill_flags_msk():
+    entries = contract.legacy_backfill_entries(
         "http://bill.auroratelecom.ru:8080/bgbilling/numbers/all_free.csv"
     )
-    assert len(urls) == 6
-    assert "all_free.csv" not in "".join(urls)
-    assert urls[0].endswith("/Crimea.csv")
-    assert urls[-1].endswith("/SPb.csv")
+    assert len(entries) == 6
+    assert "all_free.csv" not in "".join(e.url for e in entries)
+    msk = next(e for e in entries if e.url.endswith("/MSK.csv"))
+    assert msk.has_status_column is True
+    assert entries[0].url.endswith("/Crimea.csv")
 
 
-def test_whitespace_base_url_falls_back_to_regional_list():
-    client = AuroraClient(ConnectionConfig(base_url="   ", auth_settings={}))
+def test_client_requires_csv_files():
+    with pytest.raises(ProviderError, match="empty"):
+        AuroraClient(ConnectionConfig(base_url=None, auth_settings={}, extra_settings={}))
+
+
+def test_client_loads_configured_files():
+    client = AuroraClient(_cfg())
     assert len(client.csv_urls) == 6
-    assert client.csv_url == client.csv_urls[0]
     assert client.csv_url.endswith("/Crimea.csv")
+    assert client.first_entry.has_status_column is False
+    msk = next(e for e in client.csv_files if e.url.endswith("/MSK.csv"))
+    assert msk.has_status_column is True
 
 
 def test_decode_prefers_valid_utf8_over_cp1251_mojibake():
@@ -246,7 +288,7 @@ def test_sync_keeps_cross_file_duplicates_for_engine(monkeypatch):
 
     result = asyncio.run(
         AuroraProvider().sync_free_numbers(
-            ConnectionConfig(base_url=None, auth_settings={}),
+            _cfg(),
             on_progress=on_progress,
         )
     )
@@ -291,11 +333,7 @@ def test_sync_fail_closed_on_one_file(monkeypatch):
     monkeypatch.setattr(AuroraClient, "fetch_csv", fake_fetch)
 
     with pytest.raises(ProviderTransportError, match="Grozny"):
-        asyncio.run(
-            AuroraProvider().sync_free_numbers(
-                ConnectionConfig(base_url=None, auth_settings={})
-            )
-        )
+        asyncio.run(AuroraProvider().sync_free_numbers(_cfg()))
     assert "Crimea.csv" in calls
     assert "Grozny.csv" in calls
     # Fail-closed: must not continue past the failed file

@@ -75,16 +75,15 @@ def decode_csv_bytes(data: bytes) -> tuple[str, str]:
         ) from exc
 
 
-def normalize_row(row: list[str], *, filename: str | None = None) -> list[str]:
+def normalize_row(row: list[str], *, has_status_column: bool = False) -> list[str]:
     """Normalize provider row shape before the 5-column contract check.
 
-    MSK.csv currently inserts a status column (e.g. СВОБОДЕН) at index 1.
-    Drop that column when the row has exactly 6 fields so classic mapping applies.
+    When has_status_column is set (MSK-style layout), drop status at index 1
+    if the row has exactly 6 fields so classic mapping applies.
     """
     if not row:
         return row
-    name = (filename or "").rsplit("/", 1)[-1].lower()
-    if name == "msk.csv" and len(row) == 6:
+    if has_status_column and len(row) == 6:
         return [row[0], *row[2:]]
     return row
 
@@ -93,7 +92,7 @@ def parse_probe_bytes(
     data: bytes,
     *,
     truncated: bool = False,
-    filename: str | None = None,
+    has_status_column: bool = False,
 ) -> tuple[ParsedNumberItem | None, dict[str, Any]]:
     """Parse first valid free-number row from a CSV head sample."""
     text, encoding = decode_csv_bytes(data)
@@ -108,7 +107,7 @@ def parse_probe_bytes(
         if not row or all(not (c or "").strip() for c in row):
             continue
         scanned += 1
-        normalized = normalize_row(row, filename=filename)
+        normalized = normalize_row(row, has_status_column=has_status_column)
         if len(normalized) != contract.EXPECTED_COLUMNS:
             continue
         parsed = parse_row(normalized, original_column_count=len(row))
@@ -192,6 +191,7 @@ def parse_free_csv(
     *,
     raw_bytes: bytes | None = None,
     filename: str | None = None,
+    has_status_column: bool = False,
 ) -> tuple[
     list[ParsedNumberItem],
     list[dict[str, Any]],
@@ -207,7 +207,7 @@ def parse_free_csv(
     unmapped: list[dict[str, Any]] = []
     source_name = filename or contract.csv_filename(raw.request_url or "")
     for row in rows:
-        normalized = normalize_row(row, filename=source_name)
+        normalized = normalize_row(row, has_status_column=has_status_column)
         if len(normalized) != contract.EXPECTED_COLUMNS:
             unmapped.append(
                 row_to_raw_payload(row, original_column_count=len(row))
@@ -228,5 +228,6 @@ def parse_free_csv(
         "parsed": len(items),
         "unmapped": len(unmapped),
         "file": source_name or None,
+        "has_status_column": has_status_column,
     }
     return items, unmapped, meta

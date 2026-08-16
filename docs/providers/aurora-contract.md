@@ -6,25 +6,17 @@ Sources: [`aurora/SOURCE.md`](aurora/SOURCE.md) and [`aurora/raw/sample.csv`](au
 
 ## Transport — VERIFIED (live)
 
-- Method: **GET** (one request per regional file)
-- Default directory base: `http://bill.auroratelecom.ru:8080/bgbilling/numbers/`
-- Fixed file list (order):
-  1. `Crimea.csv`
-  2. `Grozny.csv`
-  3. `MSK.csv`
-  4. `Sevastopol.csv`
-  5. `Simferopol.csv`
-  6. `SPb.csv`
-- **`all_free.csv` is not part of the inventory fetch** (legacy aggregate; do not download)
+- Method: **GET** (one request per configured file URL)
+- Host allowlist: `bill.auroratelecom.ru` only
+- File list: **only** `extra_settings.csv_files` from Settings (full URLs). No runtime `DEFAULT_CSV_FILES` / directory expansion.
+- Each entry: `{ "url": "…/File.csv", "has_status_column": bool }`
+- **`all_free.csv` is forbidden**
 - Auth: none
 - Body: CSV file per URL, no JSON envelope
-- Settings `base_url` (optional):
-  - empty → default directory base + fixed file list
-  - directory URL → that prefix + fixed file list
-  - legacy single `*.csv` URL (incl. old `all_free.csv`) → **parent directory** + fixed file list (the named file itself is not fetched)
+- Seed / one-shot backfill may prefill the historical six regional URLs (MSK with `has_status_column: true`); after that Settings is SoT
 - Fail-closed: any file HTTP error / size cap / parse failure fails the whole free stage (no partial catalog cutover)
-- Merge: concatenate all mapped rows from regional files; catalog dedupe by MSISDN happens in the sync engine (**last wins**). Cross-file duplicates are exported on the Sync dropped XLSX `duplicates` sheet (same path as UIS).
-- Each successful sync fully replaces Aurora free catalog; row count may shrink or grow vs previous run (no size-ratio wipe guard). Sync UI shows was/became counts.
+- Merge: concatenate all mapped rows; catalog dedupe by MSISDN in sync engine (**last wins**)
+- Each successful sync fully replaces Aurora free catalog
 
 ## Encoding / CSV shape — VERIFIED (live)
 
@@ -34,32 +26,32 @@ Sources: [`aurora/SOURCE.md`](aurora/SOURCE.md) and [`aurora/raw/sample.csv`](au
 | Delimiter | `;` |
 | Header row | **none** |
 | Quoting | RFC-ish CSV; column 1 typically quoted (`"+7 (…)"`) |
-| Column count | **5** per row (classic). **`MSK.csv` may have 6 columns** with a status field at index 1 (e.g. `СВОБОДЕН`); that column is ignored and the remaining five map as below |
+| Column count | **5** classic. With Settings flag `has_status_column` (MSK-style): **6** columns; status at index 1 is dropped |
 
 ## Columns — VERIFIED (live)
 
 | Index | Meaning | Example |
 |---|---|---|
 | 0 | Phone (display-formatted) | `+7 (3652) 777007` |
-| 1 | Beauty / tariff type (`MSK.csv`: after dropping status col) | `ПЛАТИНОВЫЙ`, `ПРОСТОЙ`, … |
+| 1 | Beauty / tariff type (after optional status drop) | `ПЛАТИНОВЫЙ`, `ПРОСТОЙ`, … |
 | 2 | Period fee text | `75990 Руб.` or `ДОГОВОРНАЯ` |
 | 3 | Geo text | `г. Симферополь\|Республика Крым` or `г. Москва` or `Российская Федерация` |
 | 4 | Display mask description | `[ AAA-XXX - 3 одинаковых в начале ] …` |
 
-`MSK.csv` 6-column layout (live): `phone; status; type; fee; geo; display_mask` — status discarded before mapping.
+MSK-style 6-column layout: `phone; status; type; fee; geo; display_mask` — enabled per file via `has_status_column`.
 
 ## Capabilities
 
 | Capability | Supported | Notes |
 |---|---|---|
-| free_numbers | yes | Sequential GET of all regional CSVs + parse + merge |
+| free_numbers | yes | Sequential GET of configured CSVs + parse + merge |
 | purchased_numbers | **no** | No purchased export in contract |
 | dictionaries | **no** | No regions/cities API; geo is per-row text |
-| test_connection | yes | GET head of first regional file + parse first valid 5-column row |
+| test_connection | yes | GET head of first configured file + parse first valid row |
 
 ## Out of scope
 
 - Write / buy / reserve endpoints
-- Dynamic pagination (fixed file list only)
+- Directory listing / auto-discovery of files on host
 - Auth credentials
 - Fetching `all_free.csv`

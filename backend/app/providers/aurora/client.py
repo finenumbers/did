@@ -1,11 +1,10 @@
-"""Aurora Telecom CSV client — read-only GET of regional free exports."""
+"""Aurora Telecom CSV client — read-only GET of configured free exports."""
 
 from __future__ import annotations
 
 import logging
 import time
 from typing import Any
-from urllib.parse import urlparse
 
 import httpx
 
@@ -17,7 +16,6 @@ from app.providers.retry import RetryPolicy, TimeoutConfig, request_with_retries
 logger = logging.getLogger(__name__)
 
 PROBE_MAX_BYTES = 65_536
-_ALLOWED_HOST = "bill.auroratelecom.ru"
 
 
 class AuroraClient:
@@ -35,29 +33,15 @@ class AuroraClient:
             total_timeout=200.0,
         )
         self.retry = retry or RetryPolicy()
-        self.csv_urls = contract.resolve_csv_urls(connection.base_url)
-        if not self.csv_urls:
-            raise ProviderTransportError("Aurora CSV URL list is empty")
-        for url in self.csv_urls:
-            self._validate_url(url)
+        self.csv_files = contract.load_csv_files(connection.extra_settings)
+        self.csv_urls = [e.url for e in self.csv_files]
         # First URL used for probe / back-compat attribute
         self.csv_url = self.csv_urls[0]
+        self.first_entry = self.csv_files[0]
 
     @staticmethod
     def _validate_url(url: str) -> None:
-        parsed = urlparse(url)
-        if parsed.scheme not in ("http", "https"):
-            raise ProviderTransportError(f"Aurora URL scheme not allowed: {parsed.scheme!r}")
-        host = (parsed.hostname or "").lower()
-        if host != _ALLOWED_HOST:
-            raise ProviderTransportError(
-                f"Aurora URL host not allowed: {host!r} (expected {_ALLOWED_HOST})"
-            )
-        name = (parsed.path or "").rsplit("/", 1)[-1].lower()
-        if name == "all_free.csv":
-            raise ProviderTransportError(
-                "Aurora all_free.csv is not used; configure directory base for regional CSVs"
-            )
+        contract.validate_csv_url(url)
 
     def _client_kwargs(self, timeout: httpx.Timeout) -> dict[str, Any]:
         return {
@@ -177,11 +161,13 @@ class AuroraClient:
         return raw.body_text.encode("latin-1")
 
     async def probe(self) -> tuple[RawHttpResult, dict[str, Any]]:
-        """Fetch CSV head of the first regional file for test_connection."""
-        raw = await self.fetch_csv_head(self.csv_urls[0])
+        """Fetch CSV head of the first configured file for test_connection."""
+        entry = self.first_entry
+        raw = await self.fetch_csv_head(entry.url)
         return raw, {
-            "url": self.csv_urls[0],
-            "files": [contract.csv_filename(u) for u in self.csv_urls],
+            "url": entry.url,
+            "has_status_column": entry.has_status_column,
+            "files": [contract.csv_filename(e.url) for e in self.csv_files],
             "bytes": len(self.raw_bytes(raw)),
             "status_code": raw.status_code,
             "truncated": bool((raw.body_json or {}).get("truncated")),

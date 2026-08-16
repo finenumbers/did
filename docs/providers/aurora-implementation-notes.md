@@ -6,22 +6,22 @@ Nav: [`aurora/SOURCE.md`](aurora/SOURCE.md) · [`aurora-contract.md`](aurora-con
 
 | Key | Purpose |
 |---|---|
-| `base_url` | CSV directory (or legacy full `.csv` path → parent folder). No auth. |
+| `extra_settings.csv_files` | List of `{ url, has_status_column }`. Runtime SoT for free sync. |
+| `base_url` | Unused after backfill (legacy directory mode removed). |
 
 ## Sync stages
 
 | Stage id | Phase |
 |---|---|
-| `aurora_free` | Regional CSVs → free catalog (no dictionaries / purchased) |
+| `aurora_free` | Configured CSVs → free catalog (no dictionaries / purchased) |
 
 ## Operational
 
 - **Read-only** public CSV GET; no API key.
-- Default URL in `backend/app/providers/aurora/contract.py`; Settings may override via `base_url`.
-- Fixed regional files (Crimea, Grozny, MSK, Sevastopol, Simferopol, SPb); `all_free.csv` not used.
-- Download per file; decode UTF-8 when valid, else `cp1251`; parse with `csv` (`delimiter=';'`).
-- Cap download at 32 MB; `trust_env=False` (ignore HTTP_PROXY); no redirects; host allowlisted to `bill.auroratelecom.ru`.
-- Test connection streams only a ~64KB head and parses the first complete row (discards a truncated trailing line).
-- Persist: staging wipe+cutover; wipe-guard on empty / collapsed fetch.
-- Production egress: backend must reach `bill.auroratelecom.ru:8080` over **HTTP** (see `deploy/PORTAINER.md`). Vendor has no HTTPS — MITM risk is inherent to the feed.
+- File list only from Settings; empty list fails sync/test.
+- Startup one-shot backfill: if `csv_files` empty, derive from legacy `base_url` once (MSK flagged).
+- `has_status_column`: drop status at index 1 when row has 6 fields (MSK-style).
+- Cap download at 32 MB; `trust_env=False`; no redirects; host allowlisted to `bill.auroratelecom.ru`.
+- Test connection streams ~64KB head of first configured file.
+- Production egress: backend must reach `bill.auroratelecom.ru:8080` over **HTTP** (see `deploy/PORTAINER.md`).
 - Do not commit the full live CSV; keep only `docs/providers/aurora/raw/sample.csv`.

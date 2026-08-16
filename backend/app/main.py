@@ -57,22 +57,30 @@ def mark_interrupted_runs() -> None:
 def seed_providers() -> None:
     db = SessionLocal()
     try:
-        seeds = [
-            (ProviderCode.runexis, "Runexis", runexis_contract.EXAMPLE_BASE_URL, {}),
-            (ProviderCode.sipout, "SipOut", sipout_contract.EXAMPLE_BASE_URL, {}),
+        seeds: list[tuple] = [
+            (ProviderCode.runexis, "Runexis", runexis_contract.EXAMPLE_BASE_URL, {}, {}),
+            (ProviderCode.sipout, "SipOut", sipout_contract.EXAMPLE_BASE_URL, {}, {}),
             (
                 ProviderCode.finenumbers,
                 "Finenumbers",
                 finenumbers_contract.EXAMPLE_BASE_URL,
                 {},
+                {},
             ),
-            (ProviderCode.uis, "UIS", uis_contract.EXAMPLE_BASE_URL, {}),
-            (ProviderCode.aurora, "Aurora Telecom", aurora_contract.EXAMPLE_BASE_URL, {}),
-            (ProviderCode.exolve, "Exolve", exolve_contract.EXAMPLE_BASE_URL, {}),
+            (ProviderCode.uis, "UIS", uis_contract.EXAMPLE_BASE_URL, {}, {}),
+            (
+                ProviderCode.aurora,
+                "Aurora Telecom",
+                None,
+                {},
+                {"csv_files": [e.to_dict() for e in aurora_contract.seed_csv_files()]},
+            ),
+            (ProviderCode.exolve, "Exolve", exolve_contract.EXAMPLE_BASE_URL, {}, {}),
             (
                 ProviderCode.voximplant,
                 "Voximplant",
                 voximplant_contract.EXAMPLE_BASE_URL,
+                {},
                 {},
             ),
             (
@@ -80,9 +88,10 @@ def seed_providers() -> None:
                 "MCN Telecom",
                 mcn_contract.EXAMPLE_BASE_URL,
                 {},
+                {},
             ),
         ]
-        for code, name, base_url, auth in seeds:
+        for code, name, base_url, auth, extra in seeds:
             existing = db.scalar(select(Provider).where(Provider.code == code))
             if existing:
                 continue
@@ -94,11 +103,21 @@ def seed_providers() -> None:
                     provider_id=p.id,
                     base_url=base_url,
                     auth_settings=auth,
-                    extra_settings={},
+                    extra_settings=extra,
                     is_enabled=True,
                 )
             )
         db.commit()
+    finally:
+        db.close()
+
+
+def backfill_aurora_settings() -> None:
+    db = SessionLocal()
+    try:
+        from app.providers.aurora.backfill import backfill_aurora_csv_files
+
+        backfill_aurora_csv_files(db)
     finally:
         db.close()
 
@@ -114,6 +133,7 @@ def seed_pstn_inn_cache_operators() -> None:
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     seed_providers()
+    backfill_aurora_settings()
     seed_pstn_inn_cache_operators()
     mark_interrupted_runs()
     schedule_task = asyncio.create_task(sync_schedule_loop())

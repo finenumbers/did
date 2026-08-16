@@ -97,7 +97,8 @@ class ProvidersService:
         elif code == ProviderCode.aurora.value:
             notice = (
                 "Aurora Telecom: public free CSV over HTTP (no auth). "
-                "base_url is the CSV directory prefix (regional files). See aurora-contract.md. Free inventory only."
+                "Configure file URLs in extra_settings.csv_files "
+                "(optional has_status_column for MSK-style 6-col). See aurora-contract.md."
             )
         elif code == ProviderCode.exolve.value:
             notice = (
@@ -179,13 +180,28 @@ class ProvidersService:
                 }
             persist_auth_settings(conn, merged)
         if payload.extra_settings is not None:
-            merged_extra = dict(conn.extra_settings or {})
-            for key, value in payload.extra_settings.items():
-                if value in (None, ""):
-                    continue
-                merged_extra[key] = value
-            conn.extra_settings = merged_extra
-            flag_modified(conn, "extra_settings")
+            if code == ProviderCode.aurora.value:
+                from app.providers.aurora import contract as aurora_contract
+
+                entries = aurora_contract.normalize_csv_files(
+                    payload.extra_settings.get("csv_files"),
+                    require_non_empty=True,
+                )
+                conn.extra_settings = {
+                    "csv_files": [e.to_dict() for e in entries],
+                }
+                flag_modified(conn, "extra_settings")
+                # Aurora sync reads only csv_files; clear misleading base_url.
+                if payload.base_url is None:
+                    conn.base_url = None
+            else:
+                merged_extra = dict(conn.extra_settings or {})
+                for key, value in payload.extra_settings.items():
+                    if value in (None, ""):
+                        continue
+                    merged_extra[key] = value
+                conn.extra_settings = merged_extra
+                flag_modified(conn, "extra_settings")
         if payload.is_enabled is not None:
             conn.is_enabled = payload.is_enabled
             p.is_enabled = payload.is_enabled

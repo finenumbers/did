@@ -26,12 +26,11 @@ class AuroraProvider(AbstractProvider):
     code = ProviderCode.aurora
 
     def capabilities(self) -> dict[str, Any]:
-        files = ", ".join(contract.DEFAULT_CSV_FILES)
         return {
             "free_numbers": {
                 "supported": True,
                 "source": "documentation_verified",
-                "action": f"GET regional CSVs ({files})",
+                "action": "GET configured CSV URLs from Settings (extra_settings.csv_files)",
                 "doc_refs": contract.DOC_REFS,
             },
             "purchased_numbers": {
@@ -47,7 +46,7 @@ class AuroraProvider(AbstractProvider):
             "test_connection": {
                 "supported": True,
                 "source": "documentation_verified",
-                "action": f"GET {contract.DEFAULT_CSV_FILES[0]} head (parse first row)",
+                "action": "GET head of first configured CSV + parse first row",
             },
         }
 
@@ -55,7 +54,15 @@ class AuroraProvider(AbstractProvider):
         return AuroraClient(connection)
 
     async def test_connection(self, connection: ConnectionConfig) -> DiagnosticsResult:
-        client = self._client(connection)
+        try:
+            client = self._client(connection)
+        except Exception as exc:  # noqa: BLE001
+            return DiagnosticsResult(
+                ok=False,
+                message=str(exc),
+                checked_at=datetime.now(UTC),
+                details={"extra_settings": connection.extra_settings or {}},
+            )
         try:
             raw, probe = await client.probe()
             if raw.status_code >= 400:
@@ -66,11 +73,10 @@ class AuroraProvider(AbstractProvider):
                     details=probe,
                     raw=raw,
                 )
-            probe_name = contract.csv_filename(raw.request_url or client.csv_url)
             sample, meta = parser.parse_probe_bytes(
                 client.raw_bytes(raw),
                 truncated=bool((raw.body_json or {}).get("truncated")),
-                filename=probe_name,
+                has_status_column=bool(probe.get("has_status_column")),
             )
             if not sample:
                 return DiagnosticsResult(
@@ -97,9 +103,7 @@ class AuroraProvider(AbstractProvider):
                 message=str(exc),
                 checked_at=datetime.now(UTC),
                 details={
-                    "urls": contract.resolve_csv_urls(
-                        (connection.base_url or "").strip() or None
-                    ),
+                    "urls": [e.url for e in client.csv_files],
                 },
             )
 
@@ -123,9 +127,9 @@ class AuroraProvider(AbstractProvider):
 
         client = self._client(connection)
         on_progress = kwargs.get("on_progress")
-        urls = client.csv_urls
-        total_files = len(urls)
-        file_names = [contract.csv_filename(u) for u in urls]
+        files = client.csv_files
+        total_files = len(files)
+        file_names = [contract.csv_filename(e.url) for e in files]
         await emit_progress(
             on_progress,
             f"Aurora: {total_files} CSV ({', '.join(file_names)})",
@@ -139,7 +143,8 @@ class AuroraProvider(AbstractProvider):
         envelopes: list[RawHttpResult] = []
         cumulative_rows = 0
 
-        for idx, url in enumerate(urls, start=1):
+        for idx, entry in enumerate(files, start=1):
+            url = entry.url
             fname = contract.csv_filename(url)
             await emit_progress(
                 on_progress,
@@ -159,6 +164,7 @@ class AuroraProvider(AbstractProvider):
                     raw,
                     raw_bytes=client.raw_bytes(raw),
                     filename=fname,
+                    has_status_column=entry.has_status_column,
                 )
             except ProviderParseError as exc:
                 raise ProviderParseError(
@@ -171,7 +177,7 @@ class AuroraProvider(AbstractProvider):
             cumulative_rows += row_count
             logger.warning(
                 "Aurora CSV file=%s url=%s bytes=%s rows=%s parsed=%s unmapped=%s "
-                "encoding=%s ms=%s",
+                "encoding=%s status_col=%s ms=%s",
                 fname,
                 url,
                 bytes_len,
@@ -179,6 +185,7 @@ class AuroraProvider(AbstractProvider):
                 len(parsed_items),
                 len(file_unmapped),
                 meta.get("encoding"),
+                entry.has_status_column,
                 raw.elapsed_ms,
             )
             file_metas.append(
@@ -190,6 +197,7 @@ class AuroraProvider(AbstractProvider):
                     "parsed": len(parsed_items),
                     "unmapped": len(file_unmapped),
                     "encoding": meta.get("encoding"),
+                    "has_status_column": entry.has_status_column,
                     "elapsed_ms": raw.elapsed_ms,
                 }
             )

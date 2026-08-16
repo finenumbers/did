@@ -6,21 +6,21 @@ Host: `bill.auroratelecom.ru:8080` (BGBilling numbers export)
 Auth: **none** (public HTTP GET)  
 Protocol: plain **HTTP** (not HTTPS), port **8080**
 
-Product loads **six regional files** (same CSV shape).  
+Product loads **CSV URLs configured in Settings** (`extra_settings.csv_files`).  
 **`all_free.csv` is not used** and must not be fetched.
 
-| File | URL |
-|---|---|
-| Crimea.csv | http://bill.auroratelecom.ru:8080/bgbilling/numbers/Crimea.csv |
-| Grozny.csv | http://bill.auroratelecom.ru:8080/bgbilling/numbers/Grozny.csv |
-| MSK.csv | http://bill.auroratelecom.ru:8080/bgbilling/numbers/MSK.csv |
-| Sevastopol.csv | http://bill.auroratelecom.ru:8080/bgbilling/numbers/Sevastopol.csv |
-| Simferopol.csv | http://bill.auroratelecom.ru:8080/bgbilling/numbers/Simferopol.csv |
-| SPb.csv | http://bill.auroratelecom.ru:8080/bgbilling/numbers/SPb.csv |
+Historical regional examples (seed/backfill defaults):
 
-Directory base (Settings optional override):  
-`http://bill.auroratelecom.ru:8080/bgbilling/numbers/`
+| File | URL | Notes |
+|---|---|---|
+| Crimea.csv | http://bill.auroratelecom.ru:8080/bgbilling/numbers/Crimea.csv | 5 columns |
+| Grozny.csv | http://bill.auroratelecom.ru:8080/bgbilling/numbers/Grozny.csv | 5 columns |
+| MSK.csv | http://bill.auroratelecom.ru:8080/bgbilling/numbers/MSK.csv | 6 columns + status → Settings flag |
+| Sevastopol.csv | http://bill.auroratelecom.ru:8080/bgbilling/numbers/Sevastopol.csv | 5 columns |
+| Simferopol.csv | http://bill.auroratelecom.ru:8080/bgbilling/numbers/Simferopol.csv | 5 columns |
+| SPb.csv | http://bill.auroratelecom.ru:8080/bgbilling/numbers/SPb.csv | 5 columns |
 
+Directory listing is **not** used; operators edit the URL list in Settings.
 ## Artifacts
 
 | File | Source |
