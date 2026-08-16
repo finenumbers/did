@@ -123,7 +123,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {externalLinks.map((l) => (
             <Fragment key={l.href}>
               {l.dividerBefore ? <div className="nav-divider" role="separator" /> : null}
-              <a href={l.href} target="_blank" rel="noopener noreferrer">
+              <a
+                href={l.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="nav-external"
+              >
                 {l.label}
               </a>
             </Fragment>
