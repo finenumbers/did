@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api/client";
 import { clearSession, getAccessToken, getUsername } from "@/lib/auth";
 import type { ProviderHealth } from "@/lib/types/api";
@@ -31,31 +31,51 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const isLogin = pathname.startsWith("/login");
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
+
   const [health, setHealth] = useState<ProviderHealth[]>([]);
   const [hasSession, setHasSession] = useState(false);
   const [ready, setReady] = useState(isLogin);
+  const [authRequired, setAuthRequired] = useState<boolean | null>(null);
   const [gateError, setGateError] = useState<string | null>(null);
   const [retryTick, setRetryTick] = useState(0);
+  const readyRef = useRef(ready);
+  readyRef.current = ready;
+  const prevRetryTick = useRef(retryTick);
 
-  const checkAuthGate = useCallback(() => {
+  // HTTP auth gate once per shell session (cold load / leave login / Retry) — not on pathname.
+  useEffect(() => {
     if (isLogin) {
       setReady(true);
       setGateError(null);
       return;
     }
+
+    let cancelled = false;
     const token = getAccessToken();
+    const isRetry = prevRetryTick.current !== retryTick;
+    prevRetryTick.current = retryTick;
     setHasSession(Boolean(token || getUsername()));
-    setReady(false);
     setGateError(null);
+    // Never unmount an already-shown shell on route/login re-entry.
+    // Full-screen loading only on cold bootstrap or explicit Retry.
+    if (isRetry || !readyRef.current) {
+      setReady(false);
+    }
+
     void apiFetch<{ auth_required: boolean }>("/api/v1/auth/status")
       .then((st) => {
+        if (cancelled) return;
+        setAuthRequired(st.auth_required);
         if (st.auth_required && !token) {
-          router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+          router.replace(`/login?next=${encodeURIComponent(pathnameRef.current)}`);
           return;
         }
         setReady(true);
       })
       .catch(() => {
+        if (cancelled) return;
         setReady(false);
         setGateError(
           token
@@ -63,18 +83,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             : "Не удалось проверить авторизацию. Повторите попытку или войдите снова.",
         );
       });
-  }, [pathname, isLogin, router]);
 
+    return () => {
+      cancelled = true;
+    };
+  }, [isLogin, retryTick, router]);
+
+  // Sync-only guard on navigation: no HTTP, no shell unmount.
   useEffect(() => {
-    checkAuthGate();
-  }, [checkAuthGate, retryTick]);
+    if (isLogin || !ready) return;
+    if (authRequired && !getAccessToken()) {
+      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+    }
+  }, [pathname, isLogin, ready, authRequired, router]);
 
   useEffect(() => {
     if (isLogin || !ready) return;
     apiFetch<ProviderHealth[]>("/api/v1/providers/health")
       .then(setHealth)
       .catch(() => setHealth([]));
-  }, [pathname, isLogin, ready]);
+  }, [isLogin, ready]);
 
   if (isLogin) {
     return <>{children}</>;
