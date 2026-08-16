@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock
-from uuid import uuid4
 
 from app.models.enums import InventoryKind, MappingConfidence
 from app.providers.dto.numbers import NormalizedNumber
