@@ -71,6 +71,7 @@ class NumbersCatalogNormalized(Base, TimestampMixin):
     partner: Mapped[str | None] = mapped_column(Text, nullable=True)
     project: Mapped[str | None] = mapped_column(Text, nullable=True)
     equipment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rtu_connected: Mapped[str | None] = mapped_column(Text, nullable=True)
     raw_source_table: Mapped[str] = mapped_column(Text, nullable=False)
     raw_source_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     last_sync_job_id: Mapped[uuid.UUID | None] = mapped_column(

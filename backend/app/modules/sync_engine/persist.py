@@ -186,6 +186,7 @@ def _catalog_extra_fields(num: NormalizedNumber) -> dict[str, Any]:
         "partner": num.partner,
         "project": num.project,
         "equipment": num.equipment,
+        "rtu_connected": num.rtu_connected,
     }
 
 
@@ -1287,6 +1288,111 @@ def persist_finenumbers_numbers(
         "deduped_input": len(deduped),
         "staged_cutover": 1,
         **wipe_holder,
+    }
+
+
+def _purchased_match_key_row(row: NumbersCatalogNormalized) -> str | None:
+    from app.providers.finenumbers.reg_mapper import catalog_match_key
+
+    return catalog_match_key(row.abc_code, row.number_local, row.msisdn)
+
+
+def snapshot_purchased_match_keys(
+    db: Session,
+    *,
+    exclude_provider_id: uuid.UUID | None = None,
+) -> set[str]:
+    """Currently present purchased match keys (optionally excluding one provider)."""
+    q = select(NumbersCatalogNormalized).where(
+        NumbersCatalogNormalized.inventory_kind == InventoryKind.purchased,
+        NumbersCatalogNormalized.is_currently_present.is_(True),
+    )
+    if exclude_provider_id is not None:
+        q = q.where(NumbersCatalogNormalized.provider_id != exclude_provider_id)
+    rows = db.scalars(q).all()
+    keys: set[str] = set()
+    for row in rows:
+        k = _purchased_match_key_row(row)
+        if k:
+            keys.add(k)
+    return keys
+
+
+def apply_rtu_connected_flags(
+    db: Session,
+    *,
+    reg_keys: set[str],
+    early_purchased_keys: set[str],
+) -> dict[str, int]:
+    """Set rtu_connected on all purchased rows.
+
+    Не подключено — only early purchased keys (other providers) not confirmed by REG.
+    Everything else purchased → Подключено.
+    """
+    from app.providers.finenumbers import contract
+
+    rows = db.scalars(
+        select(NumbersCatalogNormalized).where(
+            NumbersCatalogNormalized.inventory_kind == InventoryKind.purchased,
+            NumbersCatalogNormalized.is_currently_present.is_(True),
+        )
+    ).all()
+    not_connected = 0
+    connected = 0
+    for row in rows:
+        key = _purchased_match_key_row(row)
+        if key and key in early_purchased_keys and key not in reg_keys:
+            row.rtu_connected = contract.RTU_NOT_CONNECTED
+            not_connected += 1
+        else:
+            row.rtu_connected = contract.RTU_CONNECTED
+            connected += 1
+    db.flush()
+    return {"rtu_connected": connected, "rtu_not_connected": not_connected}
+
+
+def persist_finenumbers_reg_purchased(
+    db: Session,
+    *,
+    provider_id: uuid.UUID,
+    job_id: uuid.UUID,
+    numbers: list[NormalizedNumber],
+    on_progress: Callable[[str, int | None, int | None], Any] | None = None,
+) -> dict[str, int]:
+    """Wipe+cutover finenumbers purchased for REG-only rows; then apply RTU flags.
+
+    Duplicates already purchased by other providers are not inserted.
+    Empty incoming is allowed (wipe REG-only slice when all REG numbers exist elsewhere).
+    """
+    from app.providers.finenumbers.reg_mapper import catalog_match_key, reg_key_set
+
+    # Keys from earlier sync stages (not Finenumbers REG slice).
+    early_keys = snapshot_purchased_match_keys(db, exclude_provider_id=provider_id)
+    reg_keys = reg_key_set(numbers)
+    only_reg: list[NormalizedNumber] = []
+    for num in numbers:
+        key = catalog_match_key(num.abc_code, num.number_local, num.msisdn)
+        if key and key in early_keys:
+            continue
+        only_reg.append(num)
+
+    persist_stats = persist_finenumbers_numbers(
+        db,
+        provider_id=provider_id,
+        job_id=job_id,
+        inventory_kind=InventoryKind.purchased,
+        numbers=only_reg,
+        on_progress=on_progress,
+    )
+    rtu_stats = apply_rtu_connected_flags(
+        db, reg_keys=reg_keys, early_purchased_keys=early_keys
+    )
+    return {
+        **persist_stats,
+        **rtu_stats,
+        "reg_total": len(reg_keys),
+        "reg_inserted": len(only_reg),
+        "early_purchased_keys": len(early_keys),
     }
 
 

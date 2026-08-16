@@ -628,9 +628,12 @@ async def _sync_provider(
         if stage:
             tracker.skip(stage, "capability not supported")
 
-    if code in (ProviderCode.finenumbers, ProviderCode.aurora):
+    if code == ProviderCode.aurora:
         mode = SyncMode.free_only
         job_type = SyncJobType.free_only
+    elif code == ProviderCode.finenumbers:
+        mode = SyncMode.full
+        job_type = SyncJobType.full
     else:
         mode = SyncMode.full
         job_type = SyncJobType.full

@@ -88,3 +88,4 @@ class NormalizedNumber:
     partner: str | None = None
     project: str | None = None
     equipment: str | None = None
+    rtu_connected: str | None = None

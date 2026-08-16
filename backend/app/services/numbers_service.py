@@ -93,6 +93,7 @@ class NumbersService:
         "partner": NumbersCatalogNormalized.partner,
         "project": NumbersCatalogNormalized.project,
         "equipment": NumbersCatalogNormalized.equipment,
+        "rtu_connected": NumbersCatalogNormalized.rtu_connected,
     }
 
     PRICE_COLUMNS = {
@@ -137,6 +138,7 @@ class NumbersService:
             "partner",
             "project",
             "equipment",
+            "rtu_connected",
             MAPPING_CONFIDENCE,
             LAST_SEEN_AT,
         }
@@ -165,6 +167,7 @@ class NumbersService:
         "partner": NumbersCatalogNormalized.partner,
         "project": NumbersCatalogNormalized.project,
         "equipment": NumbersCatalogNormalized.equipment,
+        "rtu_connected": NumbersCatalogNormalized.rtu_connected,
         "mapping_confidence": NumbersCatalogNormalized.mapping_confidence,
     }
 
@@ -427,6 +430,7 @@ class NumbersService:
             partner=row.partner,
             project=row.project,
             equipment=row.equipment,
+            rtu_connected=row.rtu_connected,
             last_seen_at=row.last_seen_at,
             is_currently_present=row.is_currently_present,
             mapping_confidence=row.mapping_confidence.value,

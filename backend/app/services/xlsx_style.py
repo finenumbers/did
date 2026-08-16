@@ -76,18 +76,33 @@ class StyledSheetWriter:
                 "valign": "vcenter",
             }
         )
+        self._fill_fmts: dict[str, Any] = {}
         worksheet.set_default_row(ROW_HEIGHT)
         for col_idx, header in enumerate(self.headers):
             worksheet.write(0, col_idx, header, self.header_fmt)
         self._row = 1
 
-    def write_row(self, values: Sequence[Any]) -> None:
+    def write_row(self, values: Sequence[Any], *, fill_color: str | None = None) -> None:
         excel_row = self._row
+        cell_fmt = None
+        if fill_color:
+            if fill_color not in self._fill_fmts:
+                self._fill_fmts[fill_color] = self.workbook.add_format(
+                    {
+                        "font_name": FONT_NAME,
+                        "font_size": FONT_SIZE,
+                        "bg_color": fill_color,
+                    }
+                )
+            cell_fmt = self._fill_fmts[fill_color]
         for col_idx in range(self.ncols):
             value = values[col_idx] if col_idx < len(values) else ""
             if value is None:
                 value = ""
-            self.ws.write(excel_row, col_idx, value)
+            if cell_fmt is not None:
+                self.ws.write(excel_row, col_idx, value, cell_fmt)
+            else:
+                self.ws.write(excel_row, col_idx, value)
             self._max_lens[col_idx] = max(self._max_lens[col_idx], display_len(value))
         self._row += 1
 

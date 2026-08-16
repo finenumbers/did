@@ -22,6 +22,8 @@ type ProviderCode =
 type Draft = {
   baseUrl: string;
   apiKey: string;
+  regApiKey: string;
+  regBaseUrl: string;
   email: string;
   password: string;
   numberingLogin: string;
@@ -39,6 +41,8 @@ type Draft = {
 const EMPTY_DRAFT: Draft = {
   baseUrl: "",
   apiKey: "",
+  regApiKey: "",
+  regBaseUrl: "",
   email: "",
   password: "",
   numberingLogin: "",
@@ -161,7 +165,16 @@ export default function SettingsPage() {
     const d = drafts[code];
     setDraft(code, { saving: true, error: null, message: null });
     let auth_settings: Record<string, string> | undefined;
-    if (code === "sipout" || code === "finenumbers") {
+    let extra_settings: Record<string, string> | undefined;
+    if (code === "finenumbers") {
+      const next: Record<string, string> = {};
+      if (d.apiKey) next.key = d.apiKey;
+      if (d.regApiKey) next.reg_key = d.regApiKey;
+      auth_settings = Object.keys(next).length ? next : undefined;
+      if (d.regBaseUrl.trim()) {
+        extra_settings = { reg_base_url: d.regBaseUrl.trim() };
+      }
+    } else if (code === "sipout") {
       auth_settings = d.apiKey ? { key: d.apiKey } : undefined;
     } else if (code === "exolve" || code === "mcn") {
       auth_settings = d.apiKey ? { api_key: d.apiKey } : undefined;
@@ -188,6 +201,7 @@ export default function SettingsPage() {
         body: JSON.stringify({
           base_url: d.baseUrl || null,
           auth_settings,
+          extra_settings,
         }),
       });
       setDraft(code, {
@@ -567,23 +581,71 @@ export default function SettingsPage() {
                         : " Токен ещё не задан."}
                     </div>
                   </>
-                ) : code === "sipout" || code === "finenumbers" ? (
+                ) : code === "sipout" ? (
                   <label>
-                    {code === "finenumbers" ? "API Bearer key" : "API key"}
+                    API key
                     <input
                       type="password"
                       placeholder={
                         d.settings?.auth_settings_masked?.key
                           ? `текущее: ${String(d.settings.auth_settings_masked.key)}`
-                          : code === "finenumbers"
-                            ? "Bearer token PSTN API"
-                            : "ключ SipOut"
+                          : "ключ SipOut"
                       }
                       value={d.apiKey}
                       onChange={(e) => setDraft(code, { apiKey: e.target.value })}
                       style={{ width: "100%" }}
                     />
                   </label>
+                ) : code === "finenumbers" ? (
+                  <>
+                    <label>
+                      PSTN API Bearer key
+                      <input
+                        type="password"
+                        placeholder={
+                          d.settings?.auth_settings_masked?.key
+                            ? `текущее: ${String(d.settings.auth_settings_masked.key)}`
+                            : "Bearer token PSTN API (pstn.finenumbers.com)"
+                        }
+                        value={d.apiKey}
+                        onChange={(e) => setDraft(code, { apiKey: e.target.value })}
+                        style={{ width: "100%" }}
+                      />
+                    </label>
+                    <label>
+                      REG API key
+                      <input
+                        type="password"
+                        placeholder={
+                          d.settings?.auth_settings_masked?.reg_key
+                            ? `текущее: ${String(d.settings.auth_settings_masked.reg_key)}`
+                            : "reg_… (reg.finenumbers.com, phones:read)"
+                        }
+                        value={d.regApiKey}
+                        onChange={(e) => setDraft(code, { regApiKey: e.target.value })}
+                        style={{ width: "100%" }}
+                      />
+                    </label>
+                    <label>
+                      REG base URL
+                      <input
+                        type="url"
+                        placeholder={
+                          typeof d.settings?.extra_settings?.reg_base_url === "string" &&
+                          d.settings.extra_settings.reg_base_url
+                            ? String(d.settings.extra_settings.reg_base_url)
+                            : "https://reg.finenumbers.com"
+                        }
+                        value={d.regBaseUrl}
+                        onChange={(e) => setDraft(code, { regBaseUrl: e.target.value })}
+                        style={{ width: "100%" }}
+                      />
+                    </label>
+                    <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
+                      Contour A: PSTN by-inn (свободные). Contour C: REG GET /api/phones
+                      (купленные / «Подключено в РТУ»). Только read-only.
+                    </div>
+                  </>
                 ) : code === "uis" ? (
                   <>
                     <label>

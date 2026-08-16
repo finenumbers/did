@@ -264,6 +264,10 @@ mark.search-hit {
   background: #eef4f9;
 }
 
+.table-scroll tbody tr.row-rtu-not-connected td {
+  background: #ffc7ce;
+}
+
 .infinite-sentinel {
   padding: 0.75rem;
   text-align: center;

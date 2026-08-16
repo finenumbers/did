@@ -179,7 +179,13 @@ class ProvidersService:
                 }
             persist_auth_settings(conn, merged)
         if payload.extra_settings is not None:
-            conn.extra_settings = payload.extra_settings
+            merged_extra = dict(conn.extra_settings or {})
+            for key, value in payload.extra_settings.items():
+                if value in (None, ""):
+                    continue
+                merged_extra[key] = value
+            conn.extra_settings = merged_extra
+            flag_modified(conn, "extra_settings")
         if payload.is_enabled is not None:
             conn.is_enabled = payload.is_enabled
             p.is_enabled = payload.is_enabled

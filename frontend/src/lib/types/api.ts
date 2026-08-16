@@ -43,6 +43,7 @@ export interface NumberItem {
   partner: string | null;
   project: string | null;
   equipment: string | null;
+  rtu_connected?: string | null;
   last_seen_at: string;
   is_currently_present: boolean;
   mapping_confidence: string;

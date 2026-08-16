@@ -35,6 +35,7 @@ EXPORT_COLUMNS: list[tuple[str, str]] = [
     ("date_from", "date_from"),
     ("last_operation_date", "last_operation_date"),
     ("operator", "Оператор"),
+    ("rtu_connected", "Подключено в РТУ"),
     ("operator_id", "operator_id"),
     ("manager_id", "manager_id"),
     ("notes", "notes"),
@@ -52,6 +53,8 @@ EXPORT_COLUMNS: list[tuple[str, str]] = [
     ("mapping_confidence", "confidence"),
     ("last_seen_at", "Обновлено"),
 ]
+
+RTU_NOT_CONNECTED_FILL = "#FFC7CE"
 
 _BATCH = 5_000
 DEFAULT_SORT_BY = "abc_code"
@@ -193,8 +196,13 @@ class NumbersExportService:
 
         workbook = open_styled_workbook(str(out), constant_memory=True)
         ws = workbook.add_worksheet(sheet_title[:31])
-        headers = [header for _, header in EXPORT_COLUMNS]
-        keys = [key for key, _ in EXPORT_COLUMNS]
+        columns = [
+            (k, h)
+            for k, h in EXPORT_COLUMNS
+            if inventory_kind == InventoryKind.purchased or k != "rtu_connected"
+        ]
+        headers = [header for _, header in columns]
+        keys = [key for key, _ in columns]
         writer = StyledSheetWriter(workbook, ws, headers)
 
         row_count = 0
@@ -202,8 +210,15 @@ class NumbersExportService:
         try:
             for row, code in result:
                 provider_code = code.value if hasattr(code, "value") else str(code)
+                fill = None
+                if (
+                    inventory_kind == InventoryKind.purchased
+                    and (row.rtu_connected or "") == "Не подключено"
+                ):
+                    fill = RTU_NOT_CONNECTED_FILL
                 writer.write_row(
-                    [_cell_value(key, row, provider_code) for key in keys]
+                    [_cell_value(key, row, provider_code) for key in keys],
+                    fill_color=fill,
                 )
                 row_count += 1
                 if on_progress and row_count % _BATCH == 0:

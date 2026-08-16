@@ -9,10 +9,21 @@ Vendor HTML/PDF materials are not checked into this repo; markers below reflect 
 
 | Contour | Purpose | Storage / writes |
 |---|---|---|
-| **A — inventory** | Free numbers for operator ИНН «Фронтир» (`5406978329`) as a provider inventory slice | `numbers_catalog_normalized` via Finenumbers sync (`free_only`) |
+| **A — inventory** | Free numbers for operator ИНН «Фронтир» (`5406978329`) as a provider inventory slice | `numbers_catalog_normalized` free via Finenumbers sync |
 | **B — operator cache** | PSTN ranges by INN for catalog column **Оператор** | `pstn_inn_cache_operators` / `pstn_inn_ranges_cache`; enrich writes **only** `catalog.operator` |
+| **C — REG / RTU** | Purchased endpoints from REG + column **Подключено в РТУ** | `GET https://reg.finenumbers.com/api/phones` (read-only); purchased + `rtu_connected` |
 
-Same INN may appear in both contours (e.g. Frontier). Contour A loads numbers; Contour B resolves operators for any provider’s catalog rows.
+Same INN may appear in A/B (e.g. Frontier). Contour C uses a separate REG API key (`auth_settings.reg_key`).
+
+## Contour C — REG — VERIFIED (sibling Reg project + code)
+
+- Base URL default: `https://reg.finenumbers.com` (`extra_settings.reg_base_url`)
+- Auth: `Authorization: Bearer reg_…` (`auth_settings.reg_key`)
+- Read-only: `GET /api/phones?kind=endpoints_registered|endpoints_unregistered|endpoints_error`
+- Number field: `endpointNumber`
+- Free inventory = PSTN expand minus REG keys
+- `rtu_connected`: «Не подключено» only for purchased from earlier providers not in REG; else «Подключено»
+- **Never** call REG mutating endpoints (`POST …/request`, `rtu-import`, `regs/poll`, …)
 
 ## Auth — VERIFIED (code)
 

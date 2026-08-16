@@ -28,6 +28,7 @@ from app.modules.sync_engine.persist import (
     persist_voximplant_numbers,
     persist_mcn_numbers,
     persist_finenumbers_numbers,
+    persist_finenumbers_reg_purchased,
     persist_regions,
     persist_runexis_numbers,
     persist_sipout_numbers,
@@ -637,113 +638,169 @@ class SyncService:
                     inventory_kind=InventoryKind.purchased,
                 )
                 unique_incoming = count_unique_provider_keys(numbers)
-                ok, reason = reload_allowed(
-                    previous=previous, incoming=unique_incoming, kind="purchased"
-                )
-                if not ok:
-                    stats["categories"]["purchased_numbers"] = {
-                        "refused_wipe": True,
-                        "previous": previous,
-                        "incoming": unique_incoming,
-                        "incoming_raw": len(numbers),
-                        "fetched": result.fetched,
-                        "reason": reason,
-                    }
-                    if stats.get("_free_cutover_committed"):
-                        stats["_inventory_split"] = True
-                        stats["inventory_split"] = True
-                        split_msg = (
-                            f"{reason}; free inventory already cut over — "
-                            "catalog may be split (new free + previous purchased)"
-                        )
-                        stats["_fatal_error"] = split_msg
-                        log_job(self.db, job.id, SyncLogLevel.error, split_msg)
-                    else:
-                        stats["_fatal_error"] = reason
-                        log_job(
-                            self.db, job.id, SyncLogLevel.error, reason or "refused wipe"
-                        )
-                    self.db.commit()
-                    await _hook("purchased", "fail", stats["_fatal_error"] or "refused wipe")
-                    stats["limitations"] = limitations
-                    return stats
 
-                record_number_drops(
-                    provider=provider.code.value,
-                    inventory_kind=InventoryKind.purchased.value,
-                    unmapped_raw=list(result.unmapped_raw or []),
-                    numbers=numbers,
-                )
-                preserve_operators_on_numbers(
-                    self.db,
-                    provider_id=provider.id,
-                    inventory_kind=InventoryKind.purchased,
-                    numbers=numbers,
-                )
-                persist_progress = _throttled_persist_progress(
-                    self.db,
-                    job_id=job.id,
-                    provider_code=provider.code.value,
-                    phase="purchased",
-                )
-                await _purchased_progress("Буфер → каталог", 0, unique_incoming)
-                log_job(
-                    self.db,
-                    job.id,
-                    SyncLogLevel.info,
-                    (
-                        f"Staging cutover provider={provider.code.value} kind=purchased "
-                        f"reload unique={unique_incoming} raw={len(numbers)} "
-                        f"(previous={previous})"
-                    ),
-                )
-                if provider.code == ProviderCode.sipout:
-                    persist_stats = persist_sipout_numbers(
+                if provider.code == ProviderCode.finenumbers:
+                    record_number_drops(
+                        provider=provider.code.value,
+                        inventory_kind=InventoryKind.purchased.value,
+                        unmapped_raw=list(result.unmapped_raw or []),
+                        numbers=numbers,
+                    )
+                    persist_progress = _throttled_persist_progress(
+                        self.db,
+                        job_id=job.id,
+                        provider_code=provider.code.value,
+                        phase="purchased",
+                    )
+                    await _purchased_progress("REG → купленные + РТУ", 0, unique_incoming)
+                    log_job(
+                        self.db,
+                        job.id,
+                        SyncLogLevel.info,
+                        (
+                            f"Finenumbers REG purchased+RTU raw={len(numbers)} "
+                            f"unique={unique_incoming} (previous_fn={previous})"
+                        ),
+                    )
+                    persist_stats = persist_finenumbers_reg_purchased(
                         self.db,
                         provider_id=provider.id,
                         job_id=job.id,
-                        inventory_kind=InventoryKind.purchased,
                         numbers=numbers,
                         on_progress=persist_progress,
                     )
-                elif provider.code == ProviderCode.runexis:
-                    persist_stats = persist_runexis_numbers(
-                        self.db,
-                        provider_id=provider.id,
-                        job_id=job.id,
-                        inventory_kind=InventoryKind.purchased,
-                        numbers=numbers,
-                        on_progress=persist_progress,
+                    parsed = int(result.parsed) if result.parsed else len(numbers)
+                    fetched = int(result.fetched)
+                    stats["categories"]["purchased_numbers"] = {
+                        **_number_reload_stats(
+                            fetched=fetched,
+                            parsed=parsed,
+                            persist_stats=persist_stats,
+                            previous=previous,
+                        ),
+                        "reg_total": persist_stats.get("reg_total"),
+                        "reg_inserted": persist_stats.get("reg_inserted"),
+                        "rtu_connected": persist_stats.get("rtu_connected"),
+                        "rtu_not_connected": persist_stats.get("rtu_not_connected"),
+                    }
+                    purch_detail = (
+                        f"{_number_reload_detail(fetched=fetched, parsed=parsed, upserted=int(persist_stats.get('upserted') or 0))}; "
+                        f"reg_inserted={persist_stats.get('reg_inserted')}, "
+                        f"rtu_not_connected={persist_stats.get('rtu_not_connected')}"
                     )
-                elif provider.code == ProviderCode.uis:
-                    persist_stats = persist_uis_numbers(
-                        self.db,
-                        provider_id=provider.id,
-                        job_id=job.id,
-                        inventory_kind=InventoryKind.purchased,
-                        numbers=numbers,
-                        on_progress=persist_progress,
+                    log_job(
+                        self.db, job.id, SyncLogLevel.info, f"Purchased numbers {purch_detail}"
                     )
+                    self.db.commit()
+                    await _hook("purchased", "end", purch_detail)
                 else:
-                    persist_stats = {}
-                parsed = int(result.parsed) if result.parsed else len(numbers)
-                fetched = int(result.fetched)
-                stats["categories"]["purchased_numbers"] = _number_reload_stats(
-                    fetched=fetched,
-                    parsed=parsed,
-                    persist_stats=persist_stats,
-                    previous=previous,
-                )
-                purch_detail = _number_reload_detail(
-                    fetched=fetched,
-                    parsed=parsed,
-                    upserted=int(persist_stats.get("upserted") or 0),
-                )
-                log_job(
-                    self.db, job.id, SyncLogLevel.info, f"Purchased numbers {purch_detail}"
-                )
-                self.db.commit()
-                await _hook("purchased", "end", purch_detail)
+                    ok, reason = reload_allowed(
+                        previous=previous, incoming=unique_incoming, kind="purchased"
+                    )
+                    if not ok:
+                        stats["categories"]["purchased_numbers"] = {
+                            "refused_wipe": True,
+                            "previous": previous,
+                            "incoming": unique_incoming,
+                            "incoming_raw": len(numbers),
+                            "fetched": result.fetched,
+                            "reason": reason,
+                        }
+                        if stats.get("_free_cutover_committed"):
+                            stats["_inventory_split"] = True
+                            stats["inventory_split"] = True
+                            split_msg = (
+                                f"{reason}; free inventory already cut over — "
+                                "catalog may be split (new free + previous purchased)"
+                            )
+                            stats["_fatal_error"] = split_msg
+                            log_job(self.db, job.id, SyncLogLevel.error, split_msg)
+                        else:
+                            stats["_fatal_error"] = reason
+                            log_job(
+                                self.db, job.id, SyncLogLevel.error, reason or "refused wipe"
+                            )
+                        self.db.commit()
+                        await _hook("purchased", "fail", stats["_fatal_error"] or "refused wipe")
+                        stats["limitations"] = limitations
+                        return stats
+
+                    record_number_drops(
+                        provider=provider.code.value,
+                        inventory_kind=InventoryKind.purchased.value,
+                        unmapped_raw=list(result.unmapped_raw or []),
+                        numbers=numbers,
+                    )
+                    preserve_operators_on_numbers(
+                        self.db,
+                        provider_id=provider.id,
+                        inventory_kind=InventoryKind.purchased,
+                        numbers=numbers,
+                    )
+                    persist_progress = _throttled_persist_progress(
+                        self.db,
+                        job_id=job.id,
+                        provider_code=provider.code.value,
+                        phase="purchased",
+                    )
+                    await _purchased_progress("Буфер → каталог", 0, unique_incoming)
+                    log_job(
+                        self.db,
+                        job.id,
+                        SyncLogLevel.info,
+                        (
+                            f"Staging cutover provider={provider.code.value} kind=purchased "
+                            f"reload unique={unique_incoming} raw={len(numbers)} "
+                            f"(previous={previous})"
+                        ),
+                    )
+                    if provider.code == ProviderCode.sipout:
+                        persist_stats = persist_sipout_numbers(
+                            self.db,
+                            provider_id=provider.id,
+                            job_id=job.id,
+                            inventory_kind=InventoryKind.purchased,
+                            numbers=numbers,
+                            on_progress=persist_progress,
+                        )
+                    elif provider.code == ProviderCode.runexis:
+                        persist_stats = persist_runexis_numbers(
+                            self.db,
+                            provider_id=provider.id,
+                            job_id=job.id,
+                            inventory_kind=InventoryKind.purchased,
+                            numbers=numbers,
+                            on_progress=persist_progress,
+                        )
+                    elif provider.code == ProviderCode.uis:
+                        persist_stats = persist_uis_numbers(
+                            self.db,
+                            provider_id=provider.id,
+                            job_id=job.id,
+                            inventory_kind=InventoryKind.purchased,
+                            numbers=numbers,
+                            on_progress=persist_progress,
+                        )
+                    else:
+                        persist_stats = {}
+                    parsed = int(result.parsed) if result.parsed else len(numbers)
+                    fetched = int(result.fetched)
+                    stats["categories"]["purchased_numbers"] = _number_reload_stats(
+                        fetched=fetched,
+                        parsed=parsed,
+                        persist_stats=persist_stats,
+                        previous=previous,
+                    )
+                    purch_detail = _number_reload_detail(
+                        fetched=fetched,
+                        parsed=parsed,
+                        upserted=int(persist_stats.get("upserted") or 0),
+                    )
+                    log_job(
+                        self.db, job.id, SyncLogLevel.info, f"Purchased numbers {purch_detail}"
+                    )
+                    self.db.commit()
+                    await _hook("purchased", "end", purch_detail)
             else:
                 self.db.commit()
                 await _hook("purchased", "end", f"fetched={result.fetched}")

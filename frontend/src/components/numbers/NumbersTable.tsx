@@ -111,6 +111,11 @@ const CATALOG_COLUMNS: Col[] = [
     value: (r) => r.operator,
   },
   {
+    key: "rtu_connected",
+    header: "Подключено в РТУ",
+    value: (r) => r.rtu_connected,
+  },
+  {
     key: "operator_id",
     header: "operator_id",
     value: (r) => r.operator_id,
@@ -205,6 +210,14 @@ export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+
+  const columns = useMemo(
+    () =>
+      kind === "purchased"
+        ? CATALOG_COLUMNS
+        : CATALOG_COLUMNS.filter((c) => c.key !== "rtu_connected"),
+    [kind],
+  );
 
   useEffect(() => {
     const t = setTimeout(() => setNumberLocalQ(numberLocalInput), 300);
@@ -393,7 +406,7 @@ export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
         <table>
           <thead>
             <tr>
-              {CATALOG_COLUMNS.map((col) => (
+              {columns.map((col) => (
                 <th key={col.key}>
                   <ColumnFilterDropdown
                     kind={kind}
@@ -415,8 +428,15 @@ export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
           </thead>
           <tbody>
             {items.map((row) => (
-              <tr key={row.id}>
-                {CATALOG_COLUMNS.map((col) => (
+              <tr
+                key={row.id}
+                className={
+                  kind === "purchased" && row.rtu_connected === "Не подключено"
+                    ? "row-rtu-not-connected"
+                    : undefined
+                }
+              >
+                {columns.map((col) => (
                   <td key={col.key}>
                     <HighlightText
                       text={cellText(col.value(row))}
