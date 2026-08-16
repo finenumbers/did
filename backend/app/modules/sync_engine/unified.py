@@ -474,10 +474,7 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
                 or f"Sync run stopped externally (status={run.status.value})"
             )
 
-        await _run_operator_enrichment(
-            db, run=run, tracker=tracker, category_stats=category_stats
-        )
-
+        # finalize before operator enrichment — enrich is the last sync stage
         tracker.begin("finalize", "Завершение")
         try:
             dropped_meta = write_dropped_xlsx()
@@ -537,6 +534,20 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
             "finalize",
             f"ok={provider_ok}, failed={len(provider_failures)}",
         )
+
+        await _run_operator_enrichment(
+            db,
+            run=run,
+            tracker=tracker,
+            category_stats=category_stats,
+            only_missing=False,
+        )
+        db.refresh(run)
+        summary = dict(run.stats or summary)
+        summary["categories"] = category_stats
+        summary["stage_timings"] = build_stage_timings(run.progress)
+        run.stats = summary
+        db.commit()
 
         if provider_failures and provider_ok == 0:
             status = SyncJobStatus.failed
@@ -767,6 +778,7 @@ async def _run_operator_enrichment(
     run: SyncRun,
     tracker: SyncProgressTracker,
     category_stats: dict[str, Any],
+    only_missing: bool = False,
 ) -> None:
     tracker.begin("operator_enrichment", "Обогащение PSTN")
     provider = db.scalars(
@@ -795,10 +807,12 @@ async def _run_operator_enrichment(
         )
 
     try:
+        # Last sync stage: fill operator on every present free/purchased row (only_missing=False).
         enrich_stats = await enrich_catalog_operators(
             db,
             connection=connection,
             on_progress=_on_enrich_progress,
+            only_missing=only_missing,
         )
         category_stats["operator_enrichment"] = enrich_stats
         log_run(

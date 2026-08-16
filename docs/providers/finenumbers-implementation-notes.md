@@ -14,6 +14,9 @@ Nav: [`finenumbers/SOURCE.md`](finenumbers/SOURCE.md) · [`finenumbers-contract.
 | Stage id | Phase |
 |---|---|
 | `finenumbers_free` | Contour A by-inn expand → catalog (no dictionaries stage) |
+| `finenumbers_purchased` | Contour C REG → purchased + RTU flags |
+| `finalize` | Dropped XLSX, inventory summary, catalog checksum |
+| `operator_enrichment` | **Last** stage: Contour B fills `operator` on all present rows |
 
 ## Contour A — free inventory
 
@@ -27,7 +30,9 @@ Nav: [`finenumbers/SOURCE.md`](finenumbers/SOURCE.md) · [`finenumbers-contract.
 - Settings UI: CRUD operators + «Загрузить кеш».
 - Tables: `pstn_inn_cache_operators`, `pstn_inn_ranges_cache`.
 - Refresh pulls `by-inn` ranges per enabled operator.
-- Enrichment (`enrich_catalog_operators`): match MSISDN against local ranges first; missing → `lookup?phone=` with rate limit.
+- Enrichment (`enrich_catalog_operators`) runs as the **last** unified-sync stage after `finalize`.
+- Every currently present free/purchased row: local ranges first; cache miss → always `lookup?phone=` (no skip for already-filled operator).
+- Successful cache/API value **overwrites** existing `operator`. Empty cache+API leaves the prior value (`unresolved_kept_existing`); empty rows without operator remain coverage failures.
 - Writes **only** `numbers_catalog_normalized.operator`. Never overwrites prices/geo/status from Contour B.
 
 ## Sync gate

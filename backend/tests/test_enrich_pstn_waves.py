@@ -1,4 +1,4 @@
-"""PSTN enrich: cache hits, skip filled operator, no retry storm on failures."""
+"""PSTN enrich: cache hits, overwrite on miss, no retry storm on failures."""
 
 from __future__ import annotations
 
@@ -83,12 +83,23 @@ def test_cache_hit_does_not_call_lookup(monkeypatch):
     assert stats["skipped_already_have_operator"] == 0
 
 
-def test_filled_operator_skips_api_on_cache_miss(monkeypatch):
+def test_filled_operator_still_looks_up_on_cache_miss(monkeypatch):
     calls: list[str] = []
+    written: list[tuple] = []
 
     async def fake_lookup(self, phone: str) -> RawHttpResult:
         calls.append(phone)
-        return _raw(body={"found": False})
+        return _raw(
+            body={
+                "found": True,
+                "data": {
+                    "abc": "900",
+                    "rangeStart": 2222222,
+                    "rangeEnd": 2222222,
+                    "operator": "FromApi",
+                },
+            }
+        )
 
     monkeypatch.setattr(
         "app.providers.finenumbers.enrich.load_enabled_ranges_for_enrich",
@@ -100,7 +111,7 @@ def test_filled_operator_skips_api_on_cache_miss(monkeypatch):
     )
     monkeypatch.setattr(
         "app.providers.finenumbers.enrich._bulk_update_operators",
-        lambda db, pairs: len(pairs),
+        lambda db, pairs: written.extend(pairs) or len(pairs),
     )
 
     cat_id = uuid.uuid4()
@@ -114,9 +125,10 @@ def test_filled_operator_skips_api_on_cache_miss(monkeypatch):
             concurrency=2,
         )
     )
-    assert calls == []
-    assert stats["lookups"] == 0
-    assert stats["skipped_already_have_operator"] == 1
+    assert calls == ["9002222222"]
+    assert stats["lookups"] == 1
+    assert stats["skipped_already_have_operator"] == 0
+    assert written == [(cat_id, "FromApi")]
 
 
 def test_failed_lookup_not_retried_in_next_wave(monkeypatch):

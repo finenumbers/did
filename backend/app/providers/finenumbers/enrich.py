@@ -1,7 +1,8 @@
 """Enrich catalog.operator from local PSTN INN cache + Finenumbers lookup.
 
 Contour B: local cache is used ONLY to fill catalog.operator (no region/inventory).
-RULE: every currently present catalog MSISDN must get a real non-empty operator.
+RULE: every currently present catalog MSISDN goes through cache → PSTN lookup when needed;
+final operator SoT is this last sync stage (overwrite when cache/API returns a value).
 """
 
 from __future__ import annotations
@@ -135,10 +136,11 @@ async def enrich_catalog_operators(
     on_progress: ProgressCb | None = None,
 ) -> dict[str, int]:
     """
-    Set operator on currently present catalog rows.
+    Set operator on currently present catalog rows (last unified-sync stage).
 
     Primary: local pstn_inn_ranges_cache (enabled INNs) — writes ONLY operator.
-    Secondary: PSTN lookup API for remaining numbers.
+    Secondary: PSTN lookup API for cache misses (always queued; overwrites existing operator).
+    With only_missing=False (default / production): every present row is enriched.
     """
     client = FinenumbersClient(connection)
     cache = OperatorRangeCache()
@@ -246,7 +248,6 @@ async def _enrich_catalog_operators_inner(
     cache_hits = 0
     lookups = 0
     errors = 0
-    skipped_already_have_operator = 0
 
     # (id, msisdn, phone, current_operator)
     pending: list[tuple] = []
@@ -267,10 +268,7 @@ async def _enrich_catalog_operators_inner(
             if current_operator != operator:
                 pending_updates.append((catalog_id, operator))
         else:
-            # Keep existing non-empty operator; PSTN only for empty operator.
-            if current_operator and str(current_operator).strip():
-                skipped_already_have_operator += 1
-                continue
+            # Cache miss: always queue PSTN lookup (even if operator already set).
             phone = phone_for_lookup(msisdn_s)
             if not phone:
                 invalid_msisdns.append(msisdn_s)
@@ -292,11 +290,9 @@ async def _enrich_catalog_operators_inner(
             total_rows,
         )
     logger.warning(
-        "PSTN enrich: cache_hits=%s pending_api=%s skipped_already_have_operator=%s "
-        "invalid_msisdn=%s",
+        "PSTN enrich: cache_hits=%s pending_api=%s invalid_msisdn=%s",
         cache_hits,
         len(pending),
-        skipped_already_have_operator,
         len(invalid_msisdns),
     )
 
@@ -378,14 +374,13 @@ async def _enrich_catalog_operators_inner(
         rounds += 1
         logger.warning(
             "PSTN enrich round=%s pending=%s phones_needed=%s lookups_so_far=%s "
-            "errors=%s cache_hits=%s skipped_already_have_operator=%s",
+            "errors=%s cache_hits=%s",
             rounds,
             len(pending),
             len(phones_needed),
             lookups,
             errors,
             cache_hits,
-            skipped_already_have_operator,
         )
         wave_base = lookups
         wave_total = len(phones_needed)
@@ -410,6 +405,7 @@ async def _enrich_catalog_operators_inner(
         )
 
     uncovered_msisdns: list[str] = list(invalid_msisdns)
+    unresolved_kept_existing = 0
     for item in pending:
         catalog_id, msisdn_s, phone, current_operator = item
         operator = cache.resolve(msisdn_s) or lookup_result.get(phone)
@@ -417,6 +413,9 @@ async def _enrich_catalog_operators_inner(
             cache_hits += 1
             if current_operator != operator:
                 pending_updates.append((catalog_id, operator))
+        elif current_operator and str(current_operator).strip():
+            # Cache+API empty: keep existing operator; do not fail coverage for this row.
+            unresolved_kept_existing += 1
         else:
             uncovered_msisdns.append(msisdn_s)
 
@@ -475,7 +474,8 @@ async def _enrich_catalog_operators_inner(
         "updated": updated,
         "lookups": lookups,
         "cache_hits": cache_hits,
-        "skipped_already_have_operator": skipped_already_have_operator,
+        "skipped_already_have_operator": 0,
+        "unresolved_kept_existing": unresolved_kept_existing,
         "missing": max(len(uncovered_msisdns), global_missing),
         "invalid_msisdn": len(invalid_msisdns),
         "errors": errors,
