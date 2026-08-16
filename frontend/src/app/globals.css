@@ -65,6 +65,13 @@ a { color: inherit; text-decoration: none; }
   color: #fff;
 }
 
+.nav-divider {
+  height: 1px;
+  margin: 0.65rem 0.7rem;
+  background: rgba(255, 255, 255, 0.14);
+  border: none;
+}
+
 .main {
   display: flex;
   flex-direction: column;

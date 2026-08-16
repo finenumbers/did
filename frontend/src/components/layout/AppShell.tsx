@@ -14,6 +14,14 @@ const links = [
   { href: "/sync-logs", label: "Синхронизация" },
 ];
 
+const externalLinks = [
+  { href: "https://reg.finenumbers.com/", label: "OSS Platform" },
+  { href: "https://pstn.finenumbers.com/", label: "PSTN Platform" },
+  { href: "https://sms-adm.finenumbers.com/", label: "SMS Platform" },
+  { href: "https://admin.finenumbers.cloud/", label: "iTooLabs Platform" },
+  { href: "https://5.227.161.180:8445/", label: "Satel RTU" },
+];
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -109,6 +117,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               {l.label}
             </Link>
+          ))}
+          <div className="nav-divider" role="separator" />
+          {externalLinks.map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {l.label}
+            </a>
           ))}
         </nav>
         <div style={{ marginTop: "auto", fontSize: "0.8rem", color: "#9aabba" }}>
