@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import threading
@@ -20,6 +21,8 @@ _current: SyncRunFileLogger | None = None
 _HANDLER_LOGGER_NAMES = (
     "app.modules.sync_engine",
     "app.providers",
+    "app.modules.catalog",
+    "app.modules.pstn_inn_cache",
 )
 
 
@@ -40,11 +43,16 @@ def _ts() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
 
+def dump_json(value: Any) -> str:
+    """Serialize context/geo payloads in full; never slice values."""
+    return json.dumps(value, ensure_ascii=False, default=str)
+
+
 class _SyncFileLogHandler(logging.Handler):
     """Mirror process logs into the active sync debug file."""
 
     def __init__(self, file_logger: SyncRunFileLogger) -> None:
-        super().__init__(level=logging.INFO)
+        super().__init__(level=logging.DEBUG)
         self._file_logger = file_logger
 
     def emit(self, record: logging.LogRecord) -> None:
@@ -64,6 +72,7 @@ class SyncRunFileLogger:
         self._fp: Any | None = None
         self._handler: _SyncFileLogHandler | None = None
         self._attached: list[logging.Logger] = []
+        self._prev_levels: list[tuple[logging.Logger, int]] = []
 
     def open(self, *, triggered_by: str | None = None) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -81,6 +90,8 @@ class SyncRunFileLogger:
         self._handler = handler
         for name in _HANDLER_LOGGER_NAMES:
             lg = logging.getLogger(name)
+            self._prev_levels.append((lg, lg.level))
+            lg.setLevel(logging.DEBUG)
             lg.addHandler(handler)
             self._attached.append(lg)
 
@@ -92,6 +103,12 @@ class SyncRunFileLogger:
                 lg.removeHandler(self._handler)
             except Exception:
                 pass
+        for lg, level in self._prev_levels:
+            try:
+                lg.setLevel(level)
+            except Exception:
+                pass
+        self._prev_levels.clear()
         self._attached.clear()
         self._handler = None
 
@@ -99,8 +116,10 @@ class SyncRunFileLogger:
         with _lock:
             if self._fp is None or self._fp.closed:
                 return
-            line = f"{_ts()}  {level.upper():7}  {message.rstrip()}\n"
-            self._fp.write(line)
+            prefix = f"{_ts()}  {level.upper():7}  "
+            lines = message.rstrip("\n").split("\n")
+            block = "".join(prefix + line + "\n" for line in lines)
+            self._fp.write(block)
             self._fp.flush()
             try:
                 os.fsync(self._fp.fileno())
@@ -187,8 +206,17 @@ def end_sync_debug_log(
             _current = None
 
 
-def mirror_db_log(level: str, message: str, *, source: str = "db") -> None:
+def mirror_db_log(
+    level: str,
+    message: str,
+    *,
+    source: str = "db",
+    context: dict[str, Any] | None = None,
+) -> None:
     fl = get_sync_debug_log()
     if fl is None:
         return
-    fl.write(level, f"[{source}] {message}")
+    line = f"[{source}] {message}"
+    if context:
+        line += f" context={dump_json(context)}"
+    fl.write(level, line)

@@ -26,4 +26,4 @@ def log_job(
         )
     )
     db.flush()
-    mirror_db_log(level.value, message, source="job")
+    mirror_db_log(level.value, message, source="job", context=context)

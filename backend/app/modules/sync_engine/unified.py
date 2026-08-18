@@ -608,6 +608,12 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
             ),
             split_stats,
         )
+        try:
+            from app.modules.sync_engine.geo_log_dump import dump_sync_geo_diagnostics
+
+            dump_sync_geo_diagnostics(db)
+        except Exception:
+            logger.exception("Failed to dump sync geo diagnostics")
         db.refresh(run)
         summary = dict(run.stats or summary)
         summary["categories"] = category_stats

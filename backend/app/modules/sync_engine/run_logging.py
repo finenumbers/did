@@ -30,4 +30,4 @@ def log_run(
         )
     )
     db.commit()
-    mirror_db_log(level.value, message, source="run")
+    mirror_db_log(level.value, message, source="run", context=context)
