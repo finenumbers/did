@@ -258,8 +258,8 @@ def test_http_404_writes_not_in_registry_and_passes_coverage(monkeypatch):
             cat_id,
             contract.OPERATOR_NOT_IN_REGISTRY,
             True,
-            contract.OPERATOR_NOT_IN_REGISTRY,
-            contract.OPERATOR_NOT_IN_REGISTRY,
+            None,
+            None,
         )
     ]
     assert stats["not_in_registry"] == 1
@@ -382,7 +382,7 @@ def test_exception_lookup_retried_across_waves_preserves_operator(monkeypatch):
     assert written == []
 
 
-def test_cache_hit_writes_gar_geo_even_if_operator_matches(monkeypatch):
+def test_cache_hit_clears_geographic_geo_even_if_operator_matches(monkeypatch):
     written: list[tuple] = []
 
     async def fake_lookup(self, phone: str) -> RawHttpResult:
@@ -421,10 +421,10 @@ def test_cache_hit_writes_gar_geo_even_if_operator_matches(monkeypatch):
             concurrency=2,
         )
     )
-    assert written == [_upd(cat_id, "CachedOp", True, "Екатеринбург", "Свердловская область")]
+    assert written == [_upd(cat_id, "CachedOp", True, None, None)]
 
 
-def test_empty_gar_does_not_overwrite_provider_geo(monkeypatch):
+def test_empty_gar_clears_leftover_geographic_geo(monkeypatch):
     written: list[tuple] = []
 
     async def fake_lookup(self, phone: str) -> RawHttpResult:
@@ -470,7 +470,7 @@ def test_empty_gar_does_not_overwrite_provider_geo(monkeypatch):
             concurrency=2,
         )
     )
-    assert written == []
+    assert written == [_upd(cat_id, "CachedOp", True, None, None)]
 
 
 def test_lookup_applies_gar_territory(monkeypatch):
@@ -513,7 +513,7 @@ def test_lookup_applies_gar_territory(monkeypatch):
             concurrency=2,
         )
     )
-    assert written == [_upd(cat_id, "FromApi", True, "Санкт-Петербург", "Санкт-Петербург")]
+    assert written == [_upd(cat_id, "FromApi", True, None, None)]
 
 
 def test_coverage_list_clears_catalog_geo(monkeypatch):
@@ -611,7 +611,7 @@ def test_enrich_refreshes_cache_when_gar_missing(monkeypatch):
         )
     )
     assert refresh_calls == [1]
-    assert written == [_upd(cat_id, "CachedOp", True, "Екатеринбург", "Свердловская область")]
+    assert written == [_upd(cat_id, "CachedOp", True, None, None)]
 
 
 def test_enrich_fails_when_gar_still_empty_after_refresh(monkeypatch):
@@ -805,7 +805,7 @@ def test_mobile_collapses_moscow_oblast_pair(monkeypatch):
     assert written == [_upd(cat_id, "CachedOp", True, "Москва", "Москва")]
 
 
-def test_geographic_keeps_moscow_and_oblast(monkeypatch):
+def test_geographic_does_not_fill_city_region(monkeypatch):
     written: list[tuple] = []
 
     monkeypatch.setattr(
@@ -835,4 +835,4 @@ def test_geographic_keeps_moscow_and_oblast(monkeypatch):
             concurrency=2,
         )
     )
-    assert written == [_upd(cat_id, "CachedOp", True, "Москва", "Московская область")]
+    assert written == [_upd(cat_id, "CachedOp", True, None, None)]

@@ -594,20 +594,6 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
                 ),
                 rtu_stats,
             )
-        from app.modules.catalog.abc_from_regions import apply_catalog_abc_from_regions
-
-        split_stats = apply_catalog_abc_from_regions(db)
-        db.commit()
-        log_run(
-            db,
-            run.id,
-            SyncLogLevel.info,
-            (
-                "Catalog ABC split from Regions capacities "
-                f"scanned={split_stats.get('scanned')} updated={split_stats.get('updated')}"
-            ),
-            split_stats,
-        )
         try:
             from app.modules.sync_engine.geo_log_dump import dump_sync_geo_diagnostics
 

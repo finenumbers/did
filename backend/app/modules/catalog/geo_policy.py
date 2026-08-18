@@ -1,4 +1,4 @@
-"""Catalog city/region after PSTN enrich: sentinel, toll-free РФ, mobile capitals."""
+"""Catalog city/region after PSTN enrich: mobile GAR, 800 РФ, geographic empty."""
 
 from __future__ import annotations
 
@@ -61,14 +61,20 @@ def catalog_city_region(
     *,
     pstn_absent: bool = False,
 ) -> tuple[str | None, str | None]:
-    """Return catalog city/region. Sentinel always wins over category overlays."""
+    """Return catalog city/region from GAR for mobile and toll-free only.
+
+    Geographic (and unknown ABC) leave both columns empty — including PSTN miss.
+    Sentinel still wins over overlays for mobile and 800.
+    """
+    category = classify_number_category(abc_code, msisdn)
+    if category not in (CATEGORY_MOBILE, CATEGORY_TOLLFREE):
+        return None, None
     if (
         pstn_absent
         or city == OPERATOR_NOT_IN_REGISTRY
         or region == OPERATOR_NOT_IN_REGISTRY
     ):
         return OPERATOR_NOT_IN_REGISTRY, OPERATOR_NOT_IN_REGISTRY
-    category = classify_number_category(abc_code, msisdn)
     if category == CATEGORY_TOLLFREE:
         return GEO_TOLLFREE, GEO_TOLLFREE
     if is_coverage_value(city):
@@ -76,6 +82,4 @@ def catalog_city_region(
     if is_coverage_value(region):
         region = None
     city = normalize_catalog_city(city)
-    if category == CATEGORY_MOBILE:
-        return collapse_mobile_capitals(city, region)
-    return city, region
+    return collapse_mobile_capitals(city, region)

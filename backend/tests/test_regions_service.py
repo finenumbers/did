@@ -1,14 +1,20 @@
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
+from openpyxl import load_workbook
 from pydantic import ValidationError
 
 from app.providers.finenumbers.contract import OPERATOR_NOT_IN_REGISTRY
 from app.providers.msisdn_split import DIGIT_CAPACITY_DEFAULT, split_msisdn, split_msisdn_by_capacity
 from app.schemas.regions import RegionCapacitySaveItem
-from app.services.regions_service import RegionsService, catalog_region_pair
+from app.services.regions_service import (
+    REGIONS_XLSX_HEADERS,
+    RegionsService,
+    catalog_region_pair,
+)
 
 
 def _db_with_rows(rows: list) -> MagicMock:
@@ -166,3 +172,35 @@ def test_split_msisdn_by_capacity():
     assert split_msisdn_by_capacity("73842399999", 5) == ("38423", "99999")
     assert split_msisdn_by_capacity("73842399999", 4) is None
     assert split_msisdn_by_capacity("3842399999", 6) is None
+
+
+def test_write_xlsx_matches_table_columns(tmp_path: Path):
+    samara_id = uuid4()
+    perm_id = uuid4()
+    rows = [
+        SimpleNamespace(
+            id=samara_id,
+            city_name="Самара",
+            region_name="Самарская область",
+            digit_capacity=6,
+        ),
+        SimpleNamespace(id=perm_id, city_name="Пермь", region_name=None, digit_capacity=7),
+    ]
+    path = tmp_path / "regions.xlsx"
+    count = RegionsService(_db_with_rows(rows)).write_xlsx(path)
+    assert count == 2
+    wb = load_workbook(path)
+    try:
+        sheet = wb.active
+        assert [sheet.cell(1, col).value for col in range(1, 4)] == list(REGIONS_XLSX_HEADERS)
+        assert [sheet.cell(2, col).value for col in range(1, 4)] == [
+            6,
+            "Самара",
+            "Самарская область",
+        ]
+        perm = [sheet.cell(3, col).value for col in range(1, 4)]
+        assert perm[0] == 7
+        assert perm[1] == "Пермь"
+        assert perm[2] in (None, "")
+    finally:
+        wb.close()

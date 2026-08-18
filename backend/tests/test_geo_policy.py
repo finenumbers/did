@@ -16,9 +16,21 @@ def test_absent_wins_over_tollfree_and_mobile():
         SENTINEL,
         SENTINEL,
     ) == (SENTINEL, SENTINEL)
+
+
+def test_geographic_geo_always_empty():
     assert catalog_city_region(
         "495", "74951234567", None, None, pstn_absent=True
-    ) == (SENTINEL, SENTINEL)
+    ) == (None, None)
+    assert catalog_city_region(
+        "495", "74951234567", "Москва", "Московская область"
+    ) == (None, None)
+    assert catalog_city_region(
+        "495", "74951234567", "Кемеровский", "Кемеровская область"
+    ) == (None, None)
+    assert catalog_city_region(
+        "384", "73842123456", "город-курорт Сочи", "Краснодарский край"
+    ) == (None, None)
 
 
 def test_found_tollfree_is_russia_even_with_gar_or_empty():
@@ -69,12 +81,6 @@ def test_mobile_pipe_gar_and_comma_blob():
     ) == ("Москва", "Москва")
 
 
-def test_geographic_moscow_pair_not_collapsed():
-    assert catalog_city_region(
-        "495", "74951234567", "Москва", "Московская область"
-    ) == ("Москва", "Московская область")
-
-
 def test_oblast_only_not_collapsed():
     assert collapse_mobile_capitals("Московская область", "Московская область") == (
         "Московская область",
@@ -92,13 +98,13 @@ def test_coverage_list_nulls_each_field():
     )
     assert catalog_city_region("495", "74951234567", blob, blob) == (None, None)
     assert catalog_city_region("900", "79001234567", blob, blob) == (None, None)
-    assert catalog_city_region("495", "74951234567", "Майкоп", blob) == ("Майкоп", None)
+    assert catalog_city_region("495", "74951234567", "Майкоп", blob) == (None, None)
 
 
-def test_catalog_city_alias_and_honorary_prefix():
+def test_mobile_city_alias_and_honorary_prefix():
     assert catalog_city_region(
-        "495", "74951234567", "Кемеровский", "Кемеровская область"
+        "900", "79001234567", "Кемеровский", "Кемеровская область"
     ) == ("Кемерово", "Кемеровская область")
     assert catalog_city_region(
-        "384", "73842123456", "город-курорт Сочи", "Краснодарский край"
+        "900", "79001234567", "город-курорт Сочи", "Краснодарский край"
     ) == ("Сочи", "Краснодарский край")

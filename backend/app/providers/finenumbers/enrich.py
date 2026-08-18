@@ -3,8 +3,9 @@
 Contour B: every currently present catalog MSISDN goes through cache → PSTN lookup
 when needed. Operator SoT is this last sync stage (or «Нет в реестре» on terminal miss).
 When garTerritory is present, overlay city_name/region_name from the parsed GAR value
-(800 → Российская Федерация; mobile capital/oblast pairs collapsed). Terminal PSTN
-miss writes «Нет в реестре» on operator, city_name, and region_name.
+for mobile and 800 only (800 → Российская Федерация; mobile capital/oblast pairs
+collapsed). Geographic city/region stay empty. Terminal PSTN miss writes
+«Нет в реестре» on operator; geo sentinel only for mobile and 800.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ from app.models.catalog import NumbersCatalogNormalized
 from app.modules.catalog.gar_territory import gar_clears_geo, parse_gar_territory
 from app.modules.catalog.geo_policy import catalog_city_region
 from app.modules.catalog.number_category import (
+    CATEGORY_MOBILE,
     CATEGORY_TOLLFREE,
     classify_number_category,
 )
@@ -257,11 +259,12 @@ async def enrich_catalog_operators(
     Secondary: PSTN lookup API for cache misses (always queued; overwrites existing operator).
     With only_missing=False (default / production): every present row is enriched.
     Terminal PSTN miss (found=false / empty / invalid MSISDN / HTTP 400|404|422)
-    → «Нет в реестре» on operator, city_name, and region_name (any category).
-    Found 800 → city/region «Российская Федерация». Found mobile capital/oblast
-    pairs collapse to the city in both columns. Transport/5xx/auth
-    errors are retried; unresolved ones remain uncovered (do not write sentinel,
-    do not clear existing operator/geo) and fail coverage.
+    → «Нет в реестре» on operator; city/region sentinel only for mobile and 800.
+    Geographic city/region are cleared, not filled. Found 800 → city/region
+    «Российская Федерация». Found mobile capital/oblast pairs collapse to the
+    city in both columns. Transport/5xx/auth errors are retried; unresolved ones
+    remain uncovered (do not write sentinel, do not clear existing operator/geo)
+    and fail coverage.
     """
     client = FinenumbersClient(connection)
     cache = OperatorRangeCache()
@@ -315,13 +318,18 @@ def _enqueue_catalog_update(
     msisdn: str | None = None,
     pstn_absent: bool = False,
 ) -> None:
+    category = classify_number_category(abc_code, msisdn)
     city, region = catalog_city_region(
         abc_code, msisdn, city, region, pstn_absent=pstn_absent
     )
-    if (
+    if category not in (CATEGORY_MOBILE, CATEGORY_TOLLFREE):
+        apply_geo = True
+        city = None
+        region = None
+    elif (
         pstn_absent
         or city == contract.OPERATOR_NOT_IN_REGISTRY
-        or classify_number_category(abc_code, msisdn) == CATEGORY_TOLLFREE
+        or category == CATEGORY_TOLLFREE
     ):
         apply_geo = True
     elif apply_geo is None:

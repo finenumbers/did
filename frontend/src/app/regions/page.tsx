@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ApiError, apiFetch } from "@/lib/api/client";
+import { ApiError, apiDownload, apiFetch } from "@/lib/api/client";
 import type { RegionCityItem, RegionsLoadResult } from "@/lib/types/api";
 
 function cellText(value: string | number | null | undefined): string {
@@ -15,6 +15,7 @@ export default function RegionsPage() {
   const [loading, setLoading] = useState(true);
   const [reloading, setReloading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const applyRows = useCallback((rows: RegionCityItem[]) => {
@@ -89,7 +90,24 @@ export default function RegionsPage() {
     setItems((prev) => prev.map((row) => (row.id === id ? { ...row, digit_capacity: n } : row)));
   }
 
-  const busy = reloading || saving;
+  async function exportXlsx() {
+    setExporting(true);
+    setError(null);
+    try {
+      const blob = await apiDownload("/api/v1/regions/export.xlsx");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "regions.xlsx";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (err: unknown) {
+      setError(err instanceof ApiError ? err.message : "Не удалось скачать XLSX");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  const busy = reloading || saving || exporting;
 
   return (
     <div className="numbers-page">
@@ -100,6 +118,14 @@ export default function RegionsPage() {
           </button>
           <button type="button" disabled={busy} onClick={() => void loadFromCatalog()}>
             {reloading ? "Загрузка…" : "Загрузить данные"}
+          </button>
+          <button
+            type="button"
+            className="secondary"
+            disabled={busy || loading}
+            onClick={() => void exportXlsx()}
+          >
+            {exporting ? "Экспорт…" : "Экспорт XLSX"}
           </button>
         </div>
         {error && <div className="state error">{error}</div>}

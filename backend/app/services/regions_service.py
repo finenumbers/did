@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 from uuid import UUID
 
 from sqlalchemy import func, or_, select
@@ -13,6 +14,10 @@ from app.modules.catalog.gar_territory import is_coverage_value
 from app.providers.finenumbers.contract import OPERATOR_NOT_IN_REGISTRY
 from app.providers.msisdn_split import DIGIT_CAPACITY_DEFAULT
 from app.schemas.regions import RegionCapacitySaveItem, RegionCityItem, RegionsLoadResult
+from app.services.xlsx_style import StyledSheetWriter, open_styled_workbook
+
+REGIONS_XLSX_HEADERS = ("Разрядность", "Город", "Регион")
+REGIONS_XLSX_SHEET = "Регионы"
 
 DIGIT_CAPACITY = DIGIT_CAPACITY_DEFAULT
 
@@ -161,3 +166,19 @@ class RegionsService:
             count=len(rows),
             message=f"Сохранено: {len(rows)}",
         )
+
+    def write_xlsx(self, path: str | Path) -> int:
+        """Write the Regions table (same columns as the UI) to path."""
+        items = self.list_cities()
+        wb = open_styled_workbook(str(path), constant_memory=True)
+        try:
+            ws = wb.add_worksheet(REGIONS_XLSX_SHEET)
+            writer = StyledSheetWriter(wb, ws, REGIONS_XLSX_HEADERS)
+            for item in items:
+                writer.write_row(
+                    [item.digit_capacity, item.city_name, item.region_name or ""]
+                )
+            writer.finalize()
+        finally:
+            wb.close()
+        return len(items)
