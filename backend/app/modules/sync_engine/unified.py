@@ -859,7 +859,7 @@ async def _run_operator_enrichment(
         )
 
     try:
-        # Last sync stage: fill operator on every present free/purchased row (only_missing=False).
+        # Last sync stage: operator + GAR city/region on every present row.
         enrich_stats = await enrich_catalog_operators(
             db,
             connection=connection,

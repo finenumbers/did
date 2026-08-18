@@ -1,8 +1,8 @@
-"""Enrich catalog.operator from local PSTN INN cache + Finenumbers lookup.
+"""Enrich catalog operator and GAR city/region from local PSTN INN cache + lookup.
 
-Contour B: local cache is used ONLY to fill catalog.operator (no region/inventory).
-RULE: every currently present catalog MSISDN goes through cache → PSTN lookup when needed;
-final operator SoT is this last sync stage — PSTN cache/API, or «Нет в реестре» on terminal miss.
+Contour B: every currently present catalog MSISDN goes through cache → PSTN lookup
+when needed. Operator SoT is this last sync stage (or «Нет в реестре» on terminal miss).
+When garTerritory is present, overlay city_name/region_name from the parsed GAR value.
 """
 
 from __future__ import annotations
@@ -14,12 +14,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
-from sqlalchemy import bindparam, func, or_, select, text
+from sqlalchemy import Boolean, bindparam, func, or_, select, text
 from sqlalchemy.dialects.postgresql import ARRAY, UUID as PGUUID
 from sqlalchemy.orm import Session
 from sqlalchemy.types import Text
 
 from app.models.catalog import NumbersCatalogNormalized
+from app.modules.catalog.gar_territory import parse_gar_territory
 from app.modules.pstn_inn_cache.service import load_enabled_ranges_for_enrich
 from app.providers.dto.common import ConnectionConfig, RawHttpResult
 from app.providers.errors import ProviderError
@@ -74,15 +75,35 @@ def _body_snippet(raw: RawHttpResult, limit: int = 200) -> str:
 
 
 @dataclass(frozen=True)
+class RangeMatch:
+    operator: str
+    city_name: str | None = None
+    region_name: str | None = None
+
+    @property
+    def apply_geo(self) -> bool:
+        return self.city_name is not None or self.region_name is not None
+
+
+@dataclass(frozen=True)
 class OperatorRange:
     abc: str
     start: int
     end: int
     operator: str
     order: int = 0
+    city_name: str | None = None
+    region_name: str | None = None
 
     def covers(self, abc: str, local: int) -> bool:
         return self.abc == abc and self.start <= local <= self.end
+
+    def as_match(self) -> RangeMatch:
+        return RangeMatch(
+            operator=self.operator,
+            city_name=self.city_name,
+            region_name=self.region_name,
+        )
 
 
 class OperatorRangeCache:
@@ -94,7 +115,16 @@ class OperatorRangeCache:
         self._order = 0
         self._finalized = False
 
-    def add(self, abc: str, start: int, end: int, operator: str) -> None:
+    def add(
+        self,
+        abc: str,
+        start: int,
+        end: int,
+        operator: str,
+        *,
+        city_name: str | None = None,
+        region_name: str | None = None,
+    ) -> None:
         if not abc or not operator or end < start:
             return
         self._finalized = False
@@ -104,19 +134,35 @@ class OperatorRangeCache:
                 return
         self._order += 1
         bucket.append(
-            OperatorRange(abc=abc, start=start, end=end, operator=operator, order=self._order)
+            OperatorRange(
+                abc=abc,
+                start=start,
+                end=end,
+                operator=operator,
+                order=self._order,
+                city_name=city_name,
+                region_name=region_name,
+            )
         )
 
     def add_from_api_row(self, row: dict) -> str | None:
         abc = str(row.get("abc") or "").strip()
         operator = str(row.get("operator") or "").strip()
+        city_name, region_name = parse_gar_territory(row.get("garTerritory"))
         try:
             start = int(row["rangeStart"])
             end = int(row["rangeEnd"])
         except (KeyError, TypeError, ValueError):
             return operator or None
         if operator:
-            self.add(abc, start, end, operator)
+            self.add(
+                abc,
+                start,
+                end,
+                operator,
+                city_name=city_name,
+                region_name=region_name,
+            )
         return operator or None
 
     def finalize(self) -> None:
@@ -126,7 +172,7 @@ class OperatorRangeCache:
             self._starts[abc] = [r.start for r in bucket]
         self._finalized = True
 
-    def resolve_parts(self, abc: str, local: int) -> str | None:
+    def resolve_parts(self, abc: str, local: int) -> RangeMatch | None:
         if not self._finalized:
             self.finalize()
         bucket = self._by_abc.get(abc) or []
@@ -134,25 +180,25 @@ class OperatorRangeCache:
             return None
         starts = self._starts.get(abc) or []
         i = bisect_right(starts, local) - 1
-        best_op: str | None = None
+        best: RangeMatch | None = None
         best_order: int | None = None
         while i >= 0:
             r = bucket[i]
             if r.start <= local <= r.end:
                 if best_order is None or r.order < best_order:
-                    best_op = r.operator
+                    best = r.as_match()
                     best_order = r.order
             i -= 1
-        return best_op
+        return best
 
-    def resolve(self, msisdn: str) -> str | None:
+    def resolve(self, msisdn: str) -> RangeMatch | None:
         parts = parse_msisdn_parts(msisdn)
         if not parts:
             return None
         abc, local = parts
         return self.resolve_parts(abc, local)
 
-    def resolve_linear_first_match(self, msisdn: str) -> str | None:
+    def resolve_linear_first_match(self, msisdn: str) -> RangeMatch | None:
         """Reference semantics (insertion order) for tests."""
         parts = parse_msisdn_parts(msisdn)
         if not parts:
@@ -160,7 +206,7 @@ class OperatorRangeCache:
         abc, local = parts
         for r in sorted(self._by_abc.get(abc) or [], key=lambda x: x.order):
             if r.covers(abc, local):
-                return r.operator
+                return r.as_match()
         return None
 
 
@@ -177,14 +223,15 @@ async def enrich_catalog_operators(
     on_progress: ProgressCb | None = None,
 ) -> dict[str, int]:
     """
-    Set operator on currently present catalog rows (last unified-sync stage).
+    Set operator (and GAR city/region when present) on currently present catalog rows.
 
-    Primary: local pstn_inn_ranges_cache (enabled INNs) — writes ONLY operator.
+    Primary: local pstn_inn_ranges_cache (enabled INNs).
     Secondary: PSTN lookup API for cache misses (always queued; overwrites existing operator).
     With only_missing=False (default / production): every present row is enriched.
     Terminal PSTN miss (found=false / empty / invalid MSISDN / HTTP 400|404|422)
-    → «Нет в реестре». Transport/5xx/auth errors are retried; unresolved ones remain
-    uncovered (do not write sentinel, do not clear existing operator) and fail coverage.
+    → «Нет в реестре» (geo left unchanged). Transport/5xx/auth errors are retried;
+    unresolved ones remain uncovered (do not write sentinel, do not clear existing
+    operator/geo) and fail coverage.
     """
     client = FinenumbersClient(connection)
     cache = OperatorRangeCache()
@@ -219,27 +266,68 @@ def _progress(
             logger.exception("enrich progress callback failed")
 
 
+def _enqueue_catalog_update(
+    pending_updates: list[tuple],
+    *,
+    catalog_id,
+    operator: str,
+    current_operator: str | None,
+    current_city: str | None,
+    current_region: str | None,
+    city: str | None = None,
+    region: str | None = None,
+    apply_geo: bool | None = None,
+) -> None:
+    if apply_geo is None:
+        apply_geo = city is not None or region is not None
+    if not apply_geo:
+        city = None
+        region = None
+    op_changed = current_operator != operator
+    geo_changed = apply_geo and (current_city != city or current_region != region)
+    if op_changed or geo_changed:
+        pending_updates.append((catalog_id, operator, apply_geo, city, region))
+
+
 def _bulk_update_operators(
     db: Session,
     pairs: list[tuple],
 ) -> int:
-    """UPDATE operator for (id, operator) pairs via unnest; returns row count attempted."""
+    """UPDATE operator and optional GAR geo for (id, operator, apply_geo, city, region)."""
     if not pairs:
         return 0
     ids = [p[0] for p in pairs]
     ops = [p[1] for p in pairs]
+    apply_geo = [p[2] for p in pairs]
+    cities = [p[3] for p in pairs]
+    regions = [p[4] for p in pairs]
     stmt = text(
         """
         UPDATE numbers_catalog_normalized AS c
-        SET operator = v.operator
-        FROM unnest(:ids, :ops) AS v(id, operator)
+        SET operator = v.operator,
+            city_name = CASE WHEN v.apply_geo THEN v.city ELSE c.city_name END,
+            region_name = CASE WHEN v.apply_geo THEN v.region ELSE c.region_name END
+        FROM unnest(:ids, :ops, :apply_geo, :cities, :regions)
+            AS v(id, operator, apply_geo, city, region)
         WHERE c.id = v.id
         """
     ).bindparams(
         bindparam("ids", type_=ARRAY(PGUUID(as_uuid=True))),
         bindparam("ops", type_=ARRAY(Text())),
+        bindparam("apply_geo", type_=ARRAY(Boolean())),
+        bindparam("cities", type_=ARRAY(Text())),
+        bindparam("regions", type_=ARRAY(Text())),
     )
-    db.execute(stmt, {"ids": ids, "ops": ops})
+    db.execute(
+        stmt,
+        {
+            "ids": ids,
+            "ops": ops,
+            "apply_geo": apply_geo,
+            "cities": cities,
+            "regions": regions,
+        },
+    )
     return len(pairs)
 
 
@@ -272,6 +360,8 @@ async def _enrich_catalog_operators_inner(
         NumbersCatalogNormalized.operator,
         NumbersCatalogNormalized.abc_code,
         NumbersCatalogNormalized.number_local,
+        NumbersCatalogNormalized.city_name,
+        NumbersCatalogNormalized.region_name,
     ).where(
         NumbersCatalogNormalized.is_currently_present.is_(True),
         NumbersCatalogNormalized.msisdn.is_not(None),
@@ -294,34 +384,68 @@ async def _enrich_catalog_operators_inner(
     errors = 0
     not_in_registry = 0
 
-    # (id, msisdn, phone, current_operator)
+    # (id, msisdn, phone, current_operator, current_city, current_region)
     pending: list[tuple] = []
     invalid_msisdns: list[str] = []
 
-    for idx, (catalog_id, msisdn, current_operator, abc_code, number_local) in enumerate(rows):
+    for idx, row in enumerate(rows):
+        (
+            catalog_id,
+            msisdn,
+            current_operator,
+            abc_code,
+            number_local,
+            current_city,
+            current_region,
+        ) = row
         msisdn_s = msisdn or ""
-        operator: str | None = None
+        match: RangeMatch | None = None
         if abc_code and number_local is not None:
             try:
-                operator = cache.resolve_parts(str(abc_code).strip(), int(number_local))
+                match = cache.resolve_parts(str(abc_code).strip(), int(number_local))
             except (TypeError, ValueError):
-                operator = None
-        if operator is None:
-            operator = cache.resolve(msisdn_s)
-        if operator:
+                match = None
+        if match is None:
+            match = cache.resolve(msisdn_s)
+        if match:
             cache_hits += 1
-            if current_operator != operator:
-                pending_updates.append((catalog_id, operator))
+            _enqueue_catalog_update(
+                pending_updates,
+                catalog_id=catalog_id,
+                operator=match.operator,
+                current_operator=current_operator,
+                current_city=current_city,
+                current_region=current_region,
+                city=match.city_name,
+                region=match.region_name,
+            )
         else:
             # Cache miss: always queue PSTN lookup (even if operator already set).
             phone = phone_for_lookup(msisdn_s)
             if not phone:
                 invalid_msisdns.append(msisdn_s)
+                _enqueue_catalog_update(
+                    pending_updates,
+                    catalog_id=catalog_id,
+                    operator=contract.OPERATOR_NOT_IN_REGISTRY,
+                    current_operator=current_operator,
+                    current_city=current_city,
+                    current_region=current_region,
+                    apply_geo=False,
+                )
                 if current_operator != contract.OPERATOR_NOT_IN_REGISTRY:
-                    pending_updates.append((catalog_id, contract.OPERATOR_NOT_IN_REGISTRY))
                     not_in_registry += 1
             else:
-                pending.append((catalog_id, msisdn_s, phone, current_operator))
+                pending.append(
+                    (
+                        catalog_id,
+                        msisdn_s,
+                        phone,
+                        current_operator,
+                        current_city,
+                        current_region,
+                    )
+                )
         if (idx + 1) % _PROGRESS_EVERY == 0:
             _progress(
                 on_progress,
@@ -414,21 +538,37 @@ async def _enrich_catalog_operators_inner(
         phone_seen: set[str] = set()
 
         for item in pending:
-            catalog_id, msisdn_s, phone, current_operator = item
-            operator = cache.resolve(msisdn_s)
-            if not operator:
+            catalog_id, msisdn_s, phone, current_operator, current_city, current_region = item
+            match = cache.resolve(msisdn_s)
+            if match is None:
                 op_direct = lookup_result.get(phone)
                 if op_direct:
-                    operator = op_direct
-            if operator:
+                    match = RangeMatch(operator=op_direct)
+            if match:
                 cache_hits += 1
-                if current_operator != operator:
-                    pending_updates.append((catalog_id, operator))
+                _enqueue_catalog_update(
+                    pending_updates,
+                    catalog_id=catalog_id,
+                    operator=match.operator,
+                    current_operator=current_operator,
+                    current_city=current_city,
+                    current_region=current_region,
+                    city=match.city_name,
+                    region=match.region_name,
+                )
                 continue
 
             if phone in absent_phones:
+                _enqueue_catalog_update(
+                    pending_updates,
+                    catalog_id=catalog_id,
+                    operator=contract.OPERATOR_NOT_IN_REGISTRY,
+                    current_operator=current_operator,
+                    current_city=current_city,
+                    current_region=current_region,
+                    apply_geo=False,
+                )
                 if current_operator != contract.OPERATOR_NOT_IN_REGISTRY:
-                    pending_updates.append((catalog_id, contract.OPERATOR_NOT_IN_REGISTRY))
                     not_in_registry += 1
                 continue
 
@@ -478,15 +618,35 @@ async def _enrich_catalog_operators_inner(
 
     uncovered_msisdns: list[str] = []
     for item in pending:
-        catalog_id, msisdn_s, phone, current_operator = item
-        operator = cache.resolve(msisdn_s) or lookup_result.get(phone)
-        if operator:
+        catalog_id, msisdn_s, phone, current_operator, current_city, current_region = item
+        match = cache.resolve(msisdn_s)
+        if match is None:
+            op_direct = lookup_result.get(phone)
+            if op_direct:
+                match = RangeMatch(operator=op_direct)
+        if match:
             cache_hits += 1
-            if current_operator != operator:
-                pending_updates.append((catalog_id, operator))
+            _enqueue_catalog_update(
+                pending_updates,
+                catalog_id=catalog_id,
+                operator=match.operator,
+                current_operator=current_operator,
+                current_city=current_city,
+                current_region=current_region,
+                city=match.city_name,
+                region=match.region_name,
+            )
         elif phone in absent_phones:
+            _enqueue_catalog_update(
+                pending_updates,
+                catalog_id=catalog_id,
+                operator=contract.OPERATOR_NOT_IN_REGISTRY,
+                current_operator=current_operator,
+                current_city=current_city,
+                current_region=current_region,
+                apply_geo=False,
+            )
             if current_operator != contract.OPERATOR_NOT_IN_REGISTRY:
-                pending_updates.append((catalog_id, contract.OPERATOR_NOT_IN_REGISTRY))
                 not_in_registry += 1
         else:
             # Transport/HTTP error after retries — keep existing operator, do not write sentinel.
@@ -508,13 +668,22 @@ async def _enrich_catalog_operators_inner(
             updated += _bulk_update_operators(db, chunk)
         except Exception:
             logger.exception("Bulk operator update failed; falling back to row updates")
-            for catalog_id, operator in chunk:
+            for catalog_id, operator, apply_geo, city, region in chunk:
                 db.execute(
                     text(
                         "UPDATE numbers_catalog_normalized "
-                        "SET operator = :op WHERE id = :id"
+                        "SET operator = :op, "
+                        "city_name = CASE WHEN :apply_geo THEN :city ELSE city_name END, "
+                        "region_name = CASE WHEN :apply_geo THEN :region ELSE region_name END "
+                        "WHERE id = :id"
                     ),
-                    {"op": operator, "id": catalog_id},
+                    {
+                        "op": operator,
+                        "apply_geo": apply_geo,
+                        "city": city,
+                        "region": region,
+                        "id": catalog_id,
+                    },
                 )
                 updated += 1
         db.commit()

@@ -51,14 +51,14 @@ const CATALOG_COLUMNS: Col[] = [
     value: (r) => r.status_raw,
   },
   {
-    key: "region_name",
-    header: "Регион",
-    value: (r) => r.region_name,
-  },
-  {
     key: "city_name",
     header: "Город",
     value: (r) => r.city_name,
+  },
+  {
+    key: "region_name",
+    header: "Регион",
+    value: (r) => r.region_name,
   },
   {
     key: "buy_price",

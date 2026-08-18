@@ -20,14 +20,16 @@ Each PSTN range row expands to one catalog row per local number in `[rangeStart,
 | — | `inventory_kind=free` | OPERATIONAL |
 | — | no provider raw table (catalog-only persist) | OPERATIONAL |
 
-## Contour B — operator enrich (not inventory)
+## Contour B — operator + GAR geo enrich (not inventory)
 
 | Source | Catalog write | Marker |
 |---|---|---|
-| Local `pstn_inn_ranges_cache` match on MSISDN | `numbers_catalog_normalized.operator` only | OPERATIONAL |
-| Fallback `GET /api/v1/lookup?phone=` (10-digit national) | same `operator` field | VERIFIED (code) |
+| Local `pstn_inn_ranges_cache` match on MSISDN | `operator`; if `garTerritory` present → `city_name` + `region_name` | OPERATIONAL |
+| Fallback `GET /api/v1/lookup?phone=` (10-digit national) | same fields from lookup `data` | VERIFIED (code) |
 
-Contour B **never** writes prices, geo, status, or wipes inventory.
+`garTerritory` (Территория ГАР) is split on the first `|`: before → city, after → region. No delimiter → both fields get the cleaned value. Leading prefixes `г.о. `, `город `, `Город `, `м.р-н `, `г. ` are stripped. Empty GAR does not overwrite provider geo. PSTN `region` is not used for these columns.
+
+Contour B **never** writes prices, status, or wipes inventory.
 
 ## Lookups
 

@@ -10,7 +10,7 @@ Vendor HTML/PDF materials are not checked into this repo; markers below reflect 
 | Contour | Purpose | Storage / writes |
 |---|---|---|
 | **A — inventory** | Free numbers for operator ИНН «Фронтир» (`5406978329`) as a provider inventory slice | `numbers_catalog_normalized` free via Finenumbers sync |
-| **B — operator cache** | PSTN ranges by INN for catalog column **Оператор** | `pstn_inn_cache_operators` / `pstn_inn_ranges_cache`; enrich writes **only** `catalog.operator` |
+| **B — operator cache** | PSTN ranges by INN for catalog **Оператор** and GAR overlay of **Город**/**Регион** | `pstn_inn_cache_operators` / `pstn_inn_ranges_cache`; enrich writes `operator` and, when `garTerritory` is present, `city_name`/`region_name` |
 | **C — REG / RTU** | Purchased endpoints from REG + column **Подключено в РТУ** | `GET https://reg.finenumbers.com/api/phones` (read-only); purchased + `rtu_connected` |
 
 Same INN may appear in A/B (e.g. Frontier). Contour C uses a separate REG API key (`auth_settings.reg_key`).
@@ -89,7 +89,7 @@ Sync does **not** auto-refresh Contour B. Cache refresh is manual from Settings.
 | purchased numbers | yes (REG Contour C) |
 | dictionaries (regions/cities) | no |
 | test connection | yes (`by-inn` page=1) |
-| operator enrichment | yes (local cache first, then lookup) |
+| operator enrichment | yes (local cache first, then lookup; GAR city/region overlay) |
 
 ## Sync stages (product)
 

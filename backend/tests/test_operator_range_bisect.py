@@ -14,9 +14,9 @@ def test_bisect_matches_linear_first_match_with_overlap():
     cache.finalize()
 
     msisdn = "74950000100"
-    assert cache.resolve_linear_first_match(msisdn) == "MegaFon"
-    assert cache.resolve(msisdn) == "MegaFon"
-    assert cache.resolve_parts("495", 100) == "MegaFon"
+    assert cache.resolve_linear_first_match(msisdn).operator == "MegaFon"
+    assert cache.resolve(msisdn).operator == "MegaFon"
+    assert cache.resolve_parts("495", 100).operator == "MegaFon"
 
 
 def test_bisect_outside_range_is_none():
@@ -32,5 +32,5 @@ def test_bisect_picks_covering_range():
     cache.add("999", 0, 99, "A")
     cache.add("999", 100, 199, "B")
     cache.finalize()
-    assert cache.resolve_parts("999", 50) == "A"
-    assert cache.resolve_parts("999", 150) == "B"
+    assert cache.resolve_parts("999", 50).operator == "A"
+    assert cache.resolve_parts("999", 150).operator == "B"

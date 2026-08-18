@@ -1,4 +1,4 @@
-"""Local PSTN INN ranges cache — Contour B: operator column only."""
+"""Local PSTN INN ranges cache — Contour B: operator + GAR city/region."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ class PstnInnCacheOperator(Base):
 
 
 class PstnInnRangeCache(Base):
-    """Cached by-inn ranges. Consumer: operator_enrichment only (writes catalog.operator)."""
+    """Cached by-inn ranges. Consumer: operator_enrichment (operator + GAR city/region)."""
 
     __tablename__ = "pstn_inn_ranges_cache"
 
@@ -45,6 +45,7 @@ class PstnInnRangeCache(Base):
     range_end: Mapped[int] = mapped_column(Integer, nullable=False)
     operator: Mapped[str] = mapped_column(Text, nullable=False)
     region: Mapped[str | None] = mapped_column(Text, nullable=True)
+    gar_territory: Mapped[str | None] = mapped_column(Text, nullable=True)
     synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

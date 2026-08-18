@@ -1,4 +1,4 @@
-"""PSTN INN ranges cache service (Contour B — operator column only)."""
+"""PSTN INN ranges cache service (Contour B — operator + GAR city/region)."""
 
 from __future__ import annotations
 
@@ -317,7 +317,7 @@ def _finenumbers_connection(db: Session) -> ConnectionConfig:
 
 
 def load_enabled_ranges_for_enrich(db: Session) -> list[dict[str, Any]]:
-    """Load ranges for enabled operators. Used only to fill catalog.operator."""
+    """Load ranges for enabled operators (operator + garTerritory for catalog overlay)."""
     enabled_inns = db.scalars(
         select(PstnInnCacheOperator.inn).where(PstnInnCacheOperator.enabled.is_(True))
     ).all()
@@ -326,13 +326,13 @@ def load_enabled_ranges_for_enrich(db: Session) -> list[dict[str, Any]]:
     rows = db.scalars(
         select(PstnInnRangeCache).where(PstnInnRangeCache.inn.in_(list(enabled_inns)))
     ).all()
-    # Contour B: expose only fields needed for operator match (region ignored by enrich)
     return [
         {
             "abc": r.abc,
             "rangeStart": r.range_start,
             "rangeEnd": r.range_end,
             "operator": r.operator,
+            "garTerritory": r.gar_territory,
         }
         for r in rows
         if r.operator
@@ -377,6 +377,7 @@ async def refresh_enabled_caches(db: Session) -> dict[str, Any]:
                     abc = str(row.get("abc") or "").strip()
                     operator = str(row.get("operator") or "").strip()
                     region = str(row.get("region") or "").strip() or None
+                    gar_territory = str(row.get("garTerritory") or "").strip() or None
                     try:
                         start = int(row["rangeStart"])
                         end = int(row["rangeEnd"])
@@ -393,6 +394,7 @@ async def refresh_enabled_caches(db: Session) -> dict[str, Any]:
                             "range_end": end,
                             "operator": operator,
                             "region": region,
+                            "gar_territory": gar_territory,
                             "synced_at": synced_at,
                         }
                     )

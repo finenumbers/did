@@ -16,7 +16,7 @@ Nav: [`finenumbers/SOURCE.md`](finenumbers/SOURCE.md) · [`finenumbers-contract.
 | `finenumbers_free` | Contour A by-inn expand → catalog (no dictionaries stage) |
 | `finenumbers_purchased` | Contour C REG → purchased + provisional RTU flags |
 | `finalize` | Dropped XLSX, inventory summary, catalog checksum |
-| `operator_enrichment` | **Last** stage: Contour B fills `operator` on all present rows; then RTU flags re-applied |
+| `operator_enrichment` | **Last** stage: Contour B fills `operator` and overlays `city_name`/`region_name` from `garTerritory` on all present rows; then RTU flags re-applied |
 
 ## Contour C — REG / RTU (purchased)
 
@@ -37,15 +37,16 @@ Nav: [`finenumbers/SOURCE.md`](finenumbers/SOURCE.md) · [`finenumbers-contract.
 ## Contour B — PSTN INN operator cache
 
 - Settings UI: CRUD operators + «Загрузить кеш».
-- Tables: `pstn_inn_cache_operators`, `pstn_inn_ranges_cache`.
-- Refresh pulls `by-inn` ranges per enabled operator.
+- Tables: `pstn_inn_cache_operators`, `pstn_inn_ranges_cache` (includes `gar_territory`).
+- Refresh pulls `by-inn` ranges per enabled operator (`operator`, `region`, `garTerritory`).
 - Enrichment (`enrich_catalog_operators`) runs as the **last** unified-sync stage after `finalize`.
 - Every currently present free/purchased row: local ranges first; cache miss → always `lookup?phone=` (no skip for already-filled operator).
 - Successful cache/API value **overwrites** existing `operator`.
-- Terminal PSTN miss (`found=false` / empty / invalid MSISDN / HTTP 400|404|422) → **`Нет в реестре`** (blue row in UI/XLSX); counts as covered for sync gate.
-- Transport/5xx/auth lookup errors: client retries 5xx; enrich re-queues across waves; unresolved → do **not** write sentinel, do **not** clear existing operator, fail `require_full_coverage` with status/body in logs.
-- Final `operator` SoT is PSTN enrich (or the sentinel above).
-- Writes **only** `numbers_catalog_normalized.operator`. Never overwrites prices/geo/status from Contour B.
+- When `garTerritory` is present, overlay **both** `city_name` and `region_name` even if operator did not change. Empty GAR leaves provider geo unchanged.
+- Terminal PSTN miss (`found=false` / empty / invalid MSISDN / HTTP 400|404|422) → **`Нет в реестре`** (blue row in UI/XLSX); counts as covered for sync gate; geo not cleared.
+- Transport/5xx/auth lookup errors: client retries 5xx; enrich re-queues across waves; unresolved → do **not** write sentinel, do **not** clear existing operator/geo, fail `require_full_coverage` with status/body in logs.
+- Final `operator` SoT is PSTN enrich (or the sentinel above). GAR overlay is SoT for city/region when the field is present.
+- After deploy: reload PSTN cache («Загрузить кеш»), then sync — old cache rows have NULL `gar_territory`.
 
 ## Sync gate
 
@@ -56,4 +57,4 @@ Nav: [`finenumbers/SOURCE.md`](finenumbers/SOURCE.md) · [`finenumbers-contract.
 
 ## Separation invariant
 
-Do not treat Contour A free inventory as Contour B cache, and do not let Contour B wipe or rewrite inventory fields other than `operator`.
+Do not treat Contour A free inventory as Contour B cache, and do not let Contour B wipe inventory or rewrite prices/status. Contour B may overlay `city_name`/`region_name` from `garTerritory` only.
