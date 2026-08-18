@@ -292,6 +292,23 @@ mark.search-hit {
   min-width: max-content;
 }
 
+.numbers-panel .regions-table {
+  width: 100%;
+  min-width: 100%;
+  table-layout: auto;
+}
+.numbers-panel .regions-table th:nth-child(1),
+.numbers-panel .regions-table td:nth-child(1),
+.numbers-panel .regions-table th:nth-child(2),
+.numbers-panel .regions-table td:nth-child(2) {
+  width: 1%;
+  white-space: nowrap;
+}
+.numbers-panel .regions-table th:nth-child(3),
+.numbers-panel .regions-table td:nth-child(3) {
+  width: auto;
+}
+
 .table-scroll thead th {
   position: sticky;
   top: 0;

@@ -36,18 +36,11 @@ export default function RegionsPage() {
   }, []);
 
   return (
-    <div className="panel">
-      <h1 style={{ marginTop: 0 }}>Регионы</h1>
-      {error && <div className="state error">{error}</div>}
-      {loading && <div className="state">Загрузка…</div>}
-      {!loading && !error && items.length === 0 && (
-        <div className="state">
-          Нет данных. Запустите синхронизацию на странице «Синхронизация».
-        </div>
-      )}
-      {!loading && !error && items.length > 0 && (
+    <div className="numbers-page">
+      <div className="panel numbers-panel">
+        {error && <div className="state error">{error}</div>}
         <div className="table-scroll">
-          <table>
+          <table className="regions-table">
             <thead>
               <tr>
                 <th>ABC</th>
@@ -65,8 +58,14 @@ export default function RegionsPage() {
               ))}
             </tbody>
           </table>
+          {loading && items.length === 0 && <div className="state">Загрузка…</div>}
+          {!loading && !error && items.length === 0 && (
+            <div className="state">
+              Нет данных. Запустите синхронизацию на странице «Синхронизация».
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
