@@ -99,6 +99,7 @@ def test_cache_hit_does_not_call_lookup(monkeypatch):
                 "rangeStart": 1111111,
                 "rangeEnd": 1111111,
                 "operator": "CachedOp",
+                "garTerritory": "г. Москва|г. Москва",
             }
         ],
     )
@@ -437,7 +438,14 @@ def test_empty_gar_does_not_overwrite_provider_geo(monkeypatch):
                 "rangeEnd": 1000000,
                 "operator": "CachedOp",
                 "garTerritory": "",
-            }
+            },
+            {
+                "abc": "812",
+                "rangeStart": 1,
+                "rangeEnd": 1,
+                "operator": "OtherOp",
+                "garTerritory": "г. Санкт-Петербург|г. Санкт-Петербург",
+            },
         ],
     )
     monkeypatch.setattr(
@@ -505,3 +513,103 @@ def test_lookup_applies_gar_territory(monkeypatch):
         )
     )
     assert written == [_upd(cat_id, "FromApi", True, "Санкт-Петербург", "Санкт-Петербург")]
+
+
+def test_enrich_refreshes_cache_when_gar_missing(monkeypatch):
+    written: list[tuple] = []
+    refresh_calls: list[int] = []
+    loads = [
+        [
+            {
+                "abc": "495",
+                "rangeStart": 1000000,
+                "rangeEnd": 1000000,
+                "operator": "CachedOp",
+                "garTerritory": "",
+            }
+        ],
+        [
+            {
+                "abc": "495",
+                "rangeStart": 1000000,
+                "rangeEnd": 1000000,
+                "operator": "CachedOp",
+                "garTerritory": "г.о. город Екатеринбург|Свердловская область",
+            }
+        ],
+    ]
+
+    async def fake_lookup(self, phone: str) -> RawHttpResult:
+        raise AssertionError("lookup must not run on cache hit")
+
+    async def fake_refresh(db):
+        refresh_calls.append(1)
+        return {}
+
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich.load_enabled_ranges_for_enrich",
+        lambda db: loads.pop(0),
+    )
+    monkeypatch.setattr(
+        "app.modules.pstn_inn_cache.service.refresh_enabled_caches",
+        fake_refresh,
+    )
+    monkeypatch.setattr(
+        "app.providers.finenumbers.client.FinenumbersClient.lookup_phone",
+        fake_lookup,
+    )
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich._bulk_update_operators",
+        lambda db, pairs: written.extend(pairs) or len(pairs),
+    )
+
+    cat_id = uuid.uuid4()
+    db = _mock_db([_cat(cat_id, "74951000000", None, "495", 1000000)])
+    asyncio.run(
+        enrich_catalog_operators(
+            db,
+            connection=_conn(),
+            require_full_coverage=False,
+            concurrency=2,
+        )
+    )
+    assert refresh_calls == [1]
+    assert written == [_upd(cat_id, "CachedOp", True, "Екатеринбург", "Свердловская область")]
+
+
+def test_enrich_fails_when_gar_still_empty_after_refresh(monkeypatch):
+    refresh_calls: list[int] = []
+
+    async def fake_refresh(db):
+        refresh_calls.append(1)
+        return {}
+
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich.load_enabled_ranges_for_enrich",
+        lambda db: [
+            {
+                "abc": "495",
+                "rangeStart": 1000000,
+                "rangeEnd": 1000000,
+                "operator": "CachedOp",
+                "garTerritory": "",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "app.modules.pstn_inn_cache.service.refresh_enabled_caches",
+        fake_refresh,
+    )
+
+    db = _mock_db([_cat(uuid.uuid4(), "74951000000", None, "495", 1000000)])
+    with pytest.raises(ProviderError) as exc:
+        asyncio.run(
+            enrich_catalog_operators(
+                db,
+                connection=_conn(),
+                require_full_coverage=False,
+                concurrency=2,
+            )
+        )
+    assert exc.value.code == "PSTN_GAR_CACHE_EMPTY"
+    assert refresh_calls == [1]

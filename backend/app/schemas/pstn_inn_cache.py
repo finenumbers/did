@@ -29,6 +29,7 @@ class PstnInnOperatorOut(BaseModel):
 class PstnInnCacheStatusOut(BaseModel):
     min_cache_ready: bool
     missing_required: list[str] = Field(default_factory=list)
+    gar_territory_missing: bool = False
     refresh: dict[str, Any] = Field(default_factory=dict)
     operators: list[PstnInnOperatorOut] = Field(default_factory=list)
 

@@ -266,6 +266,10 @@ async def enrich_catalog_operators(
         await client.aclose()
 
 
+def _count_seeded_with_gar(ranges: list[dict]) -> int:
+    return sum(1 for row in ranges if str(row.get("garTerritory") or "").strip())
+
+
 def _progress(
     on_progress: ProgressCb | None,
     detail: str,
@@ -359,20 +363,38 @@ async def _enrich_catalog_operators_inner(
 ) -> dict[str, int]:
     _progress(on_progress, "Загрузка локального кеша операторов")
     local_ranges = load_enabled_ranges_for_enrich(db)
-    seeded_with_gar = 0
-    for row in local_ranges:
-        cache.add_from_api_row(row)
-        if str(row.get("garTerritory") or "").strip():
-            seeded_with_gar += 1
+    seeded_with_gar = _count_seeded_with_gar(local_ranges)
     logger.warning(
         "PSTN enrich: seeded %s ranges from local INN cache, seeded_with_gar=%s",
         len(local_ranges),
         seeded_with_gar,
     )
     if local_ranges and seeded_with_gar == 0:
+        _progress(on_progress, "В кеше нет ГАР — перезагрузка из PSTN")
         logger.warning(
-            "PSTN enrich: none of the seeded ranges have garTerritory — reload PSTN cache"
+            "PSTN enrich: none of the seeded ranges have garTerritory — refreshing INN cache"
         )
+        from app.modules.pstn_inn_cache.service import refresh_enabled_caches
+
+        await refresh_enabled_caches(db)
+        local_ranges = load_enabled_ranges_for_enrich(db)
+        seeded_with_gar = _count_seeded_with_gar(local_ranges)
+        logger.warning(
+            "PSTN enrich: after cache refresh seeded=%s seeded_with_gar=%s",
+            len(local_ranges),
+            seeded_with_gar,
+        )
+        if not seeded_with_gar:
+            raise ProviderError(
+                "PSTN кеш без территории ГАР после перезагрузки — Город/Регион не заполнятся",
+                code="PSTN_GAR_CACHE_EMPTY",
+                details={
+                    "seeded": len(local_ranges),
+                    "seeded_with_gar": 0,
+                },
+            )
+    for row in local_ranges:
+        cache.add_from_api_row(row)
     if seed_ranges:
         for row in seed_ranges:
             cache.add_from_api_row(row)

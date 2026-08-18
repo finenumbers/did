@@ -279,6 +279,7 @@ export default function SyncPage() {
       const status = await apiFetch<{
         min_cache_ready: boolean;
         missing_required: string[];
+        gar_territory_missing?: boolean;
       }>("/api/v1/settings/pstn-inn-cache");
       setCacheReady(status.min_cache_ready);
       setCacheHint(
@@ -287,7 +288,9 @@ export default function SyncPage() {
           : `Сначала загрузите кеш операторов в Настройках${
               status.missing_required?.length
                 ? ` (не готово: ${status.missing_required.join(", ")})`
-                : ""
+                : status.gar_territory_missing
+                  ? " (в кеше нет территории ГАР)"
+                  : ""
             }`,
       );
     } catch {

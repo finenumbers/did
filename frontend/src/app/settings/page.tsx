@@ -359,8 +359,8 @@ export default function SettingsPage() {
         <div className="panel">
           <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>Кеш операторов (PSTN)</h2>
           <p style={{ color: "var(--muted)", marginTop: 0, fontSize: "0.9rem" }}>
-            Локальный кеш диапазонов используется только для заполнения столбца «Оператор».
-            Синхронизация недоступна, пока не загружен минимальный комплект.
+            Локальный кеш диапазонов заполняет столбцы «Оператор», «Город» и «Регион».
+            Синхронизация недоступна, пока не загружен минимальный комплект с территорией ГАР.
           </p>
           {cacheMsg && <div className="notice">{cacheMsg}</div>}
           {cacheErr && <div className="state error">{cacheErr}</div>}
@@ -374,6 +374,11 @@ export default function SettingsPage() {
                 {!cache.min_cache_ready && cache.missing_required.length > 0 && (
                   <span style={{ color: "var(--muted)", fontSize: "0.85rem", marginLeft: 8 }}>
                     не хватает: {cache.missing_required.join(", ")}
+                  </span>
+                )}
+                {!cache.min_cache_ready && cache.gar_territory_missing && (
+                  <span style={{ color: "var(--muted)", fontSize: "0.85rem", marginLeft: 8 }}>
+                    нет территории ГАР — нажмите «Загрузить кеш»
                   </span>
                 )}
               </div>

@@ -97,6 +97,22 @@ def is_operator_ready(op: PstnInnCacheOperator) -> bool:
     return bool(op.enabled and op.ranges_count > 0 and not (op.last_error and op.ranges_count == 0))
 
 
+def cache_has_gar_territory(db: Session) -> bool:
+    """True if at least one cached range has a non-empty PSTN garTerritory."""
+    n = db.scalar(
+        select(func.count())
+        .select_from(PstnInnRangeCache)
+        .where(
+            PstnInnRangeCache.gar_territory.is_not(None),
+            PstnInnRangeCache.gar_territory != "",
+        )
+    )
+    try:
+        return int(n or 0) > 0
+    except (TypeError, ValueError):
+        return False
+
+
 def is_min_cache_ready(db: Session) -> bool:
     ensure_required_operators(db)
     rows = db.scalars(
@@ -107,7 +123,7 @@ def is_min_cache_ready(db: Session) -> bool:
         op = by_inn.get(inn)
         if op is None or not is_operator_ready(op):
             return False
-    return True
+    return cache_has_gar_territory(db)
 
 
 def missing_required_inns(db: Session) -> list[str]:
@@ -199,8 +215,9 @@ def get_cache_status(db: Session) -> dict[str, Any]:
     missing = missing_required_inns(db)
     numbers_by_inn = _numbers_count_by_inn(db)
     return {
-        "min_cache_ready": len(missing) == 0,
+        "min_cache_ready": is_min_cache_ready(db),
         "missing_required": missing,
+        "gar_territory_missing": len(missing) == 0 and not cache_has_gar_territory(db),
         "refresh": get_refresh_status(db),
         "operators": [
             {
@@ -597,9 +614,16 @@ def require_min_cache_ready(db: Session) -> None:
         )
     if not is_min_cache_ready(db):
         missing = missing_required_inns(db)
+        if missing:
+            raise ProviderError(
+                "Сначала загрузите кеш операторов в Настройках "
+                f"(не готово: {', '.join(missing)})",
+                code="PSTN_INN_CACHE_NOT_READY",
+                details={"missing_required": missing},
+            )
         raise ProviderError(
             "Сначала загрузите кеш операторов в Настройках "
-            f"(не готово: {', '.join(missing)})",
+            "(в кеше нет территории ГАР — без неё Город и Регион пустые)",
             code="PSTN_INN_CACHE_NOT_READY",
-            details={"missing_required": missing},
+            details={"missing_required": [], "gar_territory_missing": True},
         )

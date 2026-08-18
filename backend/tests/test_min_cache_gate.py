@@ -83,9 +83,25 @@ def test_is_min_cache_ready_all_required(monkeypatch: pytest.MonkeyPatch):
     ]
     db = MagicMock()
     db.scalars.return_value.all.return_value = ready_ops
+    db.scalar.return_value = 10
     assert is_min_cache_ready(db) is True
 
     ready_ops[0].ranges_count = 0
+    assert is_min_cache_ready(db) is False
+
+
+def test_is_min_cache_ready_false_without_gar_territory(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        "app.modules.pstn_inn_cache.service.ensure_required_operators",
+        lambda db: None,
+    )
+    ready_ops = [
+        SimpleNamespace(inn=inn, enabled=True, ranges_count=5, last_error=None)
+        for inn in REQUIRED_INNS
+    ]
+    db = MagicMock()
+    db.scalars.return_value.all.return_value = ready_ops
+    db.scalar.return_value = 0
     assert is_min_cache_ready(db) is False
 
 
@@ -115,6 +131,26 @@ def test_require_min_cache_ready_blocks_during_refresh(monkeypatch: pytest.Monke
     with pytest.raises(ProviderError) as exc:
         require_min_cache_ready(MagicMock())
     assert exc.value.code == "PSTN_INN_CACHE_REFRESH_RUNNING"
+
+
+def test_require_min_cache_ready_raises_when_gar_missing(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        "app.modules.pstn_inn_cache.service.is_refresh_running",
+        lambda db: False,
+    )
+    monkeypatch.setattr(
+        "app.modules.pstn_inn_cache.service.is_min_cache_ready",
+        lambda db: False,
+    )
+    monkeypatch.setattr(
+        "app.modules.pstn_inn_cache.service.missing_required_inns",
+        lambda db: [],
+    )
+    with pytest.raises(ProviderError) as exc:
+        require_min_cache_ready(MagicMock())
+    assert exc.value.code == "PSTN_INN_CACHE_NOT_READY"
+    assert "ГАР" in str(exc.value)
+    assert exc.value.details.get("gar_territory_missing") is True
 
 
 def test_require_min_cache_ready_ok(monkeypatch: pytest.MonkeyPatch):

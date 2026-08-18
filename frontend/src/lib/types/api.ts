@@ -88,6 +88,7 @@ export interface PstnInnOperator {
 export interface PstnInnCacheStatus {
   min_cache_ready: boolean;
   missing_required: string[];
+  gar_territory_missing?: boolean;
   refresh: {
     status?: string;
     detail?: string;
