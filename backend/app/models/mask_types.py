@@ -34,4 +34,3 @@ class MaskType(Base, TimestampMixin):
     type_label: Mapped[str | None] = mapped_column(Text, nullable=True)
     premium: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
     purchase: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
-    period: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)

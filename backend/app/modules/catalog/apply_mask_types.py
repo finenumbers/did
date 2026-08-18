@@ -16,7 +16,7 @@ from app.modules.catalog.beauty_mask import beauty_mask, digits_only
 
 _BATCH = 8_000
 
-MaskTypeValues = tuple[str | None, Decimal | None, Decimal | None, Decimal | None]
+MaskTypeValues = tuple[str | None, Decimal | None, Decimal | None]
 
 
 def normalize_key_part(value: object) -> str:
@@ -61,7 +61,7 @@ def build_mask_type_index(
             row.category or "",
             row.abc or "",
             row.mask,
-        ): (row.type_label, row.premium, row.purchase, row.period)
+        ): (row.type_label, row.premium, row.purchase)
         for row in rows
     }
 
@@ -75,7 +75,7 @@ def resolve_catalog_type_premium(
 ) -> MaskTypeValues:
     mask = beauty_mask(number_local)
     if mask is None:
-        return None, None, None, None
+        return None, None, None
     cap = str(len(digits_only(number_local)))
     cat = (number_category or "").strip()
     abc = (abc_code or "").strip()
@@ -87,7 +87,7 @@ def resolve_catalog_type_premium(
         mask=mask,
     )
     if found is None:
-        return None, None, None, None
+        return None, None, None
     return found
 
 
@@ -106,7 +106,6 @@ def _values_changed(current: MaskTypeValues, new: MaskTypeValues) -> bool:
         _norm_label(current[0]) != _norm_label(new[0])
         or _norm_money(current[1]) != _norm_money(new[1])
         or _norm_money(current[2]) != _norm_money(new[2])
-        or _norm_money(current[3]) != _norm_money(new[3])
     )
 
 
@@ -124,14 +123,13 @@ def apply_mask_types(db: Session) -> dict[str, int]:
                 NumbersCatalogNormalized.type_label,
                 NumbersCatalogNormalized.premium,
                 NumbersCatalogNormalized.mask_purchase,
-                NumbersCatalogNormalized.mask_period,
             )
         )
         .where(NumbersCatalogNormalized.is_currently_present.is_(True))
         .execution_options(yield_per=_BATCH, stream_results=True)
     )
 
-    pending: list[tuple[UUID, str | None, Decimal | None, Decimal | None, Decimal | None]] = []
+    pending: list[tuple[UUID, str | None, Decimal | None, Decimal | None]] = []
     scanned = 0
     matched = 0
     updated = 0
@@ -154,7 +152,7 @@ def apply_mask_types(db: Session) -> dict[str, int]:
         )
         if any(v is not None for v in new_vals):
             matched += 1
-        current = (row.type_label, row.premium, row.mask_purchase, row.mask_period)
+        current = (row.type_label, row.premium, row.mask_purchase)
         if not _values_changed(current, new_vals):
             continue
         if all(v is None for v in new_vals) and any(v is not None for v in current):
@@ -174,7 +172,7 @@ def apply_mask_types(db: Session) -> dict[str, int]:
 
 def _bulk_update(
     db: Session,
-    pairs: list[tuple[UUID, str | None, Decimal | None, Decimal | None, Decimal | None]],
+    pairs: list[tuple[UUID, str | None, Decimal | None, Decimal | None]],
 ) -> int:
     if not pairs:
         return 0
@@ -183,7 +181,6 @@ def _bulk_update(
     types = [p[1] for p in pairs]
     prems = [p[2] for p in pairs]
     buys = [p[3] for p in pairs]
-    periods = [p[4] for p in pairs]
     money = Numeric(18, 4)
     if bind.dialect.name == "postgresql":
         stmt = text(
@@ -192,10 +189,9 @@ def _bulk_update(
             SET type_label = v.type_label,
                 premium = v.premium,
                 mask_purchase = v.mask_purchase,
-                mask_period = v.mask_period,
                 updated_at = now()
-            FROM unnest(:ids, :types, :prems, :buys, :periods)
-                AS v(id, type_label, premium, mask_purchase, mask_period)
+            FROM unnest(:ids, :types, :prems, :buys)
+                AS v(id, type_label, premium, mask_purchase)
             WHERE c.id = v.id
             """
         ).bindparams(
@@ -203,7 +199,6 @@ def _bulk_update(
             bindparam("types", type_=ARRAY(Text())),
             bindparam("prems", type_=ARRAY(money)),
             bindparam("buys", type_=ARRAY(money)),
-            bindparam("periods", type_=ARRAY(money)),
         )
         db.execute(
             stmt,
@@ -212,11 +207,10 @@ def _bulk_update(
                 "types": types,
                 "prems": prems,
                 "buys": buys,
-                "periods": periods,
             },
         )
         return len(pairs)
-    for catalog_id, type_label, premium, mask_purchase, mask_period in pairs:
+    for catalog_id, type_label, premium, mask_purchase in pairs:
         db.execute(
             text(
                 """
@@ -224,7 +218,6 @@ def _bulk_update(
                 SET type_label = :type_label,
                     premium = :premium,
                     mask_purchase = :mask_purchase,
-                    mask_period = :mask_period,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = :id
                 """
@@ -234,7 +227,6 @@ def _bulk_update(
                 "type_label": type_label,
                 "premium": premium,
                 "mask_purchase": mask_purchase,
-                "mask_period": mask_period,
             },
         )
     return len(pairs)

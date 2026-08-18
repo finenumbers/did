@@ -62,7 +62,7 @@ def test_beauty_mask_round_trip_enumerated():
 
 def test_lookup_prefers_exact_abc_then_empty():
     class Row:
-        def __init__(self, cap, cat, abc, mask, type_label, premium, purchase, period):
+        def __init__(self, cap, cat, abc, mask, type_label, premium, purchase):
             self.digit_capacity = cap
             self.category = cat
             self.abc = abc
@@ -70,7 +70,6 @@ def test_lookup_prefers_exact_abc_then_empty():
             self.type_label = type_label
             self.premium = premium
             self.purchase = purchase
-            self.period = period
 
     index = build_mask_type_index(
         [
@@ -82,7 +81,6 @@ def test_lookup_prefers_exact_abc_then_empty():
                 "обычный",
                 Decimal("1"),
                 Decimal("3"),
-                Decimal("4"),
             ),
             Row(
                 "7",
@@ -92,16 +90,15 @@ def test_lookup_prefers_exact_abc_then_empty():
                 "москва",
                 Decimal("2"),
                 Decimal("10"),
-                Decimal("20"),
             ),
         ]
     )
     assert lookup_type_premium(
         index, digit_capacity="7", category="Городской", abc="495", mask="XXXXXXX"
-    ) == ("москва", Decimal("2"), Decimal("10"), Decimal("20"))
+    ) == ("москва", Decimal("2"), Decimal("10"))
     assert lookup_type_premium(
         index, digit_capacity="7", category="Городской", abc="499", mask="XXXXXXX"
-    ) == ("обычный", Decimal("1"), Decimal("3"), Decimal("4"))
+    ) == ("обычный", Decimal("1"), Decimal("3"))
     assert (
         lookup_type_premium(
             index, digit_capacity="7", category="Мобильный", abc="495", mask="XXXXXXX"
@@ -112,7 +109,7 @@ def test_lookup_prefers_exact_abc_then_empty():
 
 def test_resolve_uses_local_length_and_falls_back():
     class Row:
-        def __init__(self, cap, cat, abc, mask, type_label, premium, purchase, period):
+        def __init__(self, cap, cat, abc, mask, type_label, premium, purchase):
             self.digit_capacity = cap
             self.category = cat
             self.abc = abc
@@ -120,7 +117,6 @@ def test_resolve_uses_local_length_and_falls_back():
             self.type_label = type_label
             self.premium = premium
             self.purchase = purchase
-            self.period = period
 
     index = build_mask_type_index(
         [
@@ -132,7 +128,6 @@ def test_resolve_uses_local_length_and_falls_back():
                 "тип",
                 Decimal("5"),
                 Decimal("6"),
-                Decimal("7"),
             )
         ]
     )
@@ -141,10 +136,10 @@ def test_resolve_uses_local_length_and_falls_back():
         number_local="1111111",
         number_category="Городской",
         abc_code="495",
-    ) == ("тип", Decimal("5"), Decimal("6"), Decimal("7"))
+    ) == ("тип", Decimal("5"), Decimal("6"))
     assert resolve_catalog_type_premium(
         index,
         number_local="1111",
         number_category="Городской",
         abc_code="495",
-    ) == (None, None, None, None)
+    ) == (None, None, None)

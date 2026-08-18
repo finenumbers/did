@@ -15,7 +15,6 @@ class MaskTypeItem(BaseModel):
     type_label: str | None = None
     premium: Decimal | None = None
     purchase: Decimal | None = None
-    period: Decimal | None = None
 
 
 class MaskTypesLoadResult(BaseModel):

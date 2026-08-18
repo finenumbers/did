@@ -76,11 +76,6 @@ const CATALOG_COLUMNS: Col[] = [
     value: (r) => formatPrice(r.mask_purchase),
   },
   {
-    key: "mask_period",
-    header: "Абонплата",
-    value: (r) => formatPrice(r.mask_period),
-  },
-  {
     key: "type_label",
     header: "Тип",
     value: (r) => r.type_label,

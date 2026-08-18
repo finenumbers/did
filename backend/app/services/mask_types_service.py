@@ -24,12 +24,11 @@ MASK_TYPES_XLSX_HEADERS = (
     "Тип",
     "Премиум",
     "Покупка",
-    "Абонплата",
 )
-MASK_TYPES_XLSX_HEADERS_V7 = MASK_TYPES_XLSX_HEADERS[:7]
 MASK_TYPES_XLSX_SHEET = "Маски"
 MAX_IMPORT_BYTES = 5 * 1024 * 1024
 EXPECTED_SEED_COUNT = 5220
+_IMPORT_WIDTH = len(MASK_TYPES_XLSX_HEADERS)
 
 
 @dataclass(frozen=True)
@@ -41,7 +40,6 @@ class MaskTypeImportRow:
     type_label: str | None
     premium: Decimal | None
     purchase: Decimal | None
-    period: Decimal | None
 
 
 def _cell_text(value: object) -> str:
@@ -102,24 +100,21 @@ def parse_mask_types_xlsx(data: bytes) -> list[MaskTypeImportRow]:
         except StopIteration as exc:
             raise ValueError("Нет заголовков") from exc
         header_cells = list(header or ())
-        got7 = tuple(_cell_text(c) for c in header_cells[:7])
-        got8 = tuple(_cell_text(c) for c in header_cells[:8])
-        if got8 == MASK_TYPES_XLSX_HEADERS:
-            width = 8
-        elif got7 == MASK_TYPES_XLSX_HEADERS_V7:
-            width = 7
-        else:
+        while len(header_cells) < _IMPORT_WIDTH:
+            header_cells.append(None)
+        got = tuple(_cell_text(c) for c in header_cells[:_IMPORT_WIDTH])
+        if got != MASK_TYPES_XLSX_HEADERS:
             raise ValueError(
-                "Заголовки должны быть: Разрядность, Категория, ABC, Маска, Тип, Премиум, Покупка, Абонплата"
+                "Заголовки должны быть: Разрядность, Категория, ABC, Маска, Тип, Премиум, Покупка"
             )
         canonical = canonical_beauty_masks()
         out: list[MaskTypeImportRow] = []
         seen: set[tuple[str, str, str, str]] = set()
         for idx, raw in enumerate(rows_iter, start=2):
             cells = list(raw or ())
-            while len(cells) < width:
+            while len(cells) < _IMPORT_WIDTH:
                 cells.append(None)
-            chunk = cells[:width]
+            chunk = cells[:_IMPORT_WIDTH]
             if _row_empty(chunk):
                 continue
             cap = _cell_text(chunk[0])
@@ -136,11 +131,6 @@ def parse_mask_types_xlsx(data: bytes) -> list[MaskTypeImportRow]:
                     f"Строка {idx}: повторяется комбинация разрядность/категория/ABC/маска"
                 )
             seen.add(key)
-            period = (
-                _parse_price_cell(chunk[7], row=idx, column="Абонплата")
-                if width == 8
-                else None
-            )
             out.append(
                 MaskTypeImportRow(
                     digit_capacity=cap,
@@ -150,7 +140,6 @@ def parse_mask_types_xlsx(data: bytes) -> list[MaskTypeImportRow]:
                     type_label=_nullable_cell(chunk[4]),
                     premium=_parse_price_cell(chunk[5], row=idx, column="Премиум"),
                     purchase=_parse_price_cell(chunk[6], row=idx, column="Покупка"),
-                    period=period,
                 )
             )
         return out
@@ -222,7 +211,6 @@ class MaskTypesService:
                 type_label=row.type_label,
                 premium=row.premium,
                 purchase=row.purchase,
-                period=row.period,
             )
             for row in rows
         ]
@@ -243,7 +231,6 @@ class MaskTypesService:
                         item.type_label or "",
                         _xlsx_price(item.premium),
                         _xlsx_price(item.purchase),
-                        _xlsx_price(item.period),
                     ]
                 )
             writer.finalize()
@@ -274,7 +261,6 @@ class MaskTypesService:
                     type_label=item.type_label,
                     premium=item.premium,
                     purchase=item.purchase,
-                    period=item.period,
                 )
                 self.db.add(row)
                 by_key[key] = row
@@ -283,7 +269,6 @@ class MaskTypesService:
             row.type_label = item.type_label
             row.premium = item.premium
             row.purchase = item.purchase
-            row.period = item.period
             updated += 1
         self.db.commit()
         return MaskTypesLoadResult(

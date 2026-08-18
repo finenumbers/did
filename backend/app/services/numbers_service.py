@@ -62,7 +62,6 @@ class NumbersService:
         "buy_price": NumbersCatalogNormalized.buy_price,
         "period_price": NumbersCatalogNormalized.period_price,
         "mask_purchase": NumbersCatalogNormalized.mask_purchase,
-        "mask_period": NumbersCatalogNormalized.mask_period,
         "premium": NumbersCatalogNormalized.premium,
     }
     PROVIDER_CODE = "provider_code"
@@ -78,7 +77,6 @@ class NumbersService:
             "buy_price",
             "period_price",
             "mask_purchase",
-            "mask_period",
             "type_label",
             "premium",
             "operator",
@@ -95,7 +93,6 @@ class NumbersService:
         "buy_price": NumbersCatalogNormalized.buy_price,
         "period_price": NumbersCatalogNormalized.period_price,
         "mask_purchase": NumbersCatalogNormalized.mask_purchase,
-        "mask_period": NumbersCatalogNormalized.mask_period,
         "region_name": NumbersCatalogNormalized.region_name,
         "city_name": NumbersCatalogNormalized.city_name,
         "type_label": NumbersCatalogNormalized.type_label,
@@ -300,7 +297,6 @@ class NumbersService:
             type_label=row.type_label,
             premium=row.premium,
             mask_purchase=row.mask_purchase,
-            mask_period=row.mask_period,
             operator=row.operator,
             rtu_connected=row.rtu_connected,
             is_currently_present=row.is_currently_present,

@@ -9,12 +9,13 @@ import pytest
 from app.modules.catalog.beauty_mask import enumerate_beauty_masks
 from app.services.mask_types_service import (
     MASK_TYPES_XLSX_HEADERS,
-    MASK_TYPES_XLSX_HEADERS_V7,
     MaskTypeImportRow,
     MaskTypesService,
     parse_mask_types_xlsx,
 )
 from app.services.xlsx_style import StyledSheetWriter, open_styled_workbook
+
+_HEADERS_V8 = (*MASK_TYPES_XLSX_HEADERS, "Абонплата")
 
 
 def _xlsx_bytes(
@@ -37,7 +38,7 @@ def _xlsx_bytes(
 def test_parse_numeric_excel_and_empty_abc(tmp_path: Path):
     data = _xlsx_bytes(
         tmp_path / "masks.xlsx",
-        [[7.0, "Городской", "", "XXXXXXX", "Золотой", 100, 200.0, "1 500,5"]],
+        [[7.0, "Городской", "", "XXXXXXX", "Золотой", 100, 200.0]],
     )
     rows = parse_mask_types_xlsx(data)
     assert len(rows) == 1
@@ -48,26 +49,25 @@ def test_parse_numeric_excel_and_empty_abc(tmp_path: Path):
     assert rows[0].type_label == "Золотой"
     assert rows[0].premium == Decimal("100")
     assert rows[0].purchase == Decimal("200")
-    assert rows[0].period == Decimal("1500.5")
+    assert not hasattr(rows[0], "period")
 
 
-def test_parse_v7_headers_leave_period_null(tmp_path: Path):
+def test_parse_extra_eighth_column_ignored(tmp_path: Path):
     data = _xlsx_bytes(
-        tmp_path / "masks_v7.xlsx",
-        [[7.0, "Городской", "", "XXXXXXX", "Золотой", 100, 200]],
-        headers=MASK_TYPES_XLSX_HEADERS_V7,
+        tmp_path / "masks_v8.xlsx",
+        [[7.0, "Городской", "", "XXXXXXX", "Золотой", 100, 200, "премиум"]],
+        headers=_HEADERS_V8,
     )
     rows = parse_mask_types_xlsx(data)
     assert len(rows) == 1
     assert rows[0].premium == Decimal("100")
     assert rows[0].purchase == Decimal("200")
-    assert rows[0].period is None
 
 
 def test_parse_non_numeric_price_rejected(tmp_path: Path):
     data = _xlsx_bytes(
         tmp_path / "bad_price.xlsx",
-        [[7, "Городской", "", "XXXXXXX", "Золотой", "премиум", "", ""]],
+        [[7, "Городской", "", "XXXXXXX", "Золотой", "премиум", ""]],
     )
     with pytest.raises(ValueError, match="некорректная цена"):
         parse_mask_types_xlsx(data)
@@ -105,7 +105,6 @@ def test_upsert_inserts_new_combo_without_deleting_seed(monkeypatch):
         type_label=None,
         premium=None,
         purchase=None,
-        period=None,
     )
     db = MagicMock()
     db.scalar.return_value = 5220
@@ -121,7 +120,6 @@ def test_upsert_inserts_new_combo_without_deleting_seed(monkeypatch):
                 type_label="москва",
                 premium=Decimal("5"),
                 purchase=Decimal("10"),
-                period=Decimal("20"),
             )
         ],
     )

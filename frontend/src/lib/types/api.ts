@@ -20,7 +20,6 @@ export interface NumberItem {
   buy_price: string | null;
   period_price: string | null;
   mask_purchase: string | null;
-  mask_period: string | null;
   type_label: string | null;
   premium: string | null;
   operator: string | null;
@@ -149,7 +148,6 @@ export interface MaskTypeItem {
   type_label: string | null;
   premium: string | null;
   purchase: string | null;
-  period: string | null;
 }
 
 export interface MaskTypesLoadResult {

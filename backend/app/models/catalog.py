@@ -46,7 +46,6 @@ class NumbersCatalogNormalized(Base, TimestampMixin):
     type_label: Mapped[str | None] = mapped_column(Text, nullable=True)
     premium: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
     mask_purchase: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
-    mask_period: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
     operator: Mapped[str | None] = mapped_column(Text, nullable=True)
     rtu_connected: Mapped[str | None] = mapped_column(Text, nullable=True)
     raw_source_table: Mapped[str] = mapped_column(Text, nullable=False)

@@ -22,7 +22,6 @@ class NumberItem(BaseModel):
     type_label: str | None = None
     premium: Decimal | None = None
     mask_purchase: Decimal | None = None
-    mask_period: Decimal | None = None
     operator: str | None = None
     rtu_connected: str | None = None
     is_currently_present: bool

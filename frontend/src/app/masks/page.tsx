@@ -120,7 +120,6 @@ export default function MasksPage() {
                 <th>Тип</th>
                 <th>Премиум</th>
                 <th>Покупка</th>
-                <th>Абонплата</th>
               </tr>
             </thead>
             <tbody>
@@ -133,7 +132,6 @@ export default function MasksPage() {
                   <td>{cellText(row.type_label)}</td>
                   <td>{priceText(row.premium)}</td>
                   <td>{priceText(row.purchase)}</td>
-                  <td>{priceText(row.period)}</td>
                 </tr>
               ))}
             </tbody>

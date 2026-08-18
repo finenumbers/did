@@ -29,7 +29,6 @@ EXPORT_COLUMNS: list[tuple[str, str]] = [
     ("buy_price", "Покупка (Входящая)"),
     ("period_price", "Абонплата (Входящая)"),
     ("mask_purchase", "Покупка"),
-    ("mask_period", "Абонплата"),
     ("type_label", "Тип"),
     ("premium", "Премиум"),
     ("rtu_connected", "Подключено в РТУ"),
@@ -57,7 +56,6 @@ _HEADER_MIN_CHARS: dict[str, int] = {
     "Покупка (Входящая)": 18,
     "Абонплата (Входящая)": 20,
     "Покупка": 10,
-    "Абонплата": 12,
     "Тип": 12,
     "Премиум": 12,
     "Подключено в РТУ": 18,
@@ -74,7 +72,6 @@ _EXPORT_LOAD_ONLY = (
     NumbersCatalogNormalized.buy_price,
     NumbersCatalogNormalized.period_price,
     NumbersCatalogNormalized.mask_purchase,
-    NumbersCatalogNormalized.mask_period,
     NumbersCatalogNormalized.type_label,
     NumbersCatalogNormalized.premium,
     NumbersCatalogNormalized.rtu_connected,
@@ -114,7 +111,7 @@ def _format_price(value: Any) -> str:
 
 
 _PRICE_EXPORT_KEYS = frozenset(
-    {"buy_price", "period_price", "mask_purchase", "mask_period", "premium"}
+    {"buy_price", "period_price", "mask_purchase", "premium"}
 )
 
 
