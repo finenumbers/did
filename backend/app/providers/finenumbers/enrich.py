@@ -2,8 +2,9 @@
 
 Contour B: every currently present catalog MSISDN goes through cache → PSTN lookup
 when needed. Operator SoT is this last sync stage (or «Нет в реестре» on terminal miss).
-When garTerritory is present, overlay city_name/region_name from the parsed GAR value.
-Terminal PSTN miss writes «Нет в реестре» on operator, city_name, and region_name.
+When garTerritory is present, overlay city_name/region_name from the parsed GAR value
+(800 → Российская Федерация; mobile capital/oblast pairs collapsed). Terminal PSTN
+miss writes «Нет в реестре» on operator, city_name, and region_name.
 """
 
 from __future__ import annotations
@@ -16,12 +17,18 @@ from dataclasses import dataclass
 from enum import Enum
 
 from sqlalchemy import Boolean, bindparam, func, or_, select, text
-from sqlalchemy.dialects.postgresql import ARRAY, UUID as PGUUID
+from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Session
 from sqlalchemy.types import Text
 
 from app.models.catalog import NumbersCatalogNormalized
 from app.modules.catalog.gar_territory import parse_gar_territory
+from app.modules.catalog.geo_policy import catalog_city_region
+from app.modules.catalog.number_category import (
+    CATEGORY_TOLLFREE,
+    classify_number_category,
+)
 from app.modules.pstn_inn_cache.service import load_enabled_ranges_for_enrich
 from app.providers.dto.common import ConnectionConfig, RawHttpResult
 from app.providers.errors import ProviderError
@@ -242,7 +249,9 @@ async def enrich_catalog_operators(
     Secondary: PSTN lookup API for cache misses (always queued; overwrites existing operator).
     With only_missing=False (default / production): every present row is enriched.
     Terminal PSTN miss (found=false / empty / invalid MSISDN / HTTP 400|404|422)
-    → «Нет в реестре» on operator, city_name, and region_name. Transport/5xx/auth
+    → «Нет в реестре» on operator, city_name, and region_name (any category).
+    Found 800 → city/region «Российская Федерация». Found mobile capital/oblast
+    pairs collapse to the city in both columns. Transport/5xx/auth
     errors are retried; unresolved ones remain uncovered (do not write sentinel,
     do not clear existing operator/geo) and fail coverage.
     """
@@ -294,8 +303,20 @@ def _enqueue_catalog_update(
     city: str | None = None,
     region: str | None = None,
     apply_geo: bool | None = None,
+    abc_code: str | None = None,
+    msisdn: str | None = None,
+    pstn_absent: bool = False,
 ) -> None:
-    if apply_geo is None:
+    city, region = catalog_city_region(
+        abc_code, msisdn, city, region, pstn_absent=pstn_absent
+    )
+    if (
+        pstn_absent
+        or city == contract.OPERATOR_NOT_IN_REGISTRY
+        or classify_number_category(abc_code, msisdn) == CATEGORY_TOLLFREE
+    ):
+        apply_geo = True
+    elif apply_geo is None:
         apply_geo = city is not None or region is not None
     if not apply_geo:
         city = None
@@ -430,7 +451,7 @@ async def _enrich_catalog_operators_inner(
     errors = 0
     not_in_registry = 0
 
-    # (id, msisdn, phone, current_operator, current_city, current_region)
+    # (id, msisdn, phone, abc_code, current_operator, current_city, current_region)
     pending: list[tuple] = []
     invalid_msisdns: list[str] = []
 
@@ -464,6 +485,8 @@ async def _enrich_catalog_operators_inner(
                 current_region=current_region,
                 city=match.city_name,
                 region=match.region_name,
+                abc_code=str(abc_code).strip() if abc_code else None,
+                msisdn=msisdn_s,
             )
         else:
             # Cache miss: always queue PSTN lookup (even if operator already set).
@@ -479,6 +502,9 @@ async def _enrich_catalog_operators_inner(
                     current_region=current_region,
                     city=contract.OPERATOR_NOT_IN_REGISTRY,
                     region=contract.OPERATOR_NOT_IN_REGISTRY,
+                    abc_code=str(abc_code).strip() if abc_code else None,
+                    msisdn=msisdn_s,
+                    pstn_absent=True,
                 )
                 if current_operator != contract.OPERATOR_NOT_IN_REGISTRY:
                     not_in_registry += 1
@@ -488,6 +514,7 @@ async def _enrich_catalog_operators_inner(
                         catalog_id,
                         msisdn_s,
                         phone,
+                        abc_code,
                         current_operator,
                         current_city,
                         current_region,
@@ -585,7 +612,7 @@ async def _enrich_catalog_operators_inner(
         phone_seen: set[str] = set()
 
         for item in pending:
-            catalog_id, msisdn_s, phone, current_operator, current_city, current_region = item
+            catalog_id, msisdn_s, phone, abc_code, current_operator, current_city, current_region = item
             match = cache.resolve(msisdn_s)
             if match is None:
                 op_direct = lookup_result.get(phone)
@@ -602,6 +629,8 @@ async def _enrich_catalog_operators_inner(
                     current_region=current_region,
                     city=match.city_name,
                     region=match.region_name,
+                    abc_code=str(abc_code).strip() if abc_code else None,
+                    msisdn=msisdn_s,
                 )
                 continue
 
@@ -615,6 +644,9 @@ async def _enrich_catalog_operators_inner(
                     current_region=current_region,
                     city=contract.OPERATOR_NOT_IN_REGISTRY,
                     region=contract.OPERATOR_NOT_IN_REGISTRY,
+                    abc_code=str(abc_code).strip() if abc_code else None,
+                    msisdn=msisdn_s,
+                    pstn_absent=True,
                 )
                 if current_operator != contract.OPERATOR_NOT_IN_REGISTRY:
                     not_in_registry += 1
@@ -666,7 +698,7 @@ async def _enrich_catalog_operators_inner(
 
     uncovered_msisdns: list[str] = []
     for item in pending:
-        catalog_id, msisdn_s, phone, current_operator, current_city, current_region = item
+        catalog_id, msisdn_s, phone, abc_code, current_operator, current_city, current_region = item
         match = cache.resolve(msisdn_s)
         if match is None:
             op_direct = lookup_result.get(phone)
@@ -683,6 +715,8 @@ async def _enrich_catalog_operators_inner(
                 current_region=current_region,
                 city=match.city_name,
                 region=match.region_name,
+                abc_code=str(abc_code).strip() if abc_code else None,
+                msisdn=msisdn_s,
             )
         elif phone in absent_phones:
             _enqueue_catalog_update(
@@ -694,6 +728,9 @@ async def _enrich_catalog_operators_inner(
                 current_region=current_region,
                 city=contract.OPERATOR_NOT_IN_REGISTRY,
                 region=contract.OPERATOR_NOT_IN_REGISTRY,
+                abc_code=str(abc_code).strip() if abc_code else None,
+                msisdn=msisdn_s,
+                pstn_absent=True,
             )
             if current_operator != contract.OPERATOR_NOT_IN_REGISTRY:
                 not_in_registry += 1

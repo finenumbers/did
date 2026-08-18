@@ -12,7 +12,8 @@ _PREFIXES = (
 )
 
 
-def _strip_leading_prefixes(value: str) -> str | None:
+def strip_gar_prefix(value: str) -> str | None:
+    """Strip leading GAR labels (г., город, г.о., …) in a loop."""
     text = value.replace("\xa0", " ")
     changed = True
     while text and changed:
@@ -44,9 +45,9 @@ def parse_gar_territory(raw: str | None) -> tuple[str | None, str | None]:
         return None, None
     first = text.find("|")
     if first < 0:
-        cleaned = _strip_leading_prefixes(text)
+        cleaned = strip_gar_prefix(text)
         return cleaned, cleaned
     second = text.find("|", first + 1)
     left = text[:first]
     right = text[first + 1 :] if second < 0 else text[second + 1 :]
-    return _strip_leading_prefixes(left), _strip_leading_prefixes(right)
+    return strip_gar_prefix(left), strip_gar_prefix(right)

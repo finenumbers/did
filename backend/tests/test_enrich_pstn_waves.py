@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from app.modules.catalog.geo_policy import GEO_TOLLFREE
 from app.providers.dto.common import ConnectionConfig, RawHttpResult
 from app.providers.errors import ProviderError
 from app.providers.finenumbers import contract
@@ -613,3 +614,189 @@ def test_enrich_fails_when_gar_still_empty_after_refresh(monkeypatch):
         )
     assert exc.value.code == "PSTN_GAR_CACHE_EMPTY"
     assert refresh_calls == [1]
+
+
+def test_found_tollfree_writes_russia_even_with_gar(monkeypatch):
+    written: list[tuple] = []
+
+    async def fake_lookup(self, phone: str) -> RawHttpResult:
+        raise AssertionError("lookup must not run on cache hit")
+
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich.load_enabled_ranges_for_enrich",
+        lambda db: [
+            {
+                "abc": "800",
+                "rangeStart": 1000000,
+                "rangeEnd": 1000000,
+                "operator": "CachedOp",
+                "garTerritory": "г. Самара|Самарская область",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "app.providers.finenumbers.client.FinenumbersClient.lookup_phone",
+        fake_lookup,
+    )
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich._bulk_update_operators",
+        lambda db, pairs: written.extend(pairs) or len(pairs),
+    )
+
+    cat_id = uuid.uuid4()
+    db = _mock_db([_cat(cat_id, "78001000000", None, "800", 1000000)])
+    asyncio.run(
+        enrich_catalog_operators(
+            db,
+            connection=_conn(),
+            require_full_coverage=False,
+            concurrency=2,
+        )
+    )
+    assert written == [_upd(cat_id, "CachedOp", True, GEO_TOLLFREE, GEO_TOLLFREE)]
+
+
+def test_found_tollfree_empty_gar_still_writes_russia(monkeypatch):
+    written: list[tuple] = []
+
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich.load_enabled_ranges_for_enrich",
+        lambda db: [
+            {
+                "abc": "800",
+                "rangeStart": 1000000,
+                "rangeEnd": 1000000,
+                "operator": "CachedOp",
+                "garTerritory": "",
+            },
+            {
+                "abc": "812",
+                "rangeStart": 1,
+                "rangeEnd": 1,
+                "operator": "OtherOp",
+                "garTerritory": "г. Санкт-Петербург|г. Санкт-Петербург",
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich._bulk_update_operators",
+        lambda db, pairs: written.extend(pairs) or len(pairs),
+    )
+
+    cat_id = uuid.uuid4()
+    db = _mock_db([_cat(cat_id, "78001000000", "CachedOp", "800", 1000000)])
+    asyncio.run(
+        enrich_catalog_operators(
+            db,
+            connection=_conn(),
+            require_full_coverage=False,
+            concurrency=2,
+        )
+    )
+    assert written == [_upd(cat_id, "CachedOp", True, GEO_TOLLFREE, GEO_TOLLFREE)]
+
+
+def test_absent_tollfree_writes_sentinel_not_russia(monkeypatch):
+    written: list[tuple] = []
+
+    async def fake_lookup(self, phone: str) -> RawHttpResult:
+        return _raw(body={"found": False})
+
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich.load_enabled_ranges_for_enrich",
+        lambda db: [],
+    )
+    monkeypatch.setattr(
+        "app.providers.finenumbers.client.FinenumbersClient.lookup_phone",
+        fake_lookup,
+    )
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich._bulk_update_operators",
+        lambda db, pairs: written.extend(pairs) or len(pairs),
+    )
+
+    cat_id = uuid.uuid4()
+    db = _mock_db([_cat(cat_id, "78005555555", None, "800", 5555555)])
+    asyncio.run(
+        enrich_catalog_operators(
+            db,
+            connection=_conn(),
+            require_full_coverage=False,
+            concurrency=2,
+        )
+    )
+    assert written == [
+        _upd(
+            cat_id,
+            contract.OPERATOR_NOT_IN_REGISTRY,
+            True,
+            contract.OPERATOR_NOT_IN_REGISTRY,
+            contract.OPERATOR_NOT_IN_REGISTRY,
+        )
+    ]
+
+
+def test_mobile_collapses_moscow_oblast_pair(monkeypatch):
+    written: list[tuple] = []
+
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich.load_enabled_ranges_for_enrich",
+        lambda db: [
+            {
+                "abc": "900",
+                "rangeStart": 1111111,
+                "rangeEnd": 1111111,
+                "operator": "CachedOp",
+                "garTerritory": "г. Москва|Московская область",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich._bulk_update_operators",
+        lambda db, pairs: written.extend(pairs) or len(pairs),
+    )
+
+    cat_id = uuid.uuid4()
+    db = _mock_db([_cat(cat_id, "79001111111", None, "900", 1111111)])
+    asyncio.run(
+        enrich_catalog_operators(
+            db,
+            connection=_conn(),
+            require_full_coverage=False,
+            concurrency=2,
+        )
+    )
+    assert written == [_upd(cat_id, "CachedOp", True, "Москва", "Москва")]
+
+
+def test_geographic_keeps_moscow_and_oblast(monkeypatch):
+    written: list[tuple] = []
+
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich.load_enabled_ranges_for_enrich",
+        lambda db: [
+            {
+                "abc": "495",
+                "rangeStart": 1000000,
+                "rangeEnd": 1000000,
+                "operator": "CachedOp",
+                "garTerritory": "г. Москва|Московская область",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich._bulk_update_operators",
+        lambda db, pairs: written.extend(pairs) or len(pairs),
+    )
+
+    cat_id = uuid.uuid4()
+    db = _mock_db([_cat(cat_id, "74951000000", None, "495", 1000000)])
+    asyncio.run(
+        enrich_catalog_operators(
+            db,
+            connection=_conn(),
+            require_full_coverage=False,
+            concurrency=2,
+        )
+    )
+    assert written == [_upd(cat_id, "CachedOp", True, "Москва", "Московская область")]
