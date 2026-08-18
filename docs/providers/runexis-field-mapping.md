@@ -26,16 +26,16 @@ Sources:
 | `period_price` | live `search_numbers` item | `period_price` | decimal | yes | EXAMPLE-CONFIRMED live |
 | `mask` | live `search_numbers` item | `mask` | as-is | yes | EXAMPLE-CONFIRMED live |
 | `display_mask` | live `search_numbers` item | `display_mask` | as-is | yes | EXAMPLE-CONFIRMED live (formatted mask) |
-| `book_date` | live `search_numbers` item | `book_date` | text; `0000-…` → null | yes | EXAMPLE-CONFIRMED live |
+| `book_date` | live `search_numbers` item | raw only | text; `0000-…` → null | yes | EXAMPLE-CONFIRMED live; not in catalog |
 | `number_type` | live `search_numbers` item | `number_type` | as-is | yes | EXAMPLE-CONFIRMED live (0..5) |
 | `points` | live `search_numbers` item | `points` | decimal | yes | EXAMPLE-CONFIRMED live |
-| `date_from` | live `search_numbers` item | `date_from` | text as-is | yes | EXAMPLE-CONFIRMED live |
-| `operator_fas` | live `search_numbers` item | `operator_fas` | as-is | yes | EXAMPLE-CONFIRMED live |
-| `operator_id` | live `search_numbers` item | `operator_id` | as-is | yes | EXAMPLE-CONFIRMED live (often empty) |
-| `last_operation_date` | live `search_numbers` item | `last_operation_date` | text as-is | yes | EXAMPLE-CONFIRMED live |
-| `manager_id` | live `search_numbers` item | `manager_id` | as-is | yes | EXAMPLE-CONFIRMED live |
+| `date_from` | live `search_numbers` item | raw only | text as-is | yes | EXAMPLE-CONFIRMED live; not in catalog |
+| `operator_fas` | live `search_numbers` item | raw only | as-is | yes | EXAMPLE-CONFIRMED live; not in catalog |
+| `operator_id` | live `search_numbers` item | raw only | as-is | yes | EXAMPLE-CONFIRMED live (often empty); not in catalog |
+| `last_operation_date` | live `search_numbers` item | raw only | text as-is | yes | EXAMPLE-CONFIRMED live; not in catalog |
+| `manager_id` | live `search_numbers` item | raw only | as-is | yes | EXAMPLE-CONFIRMED live; not in catalog |
 | `notes` | live `search_numbers` item | `notes` | as-is | yes | EXAMPLE-CONFIRMED live (often empty) |
-| `abcdef` | live `search_numbers` item | `abcdef` | as-is | yes | EXAMPLE-CONFIRMED live (meaning unknown) |
+| `abcdef` | live `search_numbers` item | raw only | as-is | yes | EXAMPLE-CONFIRMED live (meaning unknown); not in catalog |
 | `book_price` | live `search_numbers` item | raw only | keep in raw | yes | not mapped to catalog |
 | currency | — | raw only | — | yes | missing in free API; not a catalog column |
 | SMS | — | raw only | — | yes | missing in free API; not a catalog column |
@@ -46,15 +46,15 @@ Sources:
 |---|---|---|---|---|---|
 | `id` | management | raw id / fallback key | as-is | yes | EXAMPLE-CONFIRMED |
 | `code` + `number` | management | `msisdn`, `provider_number_key` | `"7"+code+number` (derived) | yes | DERIVED |
-| `status.mnemonic` / `status.name` | management | `status_raw` | prefer mnemonic | yes | EXAMPLE-CONFIRMED |
+| `status.mnemonic` / `status.name` | management | DTO `status_raw` / raw | prefer mnemonic | yes | EXAMPLE-CONFIRMED; ingest/raw, not catalog |
 | `city.id` | management nested | `city_external_id` | str | yes | EXAMPLE-CONFIRMED |
 | `city.name` | management nested | `city_name` | as-is | yes | EXAMPLE-CONFIRMED |
-| `tariff` | management nested | `tariff` | name/mnemonic/id label | yes | EXAMPLE-CONFIRMED live |
+| `tariff` | management nested | raw only | name/mnemonic/id label | yes | EXAMPLE-CONFIRMED live; not in catalog |
 | `class` | management nested | `class` | name/mnemonic/id label | yes | EXAMPLE-CONFIRMED live |
 | `operator` | management nested | `operator` | name/id label | yes | EXAMPLE-CONFIRMED live |
-| `partner` | management nested | `partner` | name/id label | yes | EXAMPLE-CONFIRMED live |
-| `project` | management nested | `project` | name/id label | yes | EXAMPLE-CONFIRMED live |
-| `equipment` | management nested | `equipment` | name/id label | yes | EXAMPLE-CONFIRMED live |
+| `partner` | management nested | raw only | name/id label | yes | EXAMPLE-CONFIRMED live; not in catalog |
+| `project` | management nested | raw only | name/id label | yes | EXAMPLE-CONFIRMED live; not in catalog |
+| `equipment` | management nested | raw only | name/id label | yes | EXAMPLE-CONFIRMED live; not in catalog |
 | `subscriptionFee` / `subscription_fee` | management | `buy_price` (prefer) | Decimal | yes | EXAMPLE-CONFIRMED (often absent live); purchased path |
 | `meraPrice` / `mera_price` | management | `buy_price` (fallback) | Decimal | yes | EXAMPLE-CONFIRMED |
 | `installationCost` / `installation_cost` | management | `buy_price` (last fallback) | Decimal | yes | EXAMPLE-CONFIRMED |

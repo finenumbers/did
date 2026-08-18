@@ -2,7 +2,6 @@ from app.models.base import Base
 from app.models.catalog import (
     NumberPriceHistory,
     NumbersCatalogNormalized,
-    NumberStatusHistory,
 )
 from app.models.providers import Provider, ProviderConnection, SystemSetting
 from app.models.pstn_cache import PstnInnCacheOperator, PstnInnRangeCache
@@ -51,7 +50,6 @@ __all__ = [
     "McnRegionRaw",
     "Base",
     "NumberPriceHistory",
-    "NumberStatusHistory",
     "NumbersCatalogNormalized",
     "Provider",
     "ProviderConnection",

@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-from app.models.catalog import NumberPriceHistory, NumbersCatalogNormalized, NumberStatusHistory
+from app.models.catalog import NumberPriceHistory, NumbersCatalogNormalized
 from app.models.enums import InventoryKind, ProviderCode
 from app.models.runexis_raw import (
     RunexisCityRaw,
@@ -86,18 +86,15 @@ def wipe_provider_numbers(
     provider_code: ProviderCode,
     inventory_kind: InventoryKind,
 ) -> dict[str, int]:
-    """Hard-delete catalog + history + raw for one provider inventory kind."""
+    """Hard-delete catalog + price history + raw for one provider inventory kind."""
     catalog_ids = select(NumbersCatalogNormalized.id).where(
         NumbersCatalogNormalized.provider_id == provider_id,
         NumbersCatalogNormalized.inventory_kind == inventory_kind,
     )
-    price_del = db.execute(
+    db.execute(
         delete(NumberPriceHistory).where(NumberPriceHistory.catalog_id.in_(catalog_ids))
     )
-    status_del = db.execute(
-        delete(NumberStatusHistory).where(NumberStatusHistory.catalog_id.in_(catalog_ids))
-    )
-    catalog_del = db.execute(
+    db.execute(
         delete(NumbersCatalogNormalized).where(
             NumbersCatalogNormalized.provider_id == provider_id,
             NumbersCatalogNormalized.inventory_kind == inventory_kind,
@@ -159,27 +156,11 @@ def _catalog_extra_fields(num: NormalizedNumber) -> dict[str, Any]:
         "number_local": num.number_local,
         "mask": num.mask,
         "display_mask": num.display_mask,
-        "book_date": num.book_date,
         "number_type": num.number_type,
         "points": num.points,
-        "date_from": num.date_from,
-        "operator_fas": num.operator_fas,
-        "operator_id": num.operator_id,
-        "last_operation_date": num.last_operation_date,
-        "manager_id": num.manager_id,
         "notes": num.notes,
-        "abcdef": num.abcdef,
-        "order_id": num.order_id,
-        "doc_status": num.doc_status,
-        "doc_required": num.doc_required,
-        "order_doc_required": num.order_doc_required,
-        "sign": num.sign,
-        "tariff": num.tariff,
         "number_class": num.number_class,
         "operator": num.operator,
-        "partner": num.partner,
-        "project": num.project,
-        "equipment": num.equipment,
         "rtu_connected": num.rtu_connected,
     }
 
@@ -651,7 +632,6 @@ def _catalog_row(
         "city_name": num.city_name,
         "buy_price": num.buy_price,
         "period_price": num.period_price,
-        "status_raw": num.status_raw,
         "raw_source_table": table_name,
         "raw_source_id": raw_id,
         "last_sync_job_id": job_id,

@@ -22,36 +22,19 @@ EXPORT_COLUMNS: list[tuple[str, str]] = [
     ("abc_code", "ABC"),
     ("number_local", "Номер"),
     ("number_category", "Категория"),
-    ("status_raw", "Статус"),
     ("city_name", "Город"),
     ("region_name", "Регион"),
     ("buy_price", "Покупка"),
     ("period_price", "Абонплата"),
     ("mask", "Маска"),
     ("display_mask", "Display mask"),
-    ("book_date", "Book date"),
     ("number_type", "Тип"),
     ("points", "Баллы"),
-    ("date_from", "date_from"),
-    ("last_operation_date", "last_operation_date"),
     ("operator", "Оператор"),
     ("rtu_connected", "Подключено в РТУ"),
-    ("operator_id", "operator_id"),
-    ("manager_id", "manager_id"),
     ("notes", "notes"),
-    ("abcdef", "abcdef"),
-    ("order_id", "order_id"),
-    ("doc_status", "doc_status"),
-    ("doc_required", "doc_required"),
-    ("order_doc_required", "order_doc_required"),
-    ("sign", "sign"),
-    ("tariff", "Тариф"),
     ("class", "Класс"),
-    ("partner", "Партнёр"),
-    ("project", "Проект"),
-    ("equipment", "Оборудование"),
     ("mapping_confidence", "confidence"),
-    ("last_seen_at", "Обновлено"),
 ]
 
 RTU_NOT_CONNECTED_FILL = "#FFC7CE"
@@ -104,11 +87,6 @@ def _cell_value(key: str, row: NumbersCatalogNormalized, provider_code: str) -> 
     if key == "mapping_confidence":
         conf = row.mapping_confidence
         return conf.value if hasattr(conf, "value") else (str(conf) if conf else "")
-    if key == "last_seen_at":
-        ts = row.last_seen_at
-        if isinstance(ts, datetime):
-            return ts.isoformat()
-        return str(ts) if ts else ""
     val = getattr(row, key, None)
     return "" if val is None else val
 

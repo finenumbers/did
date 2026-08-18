@@ -21,14 +21,14 @@ Legend — meaning confirmed?: **yes** | **example-only** | **no**
 |---|---|---|---|---|---|---|
 | `list[]` | formal `list` | yes | raw + catalog | iterate | n/a | → `inventory_kind=purchased` (decision) |
 | `did` | example | example-only | `provider_number_key` / `msisdn` | as-is | yes | |
-| `status` | example | example-only | `status_raw` | as-is; no enum meaning | yes | |
+| `status` | example | example-only | raw only (`sipout_purchased_numbers_raw.status` / raw_payload) | as-is; no enum meaning | yes | not in catalog |
 | `city_id` | example | example-only | `city_external_id` | → text | yes | |
 | `has_sms` | example | example-only | raw only (`sipout_purchased_numbers_raw.has_sms` / raw_payload) | parse 0/1 | yes | not in catalog |
-| `order_id` | example | example-only | `order_id` | as-is | yes | purchased catalog |
-| `doc_status` | example | example-only | `doc_status` | as-is | yes | purchased catalog |
-| `doc_required` | example | example-only | `doc_required` | as-is | yes | purchased catalog |
-| `order_doc_required` | example | example-only | `order_doc_required` | as-is | yes | purchased catalog |
-| `sign` | example | example-only | `sign` | bool → true/false text | yes | purchased catalog |
+| `order_id` | example | example-only | raw only (`sipout_purchased_numbers_raw.order_id` / raw_payload) | as-is | yes | not in catalog |
+| `doc_status` | example | example-only | raw only (`sipout_purchased_numbers_raw.doc_status` / raw_payload) | as-is | yes | not in catalog |
+| `doc_required` | example | example-only | raw_payload | as-is | yes | not in catalog |
+| `order_doc_required` | example | example-only | raw_payload | as-is | yes | not in catalog |
+| `sign` | example | example-only | raw only (`sipout_purchased_numbers_raw.sign` / raw_payload) | bool → true/false text | yes | not in catalog |
 | setup/monthly/tariff | — | no | — | — | — | not in connected_list |
 
 ## Geo (`did` / `get_cities`)

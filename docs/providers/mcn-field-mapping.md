@@ -14,7 +14,7 @@ Sources: [`mcn-contract.md`](mcn-contract.md), [`mcn/raw/MCN-Vitrina.md`](mcn/ra
 | city/region names from dictionaries | `city_name` / `region_name` | OPERATIONAL |
 | `ndc_type_id` | `number_type` (stringified) | VERIFIED |
 | `beauty_level` | `number_class` / payload | VERIFIED |
-| — | `status_raw=free` | OPERATIONAL |
+| — | DTO `status_raw=free` (ingest only, not a catalog column) | OPERATIONAL |
 | `currency` | `normalized_payload.currency` | VERIFIED |
 
 ## Cities / regions dictionaries

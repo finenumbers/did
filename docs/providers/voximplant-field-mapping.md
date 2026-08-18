@@ -13,7 +13,7 @@ Sources: [`voximplant-contract.md`](voximplant-contract.md), raw under [`voximpl
 | `phone_category_name` | `number_type` + `number_class` | VERIFIED / EXAMPLE |
 | `phone_region_name` | `region_name` / `city_name` | VERIFIED |
 | request `phone_region_id` | `region_external_id` / `city_external_id` | OPERATIONAL |
-| — | `status_raw=free` | OPERATIONAL |
+| — | DTO `status_raw=free` (ingest only, not a catalog column) | OPERATIONAL |
 | `phone_tax_reserve`, `phone_installation_tax_reserve` | raw / `normalized_payload` only | VERIFIED |
 | `phone_country_code` | must be RU for sync rows | VERIFIED |
 

@@ -68,31 +68,14 @@ class NumbersService:
         "abc_code": NumbersCatalogNormalized.abc_code,
         "number_category": NumbersCatalogNormalized.number_category,
         "number_local": NumbersCatalogNormalized.number_local,
-        "status_raw": NumbersCatalogNormalized.status_raw,
         "region_name": NumbersCatalogNormalized.region_name,
         "city_name": NumbersCatalogNormalized.city_name,
         "mask": NumbersCatalogNormalized.mask,
         "display_mask": NumbersCatalogNormalized.display_mask,
-        "book_date": NumbersCatalogNormalized.book_date,
         "number_type": NumbersCatalogNormalized.number_type,
-        "date_from": NumbersCatalogNormalized.date_from,
-        "last_operation_date": NumbersCatalogNormalized.last_operation_date,
-        "operator_fas": NumbersCatalogNormalized.operator_fas,
-        "operator_id": NumbersCatalogNormalized.operator_id,
-        "manager_id": NumbersCatalogNormalized.manager_id,
         "notes": NumbersCatalogNormalized.notes,
-        "abcdef": NumbersCatalogNormalized.abcdef,
-        "order_id": NumbersCatalogNormalized.order_id,
-        "doc_status": NumbersCatalogNormalized.doc_status,
-        "doc_required": NumbersCatalogNormalized.doc_required,
-        "order_doc_required": NumbersCatalogNormalized.order_doc_required,
-        "sign": NumbersCatalogNormalized.sign,
-        "tariff": NumbersCatalogNormalized.tariff,
         "class": NumbersCatalogNormalized.number_class,
         "operator": NumbersCatalogNormalized.operator,
-        "partner": NumbersCatalogNormalized.partner,
-        "project": NumbersCatalogNormalized.project,
-        "equipment": NumbersCatalogNormalized.equipment,
         "rtu_connected": NumbersCatalogNormalized.rtu_connected,
     }
 
@@ -103,7 +86,6 @@ class NumbersService:
     POINTS_COLUMN = "points"
     PROVIDER_CODE = "provider_code"
     MAPPING_CONFIDENCE = "mapping_confidence"
-    LAST_SEEN_AT = "last_seen_at"
 
     FACET_COLUMNS = frozenset(
         {
@@ -111,36 +93,19 @@ class NumbersService:
             "abc_code",
             "number_category",
             "number_local",
-            "status_raw",
             "region_name",
             "city_name",
             "buy_price",
             "period_price",
             "mask",
             "display_mask",
-            "book_date",
             "number_type",
             POINTS_COLUMN,
-            "date_from",
-            "last_operation_date",
-            "operator_id",
-            "manager_id",
             "notes",
-            "abcdef",
-            "order_id",
-            "doc_status",
-            "doc_required",
-            "order_doc_required",
-            "sign",
-            "tariff",
             "class",
             "operator",
-            "partner",
-            "project",
-            "equipment",
             "rtu_connected",
             MAPPING_CONFIDENCE,
-            LAST_SEEN_AT,
         }
     )
 
@@ -153,20 +118,12 @@ class NumbersService:
         "buy_price": NumbersCatalogNormalized.buy_price,
         "period_price": NumbersCatalogNormalized.period_price,
         "points": NumbersCatalogNormalized.points,
-        "status_raw": NumbersCatalogNormalized.status_raw,
         "region_name": NumbersCatalogNormalized.region_name,
         "city_name": NumbersCatalogNormalized.city_name,
-        "last_seen_at": NumbersCatalogNormalized.last_seen_at,
         "mask": NumbersCatalogNormalized.mask,
         "number_type": NumbersCatalogNormalized.number_type,
-        "order_id": NumbersCatalogNormalized.order_id,
-        "doc_status": NumbersCatalogNormalized.doc_status,
-        "tariff": NumbersCatalogNormalized.tariff,
         "class": NumbersCatalogNormalized.number_class,
         "operator": NumbersCatalogNormalized.operator,
-        "partner": NumbersCatalogNormalized.partner,
-        "project": NumbersCatalogNormalized.project,
-        "equipment": NumbersCatalogNormalized.equipment,
         "rtu_connected": NumbersCatalogNormalized.rtu_connected,
         "mapping_confidence": NumbersCatalogNormalized.mapping_confidence,
     }
@@ -289,17 +246,6 @@ class NumbersService:
                     stmt = stmt.where(or_(*preds) if len(preds) > 1 else preds[0])
                 continue
 
-            if field == self.LAST_SEEN_AT:
-                col = NumbersCatalogNormalized.last_seen_at
-                preds = []
-                if concrete:
-                    preds.append(cast(col, String).in_(concrete))
-                if include_empty:
-                    preds.append(col.is_(None))
-                if preds:
-                    stmt = stmt.where(or_(*preds) if len(preds) > 1 else preds[0])
-                continue
-
             if field in self.PRICE_COLUMNS:
                 col = self.PRICE_COLUMNS[field]
                 preds = []
@@ -349,7 +295,6 @@ class NumbersService:
         provider: list[str] | None = None,
         region: str | None = None,
         city: str | None = None,
-        status: str | None = None,
         price_min: Decimal | None = None,
         price_max: Decimal | None = None,
     ) -> Select:
@@ -374,8 +319,6 @@ class NumbersService:
                 (NumbersCatalogNormalized.city_name.ilike(f"%{city}%"))
                 | (NumbersCatalogNormalized.city_external_id == city)
             )
-        if status:
-            stmt = stmt.where(NumbersCatalogNormalized.status_raw.ilike(f"%{status}%"))
         if price_min is not None:
             stmt = stmt.where(
                 or_(
@@ -402,36 +345,18 @@ class NumbersService:
             abc_code=row.abc_code,
             number_category=row.number_category,
             number_local=row.number_local,
-            status_raw=row.status_raw,
             region_name=row.region_name,
             city_name=row.city_name,
             buy_price=row.buy_price,
             period_price=row.period_price,
             mask=row.mask,
             display_mask=row.display_mask,
-            book_date=row.book_date,
             number_type=row.number_type,
             points=row.points,
-            date_from=row.date_from,
-            operator_fas=row.operator_fas,
-            operator_id=row.operator_id,
-            last_operation_date=row.last_operation_date,
-            manager_id=row.manager_id,
             notes=row.notes,
-            abcdef=row.abcdef,
-            order_id=row.order_id,
-            doc_status=row.doc_status,
-            doc_required=row.doc_required,
-            order_doc_required=row.order_doc_required,
-            sign=row.sign,
-            tariff=row.tariff,
             number_class=row.number_class,
             operator=row.operator,
-            partner=row.partner,
-            project=row.project,
-            equipment=row.equipment,
             rtu_connected=row.rtu_connected,
-            last_seen_at=row.last_seen_at,
             is_currently_present=row.is_currently_present,
             mapping_confidence=row.mapping_confidence.value,
         )
@@ -473,7 +398,6 @@ class NumbersService:
         provider: list[str] | None = None,
         region: str | None = None,
         city: str | None = None,
-        status: str | None = None,
         price_min: Decimal | None = None,
         price_max: Decimal | None = None,
         q: str | None = None,
@@ -490,7 +414,6 @@ class NumbersService:
             provider=provider,
             region=region,
             city=city,
-            status=status,
             price_min=price_min,
             price_max=price_max,
         )
@@ -509,8 +432,6 @@ class NumbersService:
             return cast(Provider.code, String)
         if column == self.MAPPING_CONFIDENCE:
             return cast(NumbersCatalogNormalized.mapping_confidence, String)
-        if column == self.LAST_SEEN_AT:
-            return cast(NumbersCatalogNormalized.last_seen_at, String)
         if column in self.PRICE_COLUMNS:
             return func.round(self.PRICE_COLUMNS[column])
         if column == self.POINTS_COLUMN:

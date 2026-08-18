@@ -13,7 +13,7 @@ See also `exolve-contract.md`.
 | `category_name` | `number_class` (REGULAR/BRONZE/…) |
 | slice `region_id` + lookup | `city_external_id` / `region_external_id` / names |
 | `region_name` | fallback display name if lookup miss |
-| — | `status_raw` = `free` |
+| — | DTO `status_raw` = `free` (ingest only, not a catalog column) |
 | `number_options` | `raw_payload` / `normalized_payload` only |
 
 Platform `number_category` (ABC/DEF classifier) is computed in persist — unrelated to Exolve marketing category.

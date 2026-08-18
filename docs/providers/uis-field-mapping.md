@@ -21,7 +21,7 @@ Source methods: [`uis-contract.md`](uis-contract.md).
 |---|---|
 | `virtual_phone_number` | Normalize → `msisdn`, `provider_number_key` |
 | `id` | raw `external_id`; if phone missing after normalize, key `uis:{id}` |
-| `status` | `status_raw` |
+| `status` | DTO `status_raw` / raw (not in catalog) |
 | `category` | `number_type` |
 | `type` | raw / notes-adjacent; not ABC category |
 | `name`, `comment`, `activation_date`, `redirection_phone_number` | raw_payload (+ typed raw columns where present) |

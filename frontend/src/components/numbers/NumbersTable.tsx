@@ -46,11 +46,6 @@ const CATALOG_COLUMNS: Col[] = [
     value: (r) => r.number_category,
   },
   {
-    key: "status_raw",
-    header: "Статус",
-    value: (r) => r.status_raw,
-  },
-  {
     key: "city_name",
     header: "Город",
     value: (r) => r.city_name,
@@ -81,11 +76,6 @@ const CATALOG_COLUMNS: Col[] = [
     value: (r) => r.display_mask,
   },
   {
-    key: "book_date",
-    header: "Book date",
-    value: (r) => r.book_date,
-  },
-  {
     key: "number_type",
     header: "Тип",
     value: (r) => r.number_type,
@@ -94,16 +84,6 @@ const CATALOG_COLUMNS: Col[] = [
     key: "points",
     header: "Баллы",
     value: (r) => formatPoints(r.points),
-  },
-  {
-    key: "date_from",
-    header: "date_from",
-    value: (r) => r.date_from,
-  },
-  {
-    key: "last_operation_date",
-    header: "last_operation_date",
-    value: (r) => r.last_operation_date,
   },
   {
     key: "operator",
@@ -116,54 +96,9 @@ const CATALOG_COLUMNS: Col[] = [
     value: (r) => r.rtu_connected,
   },
   {
-    key: "operator_id",
-    header: "operator_id",
-    value: (r) => r.operator_id,
-  },
-  {
-    key: "manager_id",
-    header: "manager_id",
-    value: (r) => r.manager_id,
-  },
-  {
     key: "notes",
     header: "notes",
     value: (r) => r.notes,
-  },
-  {
-    key: "abcdef",
-    header: "abcdef",
-    value: (r) => r.abcdef,
-  },
-  {
-    key: "order_id",
-    header: "order_id",
-    value: (r) => r.order_id,
-  },
-  {
-    key: "doc_status",
-    header: "doc_status",
-    value: (r) => r.doc_status,
-  },
-  {
-    key: "doc_required",
-    header: "doc_required",
-    value: (r) => r.doc_required,
-  },
-  {
-    key: "order_doc_required",
-    header: "order_doc_required",
-    value: (r) => r.order_doc_required,
-  },
-  {
-    key: "sign",
-    header: "sign",
-    value: (r) => r.sign,
-  },
-  {
-    key: "tariff",
-    header: "Тариф",
-    value: (r) => r.tariff,
   },
   {
     key: "class",
@@ -171,29 +106,9 @@ const CATALOG_COLUMNS: Col[] = [
     value: (r) => r.class,
   },
   {
-    key: "partner",
-    header: "Партнёр",
-    value: (r) => r.partner,
-  },
-  {
-    key: "project",
-    header: "Проект",
-    value: (r) => r.project,
-  },
-  {
-    key: "equipment",
-    header: "Оборудование",
-    value: (r) => r.equipment,
-  },
-  {
     key: "mapping_confidence",
     header: "confidence",
     value: (r) => r.mapping_confidence,
-  },
-  {
-    key: "last_seen_at",
-    header: "Обновлено",
-    value: (r) => new Date(r.last_seen_at).toLocaleString(),
   },
 ];
 

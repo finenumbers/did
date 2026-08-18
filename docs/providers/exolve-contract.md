@@ -69,4 +69,4 @@ Sync rules (completeness):
 | `type_name` | `number_type` |
 | `category_name` | `class` (`number_class`) |
 | geo | city/region via lookup + response fallback |
-| — | `status_raw=free` |
+| — | DTO `status_raw=free` (ingest only, not a catalog column) |
