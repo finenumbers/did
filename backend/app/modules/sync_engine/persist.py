@@ -628,8 +628,9 @@ def _catalog_row(
         "msisdn": num.msisdn,
         "region_external_id": num.region_external_id,
         "city_external_id": num.city_external_id,
-        "region_name": num.region_name,
-        "city_name": num.city_name,
+        # Catalog Город/Регион come only from PSTN garTerritory at operator_enrichment.
+        "region_name": None,
+        "city_name": None,
         "buy_price": num.buy_price,
         "period_price": num.period_price,
         "raw_source_table": table_name,

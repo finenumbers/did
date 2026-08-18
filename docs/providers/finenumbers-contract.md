@@ -10,7 +10,7 @@ Vendor HTML/PDF materials are not checked into this repo; markers below reflect 
 | Contour | Purpose | Storage / writes |
 |---|---|---|
 | **A — inventory** | Free numbers for operator ИНН «Фронтир» (`5406978329`) as a provider inventory slice | `numbers_catalog_normalized` free via Finenumbers sync |
-| **B — operator cache** | PSTN ranges by INN for catalog **Оператор** and GAR overlay of **Город**/**Регион** | `pstn_inn_cache_operators` / `pstn_inn_ranges_cache`; enrich writes `operator` and, when `garTerritory` is present, `city_name`/`region_name` |
+| **B — operator cache** | PSTN ranges by INN for catalog **Оператор** and GAR overlay of **Город**/**Регион**; terminal miss → **Нет в реестре** on operator/city/region | `pstn_inn_cache_operators` / `pstn_inn_ranges_cache`; enrich writes `operator` and, when `garTerritory` is present, `city_name`/`region_name` |
 | **C — REG / RTU** | Purchased endpoints from REG + column **Подключено в РТУ** | `GET https://reg.finenumbers.com/api/phones` (read-only); purchased + `rtu_connected` |
 
 Same INN may appear in A/B (e.g. Frontier). Contour C uses a separate REG API key (`auth_settings.reg_key`).
@@ -28,7 +28,7 @@ Same INN may appear in A/B (e.g. Frontier). Contour C uses a separate REG API ke
   - Other provider + number in REG → **Внешняя нумерация** (yellow; no duplicate catalog row)
   - Other provider + number not in REG → **Не подключено** (red)
 - Flags are re-applied after Contour B operator enrichment (final `operator` SoT is PSTN enrich only; REG does not seed operator)
-- Terminal PSTN miss (found=false / HTTP 400|404|422) → catalog `operator` = **`Нет в реестре`** (blue highlight); unresolved 5xx/transport after retries still fail enrichment coverage (no false sentinel)
+- Terminal PSTN miss (found=false / HTTP 400|404|422) → catalog `operator`, `city_name`, and `region_name` = **`Нет в реестре`** (blue highlight); unresolved 5xx/transport after retries still fail enrichment coverage (no false sentinel)
 - **Never** call REG mutating endpoints (`POST …/request`, `rtu-import`, `regs/poll`, …)
 
 ## Auth — VERIFIED (code)

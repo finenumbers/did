@@ -56,6 +56,11 @@ const CATALOG_COLUMNS: Col[] = [
     value: (r) => r.region_name,
   },
   {
+    key: "operator",
+    header: "Оператор",
+    value: (r) => r.operator,
+  },
+  {
     key: "buy_price",
     header: "Покупка",
     value: (r) => formatPrice(r.buy_price),
@@ -84,11 +89,6 @@ const CATALOG_COLUMNS: Col[] = [
     key: "points",
     header: "Баллы",
     value: (r) => formatPoints(r.points),
-  },
-  {
-    key: "operator",
-    header: "Оператор",
-    value: (r) => r.operator,
   },
   {
     key: "rtu_connected",

@@ -3,6 +3,7 @@
 Contour B: every currently present catalog MSISDN goes through cache → PSTN lookup
 when needed. Operator SoT is this last sync stage (or «Нет в реестре» on terminal miss).
 When garTerritory is present, overlay city_name/region_name from the parsed GAR value.
+Terminal PSTN miss writes «Нет в реестре» on operator, city_name, and region_name.
 """
 
 from __future__ import annotations
@@ -129,8 +130,20 @@ class OperatorRangeCache:
             return
         self._finalized = False
         bucket = self._by_abc.setdefault(abc, [])
-        for existing in bucket:
+        for idx, existing in enumerate(bucket):
             if existing.start == start and existing.end == end:
+                if (city_name or region_name) and not (
+                    existing.city_name or existing.region_name
+                ):
+                    bucket[idx] = OperatorRange(
+                        abc=existing.abc,
+                        start=existing.start,
+                        end=existing.end,
+                        operator=existing.operator,
+                        order=existing.order,
+                        city_name=city_name,
+                        region_name=region_name,
+                    )
                 return
         self._order += 1
         bucket.append(
@@ -229,9 +242,9 @@ async def enrich_catalog_operators(
     Secondary: PSTN lookup API for cache misses (always queued; overwrites existing operator).
     With only_missing=False (default / production): every present row is enriched.
     Terminal PSTN miss (found=false / empty / invalid MSISDN / HTTP 400|404|422)
-    → «Нет в реестре» (geo left unchanged). Transport/5xx/auth errors are retried;
-    unresolved ones remain uncovered (do not write sentinel, do not clear existing
-    operator/geo) and fail coverage.
+    → «Нет в реестре» on operator, city_name, and region_name. Transport/5xx/auth
+    errors are retried; unresolved ones remain uncovered (do not write sentinel,
+    do not clear existing operator/geo) and fail coverage.
     """
     client = FinenumbersClient(connection)
     cache = OperatorRangeCache()
@@ -346,9 +359,20 @@ async def _enrich_catalog_operators_inner(
 ) -> dict[str, int]:
     _progress(on_progress, "Загрузка локального кеша операторов")
     local_ranges = load_enabled_ranges_for_enrich(db)
+    seeded_with_gar = 0
     for row in local_ranges:
         cache.add_from_api_row(row)
-    logger.warning("PSTN enrich: seeded %s ranges from local INN cache", len(local_ranges))
+        if str(row.get("garTerritory") or "").strip():
+            seeded_with_gar += 1
+    logger.warning(
+        "PSTN enrich: seeded %s ranges from local INN cache, seeded_with_gar=%s",
+        len(local_ranges),
+        seeded_with_gar,
+    )
+    if local_ranges and seeded_with_gar == 0:
+        logger.warning(
+            "PSTN enrich: none of the seeded ranges have garTerritory — reload PSTN cache"
+        )
     if seed_ranges:
         for row in seed_ranges:
             cache.add_from_api_row(row)
@@ -431,7 +455,8 @@ async def _enrich_catalog_operators_inner(
                     current_operator=current_operator,
                     current_city=current_city,
                     current_region=current_region,
-                    apply_geo=False,
+                    city=contract.OPERATOR_NOT_IN_REGISTRY,
+                    region=contract.OPERATOR_NOT_IN_REGISTRY,
                 )
                 if current_operator != contract.OPERATOR_NOT_IN_REGISTRY:
                     not_in_registry += 1
@@ -566,7 +591,8 @@ async def _enrich_catalog_operators_inner(
                     current_operator=current_operator,
                     current_city=current_city,
                     current_region=current_region,
-                    apply_geo=False,
+                    city=contract.OPERATOR_NOT_IN_REGISTRY,
+                    region=contract.OPERATOR_NOT_IN_REGISTRY,
                 )
                 if current_operator != contract.OPERATOR_NOT_IN_REGISTRY:
                     not_in_registry += 1
@@ -644,7 +670,8 @@ async def _enrich_catalog_operators_inner(
                 current_operator=current_operator,
                 current_city=current_city,
                 current_region=current_region,
-                apply_geo=False,
+                city=contract.OPERATOR_NOT_IN_REGISTRY,
+                region=contract.OPERATOR_NOT_IN_REGISTRY,
             )
             if current_operator != contract.OPERATOR_NOT_IN_REGISTRY:
                 not_in_registry += 1

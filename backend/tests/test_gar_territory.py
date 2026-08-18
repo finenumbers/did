@@ -29,3 +29,12 @@ def test_nbsp_and_blank():
     assert parse_gar_territory(None) == (None, None)
     assert parse_gar_territory("  ") == (None, None)
     assert parse_gar_territory("г. ") == (None, None)
+
+
+def test_two_pipes_drops_middle():
+    assert parse_gar_territory("г. Самара|середина|Самарская область") == (
+        "Самара",
+        "Самарская область",
+    )
+    assert parse_gar_territory("A|B|C|D") == ("A", "C|D")
+    assert parse_gar_territory("A||C") == ("A", "C")

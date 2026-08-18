@@ -11,7 +11,7 @@ Each PSTN range row expands to one catalog row per local number in `[rangeStart,
 | `abc` + `rangeStart`…`rangeEnd` | `msisdn` = `7{abc}{local:07d}`, `provider_number_key` | VERIFIED (code) |
 | `abc` | `abc_code` | VERIFIED (code) |
 | local part | `number_local` (7 digits) | VERIFIED (code) |
-| `region` | `region_name` | VERIFIED (code) |
+| `region` | DTO `region_name` only (catalog Город/Регион filled later from GAR) | VERIFIED (code) |
 | `operator` | `operator` (may be overwritten later by Contour B enrich) | VERIFIED (code) |
 | `id` | `normalized_payload.range_id` | VERIFIED (code) |
 | `inn` | `normalized_payload.inn` | VERIFIED (code) |
@@ -27,7 +27,7 @@ Each PSTN range row expands to one catalog row per local number in `[rangeStart,
 | Local `pstn_inn_ranges_cache` match on MSISDN | `operator`; if `garTerritory` present → `city_name` + `region_name` | OPERATIONAL |
 | Fallback `GET /api/v1/lookup?phone=` (10-digit national) | same fields from lookup `data` | VERIFIED (code) |
 
-`garTerritory` (Территория ГАР) is split on the first `|`: before → city, after → region. No delimiter → both fields get the cleaned value. Leading prefixes `г.о. `, `город `, `Город `, `м.р-н `, `г. ` are stripped. Empty GAR does not overwrite provider geo. PSTN `region` is not used for these columns.
+`garTerritory` (Территория ГАР): no pipe → both fields get the cleaned value; one pipe → before is city, after is region; two or more pipes → city is before the first, region is after the second (middle dropped, tail kept). Leading prefixes `г.о. `, `город `, `Город `, `м.р-н `, `г. ` are stripped. Catalog `city_name`/`region_name` are not taken from number-provider APIs or PSTN `region`. Empty GAR leaves those columns NULL. Terminal PSTN miss writes **`Нет в реестре`** into operator, city, and region.
 
 Contour B **never** writes prices, status, or wipes inventory.
 

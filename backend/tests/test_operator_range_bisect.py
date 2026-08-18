@@ -27,6 +27,30 @@ def test_bisect_outside_range_is_none():
     assert cache.resolve("74950000500") is None
 
 
+def test_add_merges_geo_on_duplicate_range_keeps_first_operator():
+    cache = OperatorRangeCache()
+    cache.add("495", 0, 999, "MegaFon")
+    cache.add("495", 0, 999, "MTS", city_name="Москва", region_name="Москва")
+    cache.finalize()
+    match = cache.resolve_parts("495", 100)
+    assert match is not None
+    assert match.operator == "MegaFon"
+    assert match.city_name == "Москва"
+    assert match.region_name == "Москва"
+
+
+def test_add_does_not_overwrite_existing_geo():
+    cache = OperatorRangeCache()
+    cache.add("495", 0, 999, "MegaFon", city_name="Химки", region_name="МО")
+    cache.add("495", 0, 999, "MTS", city_name="Москва", region_name="Москва")
+    cache.finalize()
+    match = cache.resolve_parts("495", 100)
+    assert match is not None
+    assert match.operator == "MegaFon"
+    assert match.city_name == "Химки"
+    assert match.region_name == "МО"
+
+
 def test_bisect_picks_covering_range():
     cache = OperatorRangeCache()
     cache.add("999", 0, 99, "A")

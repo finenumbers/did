@@ -64,6 +64,23 @@ def _number_reload_detail(
     )
 
 
+def _log_page_integrity(
+    db: Session,
+    job_id: uuid.UUID,
+    *,
+    phase: str,
+    extra_stats: dict[str, Any] | None,
+) -> None:
+    if not extra_stats:
+        return
+    integrity = extra_stats.get("integrity")
+    if not isinstance(integrity, dict):
+        return
+    mismatch = bool(integrity.get("total_items_mismatch"))
+    level = SyncLogLevel.warning if mismatch else SyncLogLevel.info
+    log_job(db, job_id, level, f"{phase} integrity {integrity}", integrity)
+
+
 def _number_reload_stats(
     *,
     fetched: int,
@@ -582,14 +599,9 @@ class SyncService:
                     upserted=int(persist_stats.get("upserted") or 0),
                 )
                 log_job(self.db, job.id, SyncLogLevel.info, f"Free numbers {free_detail}")
-                if isinstance(result.extra_stats.get("integrity"), dict):
-                    log_job(
-                        self.db,
-                        job.id,
-                        SyncLogLevel.info,
-                        f"Free integrity {result.extra_stats['integrity']}",
-                        result.extra_stats["integrity"],
-                    )
+                _log_page_integrity(
+                    self.db, job.id, phase="Free", extra_stats=result.extra_stats
+                )
                 # Free cutover is committed; purchased failure after this = split inventory.
                 stats["_free_cutover_committed"] = True
                 free_block["operators_preserved"] = preserved_ops
@@ -789,12 +801,15 @@ class SyncService:
                         persist_stats = {}
                     parsed = int(result.parsed) if result.parsed else len(numbers)
                     fetched = int(result.fetched)
-                    stats["categories"]["purchased_numbers"] = _number_reload_stats(
+                    purch_block = _number_reload_stats(
                         fetched=fetched,
                         parsed=parsed,
                         persist_stats=persist_stats,
                         previous=previous,
                     )
+                    if result.extra_stats:
+                        purch_block.update(result.extra_stats)
+                    stats["categories"]["purchased_numbers"] = purch_block
                     purch_detail = _number_reload_detail(
                         fetched=fetched,
                         parsed=parsed,
@@ -802,6 +817,9 @@ class SyncService:
                     )
                     log_job(
                         self.db, job.id, SyncLogLevel.info, f"Purchased numbers {purch_detail}"
+                    )
+                    _log_page_integrity(
+                        self.db, job.id, phase="Purchased", extra_stats=result.extra_stats
                     )
                     self.db.commit()
                     await _hook("purchased", "end", purch_detail)

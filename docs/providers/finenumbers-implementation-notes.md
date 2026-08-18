@@ -42,10 +42,10 @@ Nav: [`finenumbers/SOURCE.md`](finenumbers/SOURCE.md) · [`finenumbers-contract.
 - Enrichment (`enrich_catalog_operators`) runs as the **last** unified-sync stage after `finalize`.
 - Every currently present free/purchased row: local ranges first; cache miss → always `lookup?phone=` (no skip for already-filled operator).
 - Successful cache/API value **overwrites** existing `operator`.
-- When `garTerritory` is present, overlay **both** `city_name` and `region_name` even if operator did not change. Empty GAR leaves provider geo unchanged.
-- Terminal PSTN miss (`found=false` / empty / invalid MSISDN / HTTP 400|404|422) → **`Нет в реестре`** (blue row in UI/XLSX); counts as covered for sync gate; geo not cleared.
+- When `garTerritory` is present, overlay **both** `city_name` and `region_name` even if operator did not change. Empty GAR leaves catalog geo NULL (not provider geo, not PSTN `region`).
+- Terminal PSTN miss (`found=false` / empty / invalid MSISDN / HTTP 400|404|422) → **`Нет в реестре`** on `operator`, `city_name`, and `region_name` (blue row in UI/XLSX); counts as covered for sync gate.
 - Transport/5xx/auth lookup errors: client retries 5xx; enrich re-queues across waves; unresolved → do **not** write sentinel, do **not** clear existing operator/geo, fail `require_full_coverage` with status/body in logs.
-- Final `operator` SoT is PSTN enrich (or the sentinel above). GAR overlay is SoT for city/region when the field is present.
+- Final `operator` SoT is PSTN enrich (or the sentinel above). GAR overlay is SoT for city/region when the field is present; sentinel is SoT on terminal miss.
 - After deploy: reload PSTN cache («Загрузить кеш»), then sync — old cache rows have NULL `gar_territory`.
 
 ## Sync gate

@@ -9,7 +9,7 @@ Source methods: [`uis-contract.md`](uis-contract.md).
 | `phone_number` | Normalize to `7XXXXXXXXXX` → `msisdn`, `provider_number_key`; derive `abc_code`, `number_local`, `number_category` |
 | `onetime_payment` | `buy_price` |
 | `monthly_charge` | `period_price` |
-| `location_name` | `region_name` |
+| `location_name` | DTO / raw `region_name` (catalog Город/Регион from PSTN GAR only) |
 | `location_mnemonic` | `region_external_id` (string) + raw |
 | `category` | `number_type` (usual/bronze/… — beauty class, not ABC «Категория») |
 | `min_charge` | raw_payload only |

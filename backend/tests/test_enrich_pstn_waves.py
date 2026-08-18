@@ -207,7 +207,15 @@ def test_found_false_writes_not_in_registry_and_passes_coverage(monkeypatch):
         )
     )
     assert calls == ["9005555555"]
-    assert written == [_upd(cat_id, contract.OPERATOR_NOT_IN_REGISTRY)]
+    assert written == [
+        _upd(
+            cat_id,
+            contract.OPERATOR_NOT_IN_REGISTRY,
+            True,
+            contract.OPERATOR_NOT_IN_REGISTRY,
+            contract.OPERATOR_NOT_IN_REGISTRY,
+        )
+    ]
     assert stats["not_in_registry"] == 1
     assert stats["missing"] == 0
     assert stats["errors"] == 0
@@ -243,7 +251,15 @@ def test_http_404_writes_not_in_registry_and_passes_coverage(monkeypatch):
             concurrency=2,
         )
     )
-    assert written == [_upd(cat_id, contract.OPERATOR_NOT_IN_REGISTRY)]
+    assert written == [
+        _upd(
+            cat_id,
+            contract.OPERATOR_NOT_IN_REGISTRY,
+            True,
+            contract.OPERATOR_NOT_IN_REGISTRY,
+            contract.OPERATOR_NOT_IN_REGISTRY,
+        )
+    ]
     assert stats["not_in_registry"] == 1
     assert stats["errors"] == 0
     assert stats["missing"] == 0
