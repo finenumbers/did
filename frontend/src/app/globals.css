@@ -169,8 +169,15 @@ button.nav-logout:hover {
 }
 
 .numbers-panel .filters,
-.numbers-panel .active-filters {
+.numbers-panel .active-filters,
+.numbers-panel .regions-toolbar {
   flex-shrink: 0;
+}
+
+.regions-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
 }
 
 h1 { margin: 0 0 1rem; font-size: 1.35rem; }

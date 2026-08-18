@@ -151,3 +151,9 @@ export interface RegionCityItem {
   city_name: string;
   region_name: string | null;
 }
+
+export interface RegionsLoadResult {
+  ok: boolean;
+  count: number;
+  message: string;
+}

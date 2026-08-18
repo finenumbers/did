@@ -9,3 +9,9 @@ class RegionCityItem(BaseModel):
     abc: str | None = None
     city_name: str
     region_name: str | None = None
+
+
+class RegionsLoadResult(BaseModel):
+    ok: bool = True
+    count: int
+    message: str

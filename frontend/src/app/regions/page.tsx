@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ApiError, apiFetch } from "@/lib/api/client";
-import type { RegionCityItem } from "@/lib/types/api";
+import type { RegionCityItem, RegionsLoadResult } from "@/lib/types/api";
 
 function cellText(value: string | null | undefined): string {
   if (value === null || value === undefined || value === "") return "—";
@@ -12,32 +12,47 @@ function cellText(value: string | null | undefined): string {
 export default function RegionsPage() {
   const [items, setItems] = useState<RegionCityItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reloading, setReloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
+  const loadList = useCallback(async ({ asInitial = false } = {}) => {
+    if (asInitial) setLoading(true);
     setError(null);
-    void apiFetch<RegionCityItem[]>("/api/v1/regions")
-      .then((rows) => {
-        if (cancelled) return;
-        setItems(rows);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setError(err instanceof ApiError ? err.message : "Не удалось загрузить регионы");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    try {
+      const rows = await apiFetch<RegionCityItem[]>("/api/v1/regions");
+      setItems(rows);
+    } catch (err: unknown) {
+      setError(err instanceof ApiError ? err.message : "Не удалось загрузить регионы");
+    } finally {
+      if (asInitial) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadList({ asInitial: true });
+  }, [loadList]);
+
+  async function loadFromSipout() {
+    setReloading(true);
+    setError(null);
+    try {
+      await apiFetch<RegionsLoadResult>("/api/v1/regions/load", { method: "POST" });
+      await loadList();
+    } catch (err: unknown) {
+      setError(err instanceof ApiError ? err.message : "Не удалось загрузить данные SipOut");
+    } finally {
+      setReloading(false);
+    }
+  }
 
   return (
     <div className="numbers-page">
       <div className="panel numbers-panel">
+        <div className="regions-toolbar">
+          <button type="button" disabled={reloading} onClick={() => void loadFromSipout()}>
+            {reloading ? "Загрузка…" : "Загрузить данные"}
+          </button>
+        </div>
         {error && <div className="state error">{error}</div>}
         <div className="table-scroll">
           <table className="regions-table">
@@ -59,10 +74,8 @@ export default function RegionsPage() {
             </tbody>
           </table>
           {loading && items.length === 0 && <div className="state">Загрузка…</div>}
-          {!loading && !error && items.length === 0 && (
-            <div className="state">
-              Нет данных. Запустите синхронизацию на странице «Синхронизация».
-            </div>
+          {!loading && !reloading && !error && items.length === 0 && (
+            <div className="state">Нет данных. Нажмите «Загрузить данные».</div>
           )}
         </div>
       </div>

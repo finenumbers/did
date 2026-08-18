@@ -34,6 +34,7 @@ from app.models.voximplant_raw import (
     VoximplantRegionRaw,
 )
 from app.models.mcn_raw import McnCityRaw, McnFreeNumberRaw, McnRegionRaw
+from app.models.regions_directory import RegionsDirectory
 
 __all__ = [
     "AuroraFreeNumberRaw",
@@ -54,6 +55,7 @@ __all__ = [
     "NumbersCatalogNormalized",
     "Provider",
     "ProviderConnection",
+    "RegionsDirectory",
     "PstnInnCacheOperator",
     "PstnInnRangeCache",
     "RunexisCityRaw",
