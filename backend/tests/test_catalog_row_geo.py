@@ -37,6 +37,8 @@ def test_catalog_row_drops_provider_geo_keeps_external_ids():
     assert row["region_external_id"] == "region-1"
     assert "mapping_confidence" not in row
     assert "number_type" not in row
+    assert "mask" not in row
+    assert "display_mask" not in row
     assert "points" not in row
     assert "notes" not in row
     assert "class" not in row

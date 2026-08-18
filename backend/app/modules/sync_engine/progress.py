@@ -51,6 +51,7 @@ STAGE_DEFS: list[dict[str, str]] = [
     {"id": "operator_enrichment", "group": "Завершение", "label": "Обогащение PSTN"},
     {"id": "rtu_flags", "group": "Завершение", "label": "Флаги РТУ"},
     {"id": "geographic_from_regions", "group": "Завершение", "label": "Разбор городских по Регионам"},
+    {"id": "mask_types", "group": "Завершение", "label": "Тип и премиум по маскам"},
     {"id": "catalog_snapshot", "group": "Завершение", "label": "Снимок каталога XLSX"},
 ]
 

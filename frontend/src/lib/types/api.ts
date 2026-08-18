@@ -19,8 +19,8 @@ export interface NumberItem {
   city_name: string | null;
   buy_price: string | null;
   period_price: string | null;
-  mask: string | null;
-  display_mask: string | null;
+  type_label: string | null;
+  premium: string | null;
   operator: string | null;
   rtu_connected?: string | null;
   is_currently_present: boolean;
@@ -135,5 +135,24 @@ export interface RegionCityItem {
 export interface RegionsLoadResult {
   ok: boolean;
   count: number;
+  message: string;
+}
+
+export interface MaskTypeItem {
+  id: string;
+  digit_capacity: string;
+  category: string;
+  abc: string;
+  mask: string;
+  type_label: string | null;
+  premium: string | null;
+  purchase: string | null;
+}
+
+export interface MaskTypesLoadResult {
+  ok: boolean;
+  count: number;
+  updated: number;
+  inserted: number;
   message: string;
 }

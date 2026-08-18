@@ -328,6 +328,21 @@ mark.search-hit {
   width: auto;
 }
 
+.numbers-panel .masks-table {
+  width: 100%;
+  min-width: 100%;
+  table-layout: auto;
+}
+.numbers-panel .masks-table th:nth-child(-n+4),
+.numbers-panel .masks-table td:nth-child(-n+4) {
+  width: 1%;
+  white-space: nowrap;
+}
+.numbers-panel .masks-table th:nth-child(n+5),
+.numbers-panel .masks-table td:nth-child(n+5) {
+  width: auto;
+}
+
 .table-scroll thead th {
   position: sticky;
   top: 0;

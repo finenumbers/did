@@ -20,6 +20,7 @@ _TAIL = (
     "operator_enrichment",
     "rtu_flags",
     "geographic_from_regions",
+    "mask_types",
     "catalog_snapshot",
 )
 
@@ -28,8 +29,8 @@ def test_stage_defs_full_provider_matrix():
     ids = [s["id"] for s in STAGE_DEFS]
     assert ids[0] == "prepare"
     assert STAGE_DEFS[0]["group"] == "Подготовка"
-    assert ids[-5:] == list(_TAIL)
-    assert all(s["group"] == "Завершение" for s in STAGE_DEFS[-5:])
+    assert ids[-6:] == list(_TAIL)
+    assert all(s["group"] == "Завершение" for s in STAGE_DEFS[-6:])
     assert "Общее" not in {s["group"] for s in STAGE_DEFS}
     for provider in _PROVIDERS:
         assert f"{provider}_dictionaries" in ids

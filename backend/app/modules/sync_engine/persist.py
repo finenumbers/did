@@ -154,8 +154,6 @@ def _catalog_extra_fields(num: NormalizedNumber) -> dict[str, Any]:
         "abc_code": num.abc_code,
         "number_category": classify_number_category(num.abc_code, num.msisdn),
         "number_local": num.number_local,
-        "mask": num.mask,
-        "display_mask": num.display_mask,
         "operator": num.operator,
         "rtu_connected": num.rtu_connected,
     }

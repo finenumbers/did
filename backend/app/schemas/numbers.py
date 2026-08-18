@@ -19,8 +19,8 @@ class NumberItem(BaseModel):
     city_name: str | None = None
     buy_price: Decimal | None = None
     period_price: Decimal | None = None
-    mask: str | None = None
-    display_mask: str | None = None
+    type_label: str | None = None
+    premium: str | None = None
     operator: str | None = None
     rtu_connected: str | None = None
     is_currently_present: bool

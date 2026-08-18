@@ -28,8 +28,8 @@ EXPORT_COLUMNS: list[tuple[str, str]] = [
     ("operator", "Оператор"),
     ("buy_price", "Покупка"),
     ("period_price", "Абонплата"),
-    ("mask", "Маска"),
-    ("display_mask", "Display mask"),
+    ("type_label", "Тип"),
+    ("premium", "Премиум"),
     ("rtu_connected", "Подключено в РТУ"),
 ]
 
@@ -54,8 +54,8 @@ _HEADER_MIN_CHARS: dict[str, int] = {
     "Оператор": 18,
     "Покупка": 10,
     "Абонплата": 12,
-    "Маска": 14,
-    "Display mask": 16,
+    "Тип": 12,
+    "Премиум": 12,
     "Подключено в РТУ": 18,
 }
 
@@ -69,8 +69,8 @@ _EXPORT_LOAD_ONLY = (
     NumbersCatalogNormalized.operator,
     NumbersCatalogNormalized.buy_price,
     NumbersCatalogNormalized.period_price,
-    NumbersCatalogNormalized.mask,
-    NumbersCatalogNormalized.display_mask,
+    NumbersCatalogNormalized.type_label,
+    NumbersCatalogNormalized.premium,
     NumbersCatalogNormalized.rtu_connected,
 )
 

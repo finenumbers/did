@@ -566,11 +566,12 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
                 ),
                 catalog_checksum,
             )
-        # RTU depends on post-enrich operator; geographic ABC/geo is last catalog mutation.
+        # RTU depends on post-enrich operator; mask types need final ABC/local after geo.
         _run_rtu_flags(db, run=run, tracker=tracker, category_stats=category_stats)
         _run_geographic_from_regions(
             db, run=run, tracker=tracker, category_stats=category_stats
         )
+        _run_mask_types(db, run=run, tracker=tracker, category_stats=category_stats)
         try:
             from app.modules.sync_engine.geo_log_dump import dump_sync_geo_diagnostics
 
@@ -884,6 +885,7 @@ _TAIL_STAGE_IDS = (
     "operator_enrichment",
     "rtu_flags",
     "geographic_from_regions",
+    "mask_types",
 )
 
 
@@ -1023,6 +1025,50 @@ def _run_geographic_from_regions(
             f"Geographic ABC from regions failed: {exc}",
         )
         tracker.fail("geographic_from_regions", str(exc))
+
+
+def _run_mask_types(
+    db: Session,
+    *,
+    run: SyncRun,
+    tracker: SyncProgressTracker,
+    category_stats: dict[str, Any],
+) -> None:
+    tracker.begin("mask_types", "Тип и премиум по справочнику Маски и типы")
+    try:
+        from app.modules.catalog.apply_mask_types import apply_mask_types
+        from app.services.mask_types_service import ensure_mask_types_seeded
+
+        ensure_mask_types_seeded(db)
+        stats = apply_mask_types(db)
+        db.commit()
+        category_stats["mask_types"] = stats
+        log_run(
+            db,
+            run.id,
+            SyncLogLevel.info,
+            (
+                "Mask types lookup "
+                f"directory={stats.get('directory')} "
+                f"scanned={stats.get('scanned')} "
+                f"matched={stats.get('matched')} "
+                f"updated={stats.get('updated')}"
+            ),
+            stats,
+        )
+        tracker.end(
+            "mask_types",
+            f"directory={stats.get('directory')}, scanned={stats.get('scanned')}, "
+            f"matched={stats.get('matched')}, updated={stats.get('updated')}",
+        )
+    except Exception as exc:
+        log_run(
+            db,
+            run.id,
+            SyncLogLevel.error,
+            f"Mask types lookup failed: {exc}",
+        )
+        tracker.fail("mask_types", str(exc))
 
 
 def _run_catalog_snapshot(

@@ -12,6 +12,7 @@ const links = [
   { href: "/free-numbers", label: "Свободные номера" },
   { href: "/purchased-numbers", label: "Купленные номера" },
   { href: "/booking", label: "Бронирование" },
+  { href: "/masks", label: "Маски и типы" },
   { href: "/regions", label: "Регионы" },
   { href: "/settings", label: "Настройки" },
   { href: "/sync-logs", label: "Синхронизация" },

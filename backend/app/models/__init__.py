@@ -34,6 +34,7 @@ from app.models.voximplant_raw import (
 )
 from app.models.mcn_raw import McnCityRaw, McnFreeNumberRaw, McnRegionRaw
 from app.models.regions_directory import RegionsDirectory
+from app.models.mask_types import MaskType
 
 __all__ = [
     "AuroraFreeNumberRaw",
@@ -53,6 +54,7 @@ __all__ = [
     "NumbersCatalogNormalized",
     "Provider",
     "ProviderConnection",
+    "MaskType",
     "RegionsDirectory",
     "PstnInnCacheOperator",
     "PstnInnRangeCache",

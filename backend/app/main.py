@@ -130,11 +130,22 @@ def seed_pstn_inn_cache_operators() -> None:
         db.close()
 
 
+def seed_mask_types() -> None:
+    db = SessionLocal()
+    try:
+        from app.services.mask_types_service import ensure_mask_types_seeded
+
+        ensure_mask_types_seeded(db)
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     seed_providers()
     backfill_aurora_settings()
     seed_pstn_inn_cache_operators()
+    seed_mask_types()
     mark_interrupted_runs()
     schedule_task = asyncio.create_task(sync_schedule_loop())
     try:

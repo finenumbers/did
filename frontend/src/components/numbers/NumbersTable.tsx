@@ -71,20 +71,20 @@ const CATALOG_COLUMNS: Col[] = [
     value: (r) => formatPrice(r.period_price),
   },
   {
-    key: "mask",
-    header: "Маска",
-    value: (r) => r.mask,
+    key: "type_label",
+    header: "Тип",
+    value: (r) => r.type_label,
   },
-    {
-        key: "display_mask",
-        header: "Display mask",
-        value: (r) => r.display_mask,
-    },
-    {
-        key: "rtu_connected",
-        header: "Подключено в РТУ",
-        value: (r) => r.rtu_connected,
-    },
+  {
+    key: "premium",
+    header: "Премиум",
+    value: (r) => r.premium,
+  },
+  {
+    key: "rtu_connected",
+    header: "Подключено в РТУ",
+    value: (r) => r.rtu_connected,
+  },
 ];
 
 function formatExportEta(startedMs: number, done: number, total: number): string | null {
