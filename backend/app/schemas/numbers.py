@@ -20,7 +20,9 @@ class NumberItem(BaseModel):
     buy_price: Decimal | None = None
     period_price: Decimal | None = None
     type_label: str | None = None
-    premium: str | None = None
+    premium: Decimal | None = None
+    mask_purchase: Decimal | None = None
+    mask_period: Decimal | None = None
     operator: str | None = None
     rtu_connected: str | None = None
     is_currently_present: bool

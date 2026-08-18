@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 
-from sqlalchemy import Text, UniqueConstraint
+from sqlalchemy import Numeric, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -31,5 +32,6 @@ class MaskType(Base, TimestampMixin):
     abc: Mapped[str] = mapped_column(Text, nullable=False, default="")
     mask: Mapped[str] = mapped_column(Text, nullable=False)
     type_label: Mapped[str | None] = mapped_column(Text, nullable=True)
-    premium: Mapped[str | None] = mapped_column(Text, nullable=True)
-    purchase: Mapped[str | None] = mapped_column(Text, nullable=True)
+    premium: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    purchase: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    period: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)

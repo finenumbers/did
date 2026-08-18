@@ -26,8 +26,10 @@ EXPORT_COLUMNS: list[tuple[str, str]] = [
     ("city_name", "Город"),
     ("region_name", "Регион"),
     ("operator", "Оператор"),
-    ("buy_price", "Покупка"),
-    ("period_price", "Абонплата"),
+    ("buy_price", "Покупка (Входящая)"),
+    ("period_price", "Абонплата (Входящая)"),
+    ("mask_purchase", "Покупка"),
+    ("mask_period", "Абонплата"),
     ("type_label", "Тип"),
     ("premium", "Премиум"),
     ("rtu_connected", "Подключено в РТУ"),
@@ -52,6 +54,8 @@ _HEADER_MIN_CHARS: dict[str, int] = {
     "Город": 16,
     "Регион": 18,
     "Оператор": 18,
+    "Покупка (Входящая)": 18,
+    "Абонплата (Входящая)": 20,
     "Покупка": 10,
     "Абонплата": 12,
     "Тип": 12,
@@ -69,6 +73,8 @@ _EXPORT_LOAD_ONLY = (
     NumbersCatalogNormalized.operator,
     NumbersCatalogNormalized.buy_price,
     NumbersCatalogNormalized.period_price,
+    NumbersCatalogNormalized.mask_purchase,
+    NumbersCatalogNormalized.mask_period,
     NumbersCatalogNormalized.type_label,
     NumbersCatalogNormalized.premium,
     NumbersCatalogNormalized.rtu_connected,
@@ -107,13 +113,16 @@ def _format_price(value: Any) -> str:
     return sign + " ".join(reversed(parts))
 
 
+_PRICE_EXPORT_KEYS = frozenset(
+    {"buy_price", "period_price", "mask_purchase", "mask_period", "premium"}
+)
+
+
 def _cell_value(key: str, row: NumbersCatalogNormalized, provider_code: str) -> Any:
     if key == "provider_code":
         return provider_code
-    if key == "buy_price":
-        return _format_price(row.buy_price)
-    if key == "period_price":
-        return _format_price(row.period_price)
+    if key in _PRICE_EXPORT_KEYS:
+        return _format_price(getattr(row, key, None))
     val = getattr(row, key, None)
     return "" if val is None else val
 
@@ -138,6 +147,10 @@ def _iso_dt(value: Any) -> str | None:
     return value.isoformat() if isinstance(value, datetime) else None
 
 
+def export_columns_schema() -> str:
+    return "|".join(header for _key, header in EXPORT_COLUMNS)
+
+
 def catalog_fingerprint(db: Session, inventory_kind: InventoryKind) -> dict[str, Any]:
     count, max_seen, max_updated = db.execute(
         select(
@@ -153,6 +166,7 @@ def catalog_fingerprint(db: Session, inventory_kind: InventoryKind) -> dict[str,
         "count": int(count or 0),
         "max_last_seen_at": _iso_dt(max_seen),
         "max_updated_at": _iso_dt(max_updated),
+        "columns_schema": export_columns_schema(),
     }
 
 

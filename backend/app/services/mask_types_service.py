@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
@@ -23,7 +24,9 @@ MASK_TYPES_XLSX_HEADERS = (
     "Тип",
     "Премиум",
     "Покупка",
+    "Абонплата",
 )
+MASK_TYPES_XLSX_HEADERS_V7 = MASK_TYPES_XLSX_HEADERS[:7]
 MASK_TYPES_XLSX_SHEET = "Маски"
 MAX_IMPORT_BYTES = 5 * 1024 * 1024
 EXPECTED_SEED_COUNT = 5220
@@ -36,8 +39,9 @@ class MaskTypeImportRow:
     abc: str
     mask: str
     type_label: str | None
-    premium: str | None
-    purchase: str | None
+    premium: Decimal | None
+    purchase: Decimal | None
+    period: Decimal | None
 
 
 def _cell_text(value: object) -> str:
@@ -51,6 +55,32 @@ def _nullable_cell(value: object) -> str | None:
 
 def _row_empty(values: list[object]) -> bool:
     return all(_cell_text(v) == "" for v in values)
+
+
+def _parse_price_cell(value: object, *, row: int, column: str) -> Decimal | None:
+    if isinstance(value, bool):
+        raise ValueError(f"Строка {row}: некорректная цена в столбце {column}")
+    if isinstance(value, int):
+        return Decimal(value)
+    if isinstance(value, float):
+        return Decimal(str(value))
+    if isinstance(value, Decimal):
+        return value
+    text = _cell_text(value).replace(" ", "").replace(",", ".")
+    if not text:
+        return None
+    try:
+        return Decimal(text)
+    except InvalidOperation as exc:
+        raise ValueError(f"Строка {row}: некорректная цена в столбце {column}") from exc
+
+
+def _xlsx_price(value: Decimal | None) -> object:
+    if value is None:
+        return ""
+    if value == value.to_integral_value():
+        return int(value)
+    return float(value)
 
 
 def parse_mask_types_xlsx(data: bytes) -> list[MaskTypeImportRow]:
@@ -71,19 +101,25 @@ def parse_mask_types_xlsx(data: bytes) -> list[MaskTypeImportRow]:
             header = next(rows_iter)
         except StopIteration as exc:
             raise ValueError("Нет заголовков") from exc
-        got = tuple(_cell_text(c) for c in list(header or ())[:7])
-        if got != MASK_TYPES_XLSX_HEADERS:
+        header_cells = list(header or ())
+        got7 = tuple(_cell_text(c) for c in header_cells[:7])
+        got8 = tuple(_cell_text(c) for c in header_cells[:8])
+        if got8 == MASK_TYPES_XLSX_HEADERS:
+            width = 8
+        elif got7 == MASK_TYPES_XLSX_HEADERS_V7:
+            width = 7
+        else:
             raise ValueError(
-                "Заголовки должны быть: Разрядность, Категория, ABC, Маска, Тип, Премиум, Покупка"
+                "Заголовки должны быть: Разрядность, Категория, ABC, Маска, Тип, Премиум, Покупка, Абонплата"
             )
         canonical = canonical_beauty_masks()
         out: list[MaskTypeImportRow] = []
         seen: set[tuple[str, str, str, str]] = set()
         for idx, raw in enumerate(rows_iter, start=2):
             cells = list(raw or ())
-            while len(cells) < 7:
+            while len(cells) < width:
                 cells.append(None)
-            chunk = cells[:7]
+            chunk = cells[:width]
             if _row_empty(chunk):
                 continue
             cap = _cell_text(chunk[0])
@@ -96,8 +132,15 @@ def parse_mask_types_xlsx(data: bytes) -> list[MaskTypeImportRow]:
                 raise ValueError(f"Строка {idx}: неизвестная маска {mask}")
             key = (cap, category, abc, mask)
             if key in seen:
-                raise ValueError(f"Строка {idx}: повторяется комбинация разрядность/категория/ABC/маска")
+                raise ValueError(
+                    f"Строка {idx}: повторяется комбинация разрядность/категория/ABC/маска"
+                )
             seen.add(key)
+            period = (
+                _parse_price_cell(chunk[7], row=idx, column="Абонплата")
+                if width == 8
+                else None
+            )
             out.append(
                 MaskTypeImportRow(
                     digit_capacity=cap,
@@ -105,8 +148,9 @@ def parse_mask_types_xlsx(data: bytes) -> list[MaskTypeImportRow]:
                     abc=abc,
                     mask=mask,
                     type_label=_nullable_cell(chunk[4]),
-                    premium=_nullable_cell(chunk[5]),
-                    purchase=_nullable_cell(chunk[6]),
+                    premium=_parse_price_cell(chunk[5], row=idx, column="Премиум"),
+                    purchase=_parse_price_cell(chunk[6], row=idx, column="Покупка"),
+                    period=period,
                 )
             )
         return out
@@ -178,6 +222,7 @@ class MaskTypesService:
                 type_label=row.type_label,
                 premium=row.premium,
                 purchase=row.purchase,
+                period=row.period,
             )
             for row in rows
         ]
@@ -196,8 +241,9 @@ class MaskTypesService:
                         item.abc,
                         item.mask,
                         item.type_label or "",
-                        item.premium or "",
-                        item.purchase or "",
+                        _xlsx_price(item.premium),
+                        _xlsx_price(item.purchase),
+                        _xlsx_price(item.period),
                     ]
                 )
             writer.finalize()
@@ -228,6 +274,7 @@ class MaskTypesService:
                     type_label=item.type_label,
                     premium=item.premium,
                     purchase=item.purchase,
+                    period=item.period,
                 )
                 self.db.add(row)
                 by_key[key] = row
@@ -236,6 +283,7 @@ class MaskTypesService:
             row.type_label = item.type_label
             row.premium = item.premium
             row.purchase = item.purchase
+            row.period = item.period
             updated += 1
         self.db.commit()
         return MaskTypesLoadResult(

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from app.modules.catalog.apply_mask_types import (
     build_mask_type_index,
     lookup_type_premium,
@@ -60,26 +62,46 @@ def test_beauty_mask_round_trip_enumerated():
 
 def test_lookup_prefers_exact_abc_then_empty():
     class Row:
-        def __init__(self, cap, cat, abc, mask, type_label, premium):
+        def __init__(self, cap, cat, abc, mask, type_label, premium, purchase, period):
             self.digit_capacity = cap
             self.category = cat
             self.abc = abc
             self.mask = mask
             self.type_label = type_label
             self.premium = premium
+            self.purchase = purchase
+            self.period = period
 
     index = build_mask_type_index(
         [
-            Row("7", "Городской", "", "XXXXXXX", "обычный", "нет"),
-            Row("7", "Городской", "495", "XXXXXXX", "москва", "да"),
+            Row(
+                "7",
+                "Городской",
+                "",
+                "XXXXXXX",
+                "обычный",
+                Decimal("1"),
+                Decimal("3"),
+                Decimal("4"),
+            ),
+            Row(
+                "7",
+                "Городской",
+                "495",
+                "XXXXXXX",
+                "москва",
+                Decimal("2"),
+                Decimal("10"),
+                Decimal("20"),
+            ),
         ]
     )
     assert lookup_type_premium(
         index, digit_capacity="7", category="Городской", abc="495", mask="XXXXXXX"
-    ) == ("москва", "да")
+    ) == ("москва", Decimal("2"), Decimal("10"), Decimal("20"))
     assert lookup_type_premium(
         index, digit_capacity="7", category="Городской", abc="499", mask="XXXXXXX"
-    ) == ("обычный", "нет")
+    ) == ("обычный", Decimal("1"), Decimal("3"), Decimal("4"))
     assert (
         lookup_type_premium(
             index, digit_capacity="7", category="Мобильный", abc="495", mask="XXXXXXX"
@@ -90,26 +112,39 @@ def test_lookup_prefers_exact_abc_then_empty():
 
 def test_resolve_uses_local_length_and_falls_back():
     class Row:
-        def __init__(self, cap, cat, abc, mask, type_label, premium):
+        def __init__(self, cap, cat, abc, mask, type_label, premium, purchase, period):
             self.digit_capacity = cap
             self.category = cat
             self.abc = abc
             self.mask = mask
             self.type_label = type_label
             self.premium = premium
+            self.purchase = purchase
+            self.period = period
 
     index = build_mask_type_index(
-        [Row("7", "Городской", "", "XXXXXXX", "тип", "премиум")]
+        [
+            Row(
+                "7",
+                "Городской",
+                "",
+                "XXXXXXX",
+                "тип",
+                Decimal("5"),
+                Decimal("6"),
+                Decimal("7"),
+            )
+        ]
     )
     assert resolve_catalog_type_premium(
         index,
         number_local="1111111",
         number_category="Городской",
         abc_code="495",
-    ) == ("тип", "премиум")
+    ) == ("тип", Decimal("5"), Decimal("6"), Decimal("7"))
     assert resolve_catalog_type_premium(
         index,
         number_local="1111",
         number_category="Городской",
         abc_code="495",
-    ) == (None, None)
+    ) == (None, None, None, None)

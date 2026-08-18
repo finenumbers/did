@@ -1,3 +1,4 @@
+from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -12,8 +13,9 @@ class MaskTypeItem(BaseModel):
     abc: str
     mask: str
     type_label: str | None = None
-    premium: str | None = None
-    purchase: str | None = None
+    premium: Decimal | None = None
+    purchase: Decimal | None = None
+    period: Decimal | None = None
 
 
 class MaskTypesLoadResult(BaseModel):

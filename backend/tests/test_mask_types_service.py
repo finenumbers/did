@@ -1,3 +1,4 @@
+from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -8,6 +9,7 @@ import pytest
 from app.modules.catalog.beauty_mask import enumerate_beauty_masks
 from app.services.mask_types_service import (
     MASK_TYPES_XLSX_HEADERS,
+    MASK_TYPES_XLSX_HEADERS_V7,
     MaskTypeImportRow,
     MaskTypesService,
     parse_mask_types_xlsx,
@@ -15,11 +17,15 @@ from app.services.mask_types_service import (
 from app.services.xlsx_style import StyledSheetWriter, open_styled_workbook
 
 
-def _xlsx_bytes(path: Path, rows: list[list[object]]) -> bytes:
+def _xlsx_bytes(
+    path: Path,
+    rows: list[list[object]],
+    headers: tuple[str, ...] = MASK_TYPES_XLSX_HEADERS,
+) -> bytes:
     wb = open_styled_workbook(str(path), constant_memory=True)
     try:
         ws = wb.add_worksheet("Sheet1")
-        writer = StyledSheetWriter(wb, ws, MASK_TYPES_XLSX_HEADERS)
+        writer = StyledSheetWriter(wb, ws, headers)
         for row in rows:
             writer.write_row(row)
         writer.finalize()
@@ -31,7 +37,7 @@ def _xlsx_bytes(path: Path, rows: list[list[object]]) -> bytes:
 def test_parse_numeric_excel_and_empty_abc(tmp_path: Path):
     data = _xlsx_bytes(
         tmp_path / "masks.xlsx",
-        [[7.0, "Городской", "", "XXXXXXX", "Золотой", 100, 200]],
+        [[7.0, "Городской", "", "XXXXXXX", "Золотой", 100, 200.0, "1 500,5"]],
     )
     rows = parse_mask_types_xlsx(data)
     assert len(rows) == 1
@@ -40,8 +46,31 @@ def test_parse_numeric_excel_and_empty_abc(tmp_path: Path):
     assert rows[0].abc == ""
     assert rows[0].mask == "XXXXXXX"
     assert rows[0].type_label == "Золотой"
-    assert rows[0].premium == "100"
-    assert rows[0].purchase == "200"
+    assert rows[0].premium == Decimal("100")
+    assert rows[0].purchase == Decimal("200")
+    assert rows[0].period == Decimal("1500.5")
+
+
+def test_parse_v7_headers_leave_period_null(tmp_path: Path):
+    data = _xlsx_bytes(
+        tmp_path / "masks_v7.xlsx",
+        [[7.0, "Городской", "", "XXXXXXX", "Золотой", 100, 200]],
+        headers=MASK_TYPES_XLSX_HEADERS_V7,
+    )
+    rows = parse_mask_types_xlsx(data)
+    assert len(rows) == 1
+    assert rows[0].premium == Decimal("100")
+    assert rows[0].purchase == Decimal("200")
+    assert rows[0].period is None
+
+
+def test_parse_non_numeric_price_rejected(tmp_path: Path):
+    data = _xlsx_bytes(
+        tmp_path / "bad_price.xlsx",
+        [[7, "Городской", "", "XXXXXXX", "Золотой", "премиум", "", ""]],
+    )
+    with pytest.raises(ValueError, match="некорректная цена"):
+        parse_mask_types_xlsx(data)
 
 
 def test_parse_unknown_mask_rejected(tmp_path: Path):
@@ -76,6 +105,7 @@ def test_upsert_inserts_new_combo_without_deleting_seed(monkeypatch):
         type_label=None,
         premium=None,
         purchase=None,
+        period=None,
     )
     db = MagicMock()
     db.scalar.return_value = 5220
@@ -89,8 +119,9 @@ def test_upsert_inserts_new_combo_without_deleting_seed(monkeypatch):
                 abc="495",
                 mask="XXXXXXX",
                 type_label="москва",
-                premium="да",
-                purchase="10",
+                premium=Decimal("5"),
+                purchase=Decimal("10"),
+                period=Decimal("20"),
             )
         ],
     )

@@ -2,11 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, apiDownload, apiFetch, apiUpload } from "@/lib/api/client";
+import { formatPrice } from "@/lib/format";
 import type { MaskTypeItem, MaskTypesLoadResult } from "@/lib/types/api";
 
 function cellText(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === "") return "—";
   return String(value);
+}
+
+function priceText(value: string | number | null | undefined): string {
+  return formatPrice(value) ?? "—";
 }
 
 export default function MasksPage() {
@@ -115,6 +120,7 @@ export default function MasksPage() {
                 <th>Тип</th>
                 <th>Премиум</th>
                 <th>Покупка</th>
+                <th>Абонплата</th>
               </tr>
             </thead>
             <tbody>
@@ -125,8 +131,9 @@ export default function MasksPage() {
                   <td>{cellText(row.abc)}</td>
                   <td>{row.mask}</td>
                   <td>{cellText(row.type_label)}</td>
-                  <td>{cellText(row.premium)}</td>
-                  <td>{cellText(row.purchase)}</td>
+                  <td>{priceText(row.premium)}</td>
+                  <td>{priceText(row.purchase)}</td>
+                  <td>{priceText(row.period)}</td>
                 </tr>
               ))}
             </tbody>

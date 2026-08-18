@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import threading
 import time
 from pathlib import Path
@@ -12,7 +13,7 @@ from openpyxl import load_workbook
 
 from app.models.enums import InventoryKind
 from app.services import numbers_export_jobs as jobs
-from app.services.numbers_export import is_default_export_query
+from app.services.numbers_export import export_columns_schema, is_default_export_query
 
 
 def test_is_default_export_query():
@@ -182,6 +183,56 @@ def test_snapshot_stale_when_updated_at_changes(tmp_path: Path, monkeypatch: pyt
         "max_updated_at": "2026-08-19T12:00:00+00:00",
     }
     assert jobs.snapshot_is_fresh(InventoryKind.free, fp) is False
+
+
+def test_snapshot_stale_without_or_when_columns_schema_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    _reset_export_state(tmp_path, monkeypatch)
+    xlsx_path = tmp_path / "free_latest.xlsx"
+    meta_path = tmp_path / "free_latest.meta.json"
+    wb = xlsxwriter.Workbook(str(xlsx_path))
+    ws = wb.add_worksheet("Свободные")
+    ws.write(0, 0, "Провайдер")
+    wb.close()
+    schema = export_columns_schema()
+    assert "Покупка (Входящая)" in schema
+    assert "Покупка|" in schema or schema.endswith("Покупка")
+    base_fp = {
+        "count": 10,
+        "max_last_seen_at": "2026-01-01T00:00:00+00:00",
+        "max_updated_at": "2026-01-01T00:00:00+00:00",
+        "columns_schema": schema,
+    }
+    meta_path.write_text(
+        '{"count": 10, "max_last_seen_at": "2026-01-01T00:00:00+00:00",'
+        ' "max_updated_at": "2026-01-01T00:00:00+00:00",'
+        ' "sort_by": "abc_code", "sort_dir": "asc"}',
+        encoding="utf-8",
+    )
+    assert jobs.snapshot_is_fresh(InventoryKind.free, base_fp) is False
+    meta_path.write_text(
+        '{"count": 10, "max_last_seen_at": "2026-01-01T00:00:00+00:00",'
+        ' "max_updated_at": "2026-01-01T00:00:00+00:00",'
+        ' "columns_schema": "old-headers",'
+        ' "sort_by": "abc_code", "sort_dir": "asc"}',
+        encoding="utf-8",
+    )
+    assert jobs.snapshot_is_fresh(InventoryKind.free, base_fp) is False
+    meta_path.write_text(
+        json.dumps(
+            {
+                "count": 10,
+                "max_last_seen_at": "2026-01-01T00:00:00+00:00",
+                "max_updated_at": "2026-01-01T00:00:00+00:00",
+                "columns_schema": schema,
+                "sort_by": "abc_code",
+                "sort_dir": "asc",
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert jobs.snapshot_is_fresh(InventoryKind.free, base_fp) is True
 
 
 def test_unfiltered_waits_on_snapshot_writer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

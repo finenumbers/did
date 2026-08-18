@@ -43,3 +43,7 @@ def test_catalog_row_drops_provider_geo_keeps_external_ids():
     assert "notes" not in row
     assert "class" not in row
     assert "number_class" not in row
+    assert "type_label" not in row
+    assert "premium" not in row
+    assert "mask_purchase" not in row
+    assert "mask_period" not in row

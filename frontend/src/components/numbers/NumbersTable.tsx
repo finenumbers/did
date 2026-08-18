@@ -62,13 +62,23 @@ const CATALOG_COLUMNS: Col[] = [
   },
   {
     key: "buy_price",
-    header: "Покупка",
+    header: "Покупка (Входящая)",
     value: (r) => formatPrice(r.buy_price),
   },
   {
     key: "period_price",
-    header: "Абонплата",
+    header: "Абонплата (Входящая)",
     value: (r) => formatPrice(r.period_price),
+  },
+  {
+    key: "mask_purchase",
+    header: "Покупка",
+    value: (r) => formatPrice(r.mask_purchase),
+  },
+  {
+    key: "mask_period",
+    header: "Абонплата",
+    value: (r) => formatPrice(r.mask_period),
   },
   {
     key: "type_label",
@@ -78,7 +88,7 @@ const CATALOG_COLUMNS: Col[] = [
   {
     key: "premium",
     header: "Премиум",
-    value: (r) => r.premium,
+    value: (r) => formatPrice(r.premium),
   },
   {
     key: "rtu_connected",

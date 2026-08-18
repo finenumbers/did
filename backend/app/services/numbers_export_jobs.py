@@ -162,6 +162,7 @@ def snapshot_is_fresh(kind: InventoryKind, fingerprint: dict[str, Any]) -> bool:
         meta.get("count") == fingerprint.get("count")
         and meta.get("max_last_seen_at") == fingerprint.get("max_last_seen_at")
         and meta.get("max_updated_at") == fingerprint.get("max_updated_at")
+        and meta.get("columns_schema") == fingerprint.get("columns_schema")
         and meta.get("sort_by") == DEFAULT_SORT_BY
         and meta.get("sort_dir") == DEFAULT_SORT_DIR
     )
