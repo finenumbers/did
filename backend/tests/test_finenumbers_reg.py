@@ -34,6 +34,14 @@ def test_catalog_match_key_zero_pads_local():
     assert catalog_match_key("900", "234567", None) == "900|0234567"
 
 
+def test_catalog_match_key_prefers_msisdn_over_stored_abc():
+    assert catalog_match_key("3842", "666666", "73842666666") == "384|2666666"
+    assert catalog_match_key("384", "2666666", "73842666666") == "384|2666666"
+    assert catalog_match_key("3842", "666666", "73842666666") == catalog_match_key(
+        "384", "2666666", "73842666666"
+    )
+
+
 def test_reg_key_set_dedupes():
     a = map_reg_endpoint({"endpointNumber": "73852222205"})
     b = map_reg_endpoint({"endpointNumber": "73852222205"})

@@ -10,13 +10,7 @@ from app.providers.finenumbers.mapper import msisdn_from_abc_local, parse_msisdn
 
 
 def catalog_match_key(abc_code: str | None, number_local: str | None, msisdn: str | None) -> str | None:
-    """Stable key for ABC+local matching (zero-padded local). Fallback: msisdn digits."""
-    if abc_code and number_local is not None and str(number_local).strip() != "":
-        try:
-            local_i = int(str(number_local).strip())
-            return f"{str(abc_code).strip()}|{local_i:07d}"
-        except (TypeError, ValueError):
-            pass
+    """Stable key from MSISDN (always 3+7). Fallback: stored abc + zero-padded local."""
     if msisdn:
         parts = parse_msisdn_parts(str(msisdn))
         if parts:
@@ -25,6 +19,12 @@ def catalog_match_key(abc_code: str | None, number_local: str | None, msisdn: st
         digits = "".join(ch for ch in str(msisdn) if ch.isdigit())
         if digits:
             return f"msisdn|{digits}"
+    if abc_code and number_local is not None and str(number_local).strip() != "":
+        try:
+            local_i = int(str(number_local).strip())
+            return f"{str(abc_code).strip()}|{local_i:07d}"
+        except (TypeError, ValueError):
+            pass
     return None
 
 

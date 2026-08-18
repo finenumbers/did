@@ -54,7 +54,9 @@ def build_inventory_summary(category_stats: dict[str, Any]) -> list[dict[str, An
     """Flatten per-provider free/purchased reload stats into was/became rows."""
     rows: list[dict[str, Any]] = []
     for provider, cats in (category_stats or {}).items():
-        if provider == "operator_enrichment" or not isinstance(cats, dict):
+        if provider in {"operator_enrichment", "geographic_from_regions"} or not isinstance(
+            cats, dict
+        ):
             continue
         label_provider = _PROVIDER_LABELS.get(provider, provider)
         for cat_key, kind_short in _KIND_SHORT.items():

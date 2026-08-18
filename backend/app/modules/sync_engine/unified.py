@@ -474,7 +474,6 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
                 or f"Sync run stopped externally (status={run.status.value})"
             )
 
-        # finalize before operator enrichment — enrich is the last sync stage
         tracker.begin("finalize", "Завершение")
         try:
             dropped_meta = write_dropped_xlsx()
@@ -567,33 +566,11 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
                 ),
                 catalog_checksum,
             )
-        # Always re-apply RTU after enrich — even if enrichment failed: batches may
-        # already be committed, and skipping would leave stale Своя/Внешняя flags.
-        # Finenumbers labels depend on final (post-enrich) operator.
-        fn_cats = category_stats.get("finenumbers")
-        purch_stats = (
-            fn_cats.get("purchased_numbers") if isinstance(fn_cats, dict) else None
+        # RTU depends on post-enrich operator; geographic ABC/geo is last catalog mutation.
+        _run_rtu_flags(db, run=run, tracker=tracker, category_stats=category_stats)
+        _run_geographic_from_regions(
+            db, run=run, tracker=tracker, category_stats=category_stats
         )
-        if isinstance(purch_stats, dict) and "reg_keys" in purch_stats:
-            from app.modules.sync_engine.persist import apply_rtu_connected_flags
-
-            rtu_stats = apply_rtu_connected_flags(
-                db, reg_keys=set(purch_stats.get("reg_keys") or [])
-            )
-            purch_stats.update(rtu_stats)
-            db.commit()
-            log_run(
-                db,
-                run.id,
-                SyncLogLevel.info,
-                (
-                    "RTU flags re-applied after operator enrichment "
-                    f"own={rtu_stats.get('rtu_own')} "
-                    f"external={rtu_stats.get('rtu_external')} "
-                    f"not_connected={rtu_stats.get('rtu_not_connected')}"
-                ),
-                rtu_stats,
-            )
         try:
             from app.modules.sync_engine.geo_log_dump import dump_sync_geo_diagnostics
 
@@ -618,12 +595,27 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
             err = None
 
         db.refresh(run)
-        if (
-            stage_status(run.progress, "operator_enrichment") == "failed"
-            and status == SyncJobStatus.success
-        ):
+        tail_fail = _first_failed_tail_stage(run.progress)
+        if tail_fail and status == SyncJobStatus.success:
             status = SyncJobStatus.partial
-            err = "operator enrichment failed"
+            err = f"{tail_fail} failed"
+
+        _run_catalog_snapshot(
+            db,
+            run=run,
+            tracker=tracker,
+            schedule=status in (SyncJobStatus.success, SyncJobStatus.partial)
+            and provider_ok > 0,
+        )
+        db.refresh(run)
+        snap_fail = stage_status(run.progress, "catalog_snapshot") == "failed"
+        if snap_fail and status == SyncJobStatus.success:
+            status = SyncJobStatus.partial
+            err = "catalog snapshot failed"
+        summary = dict(run.stats or summary)
+        summary["stage_timings"] = build_stage_timings(run.progress)
+        run.stats = summary
+        db.commit()
 
         _finish_run(db, run, status, err)
         log_run(
@@ -633,20 +625,6 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
             f"Unified sync finished status={status.value}",
             summary,
         )
-        # Rebuild full-catalog XLSX snapshots for fast unfiltered export downloads.
-        if status in (SyncJobStatus.success, SyncJobStatus.partial) and provider_ok > 0:
-            try:
-                from app.services.numbers_export_jobs import schedule_snapshot_rebuild
-
-                schedule_snapshot_rebuild()
-                log_run(
-                    db,
-                    run.id,
-                    SyncLogLevel.info,
-                    "Scheduled catalog XLSX snapshot rebuild",
-                )
-            except Exception:
-                logger.exception("Failed to schedule catalog XLSX snapshot rebuild")
     finally:
         if not dropped_written:
             try:
@@ -786,17 +764,13 @@ async def _sync_provider(
         )
         return False
 
-    if code not in (ProviderCode.finenumbers, ProviderCode.aurora):
-        for phase in ("dictionaries", "free", "purchased"):
-            sid = stage_for_provider_phase(code.value, phase)
-            if not sid:
-                continue
-            st = stage_status(run.progress, sid)
-            if st == "pending":
-                if phase == "purchased" and not caps.get("purchased_numbers", {}).get(
-                    "supported"
-                ):
-                    tracker.skip(sid, "capability not supported")
+    _skip_pending_dict_purchased(
+        db,
+        tracker,
+        code.value,
+        caps=caps,
+        mode=mode,
+    )
 
     if job.status == SyncJobStatus.partial:
         log_run(db, run.id, SyncLogLevel.warning, f"{code.value} completed with limitations")
@@ -865,7 +839,7 @@ async def _run_operator_enrichment(
         )
 
     try:
-        # Last sync stage: operator + GAR city/region on every present row.
+        # Operator + GAR city/region (mobile/800). Geographic geo stays empty here.
         enrich_stats = await enrich_catalog_operators(
             db,
             connection=connection,
@@ -904,3 +878,175 @@ async def _run_operator_enrichment(
     except Exception as exc:
         log_run(db, run.id, SyncLogLevel.error, f"Operator enrichment failed: {exc}")
         tracker.fail("operator_enrichment", str(exc))
+
+
+_TAIL_STAGE_IDS = (
+    "operator_enrichment",
+    "rtu_flags",
+    "geographic_from_regions",
+)
+
+
+def _first_failed_tail_stage(progress: dict[str, Any] | None) -> str | None:
+    for stage_id in _TAIL_STAGE_IDS:
+        if stage_status(progress, stage_id) == "failed":
+            return stage_id
+    return None
+
+
+def _skip_pending_dict_purchased(
+    db: Session,
+    tracker: SyncProgressTracker,
+    provider_code: str,
+    *,
+    caps: dict[str, Any],
+    mode: SyncMode,
+) -> None:
+    """Close dictionaries/purchased that the provider job never started (e.g. Aurora free_only)."""
+    run = db.get(SyncRun, tracker.run_id)
+    progress = run.progress if run else None
+    dict_supported = bool((caps.get("dictionaries") or {}).get("supported"))
+    purch_supported = bool((caps.get("purchased_numbers") or {}).get("supported"))
+    reasons = {
+        "dictionaries": (
+            "нет справочников в API"
+            if not dict_supported
+            else (
+                "режим только свободные"
+                if mode == SyncMode.free_only
+                else "не выполнялся"
+            )
+        ),
+        "purchased": (
+            "купленные вне scope"
+            if not purch_supported
+            else (
+                "режим только свободные"
+                if mode == SyncMode.free_only
+                else "не выполнялся"
+            )
+        ),
+    }
+    for phase in ("dictionaries", "purchased"):
+        sid = stage_for_provider_phase(provider_code, phase)
+        if not sid:
+            continue
+        st = stage_status(progress, sid)
+        if st == "pending":
+            tracker.skip(sid, reasons[phase])
+
+
+def _run_rtu_flags(
+    db: Session,
+    *,
+    run: SyncRun,
+    tracker: SyncProgressTracker,
+    category_stats: dict[str, Any],
+) -> None:
+    """Re-apply RTU after enrich even if PSTN failed — batches may already be committed."""
+    fn_cats = category_stats.get("finenumbers")
+    purch_stats = (
+        fn_cats.get("purchased_numbers") if isinstance(fn_cats, dict) else None
+    )
+    if not isinstance(purch_stats, dict) or "reg_keys" not in purch_stats:
+        tracker.skip("rtu_flags", "нет REG ключей")
+        return
+    tracker.begin("rtu_flags", "Флаги РТУ")
+    try:
+        from app.modules.sync_engine.persist import apply_rtu_connected_flags
+
+        rtu_stats = apply_rtu_connected_flags(
+            db, reg_keys=set(purch_stats.get("reg_keys") or [])
+        )
+        purch_stats.update(rtu_stats)
+        db.commit()
+        log_run(
+            db,
+            run.id,
+            SyncLogLevel.info,
+            (
+                "RTU flags re-applied after operator enrichment "
+                f"own={rtu_stats.get('rtu_own')} "
+                f"external={rtu_stats.get('rtu_external')} "
+                f"not_connected={rtu_stats.get('rtu_not_connected')}"
+            ),
+            rtu_stats,
+        )
+        tracker.end(
+            "rtu_flags",
+            f"own={rtu_stats.get('rtu_own')}, external={rtu_stats.get('rtu_external')}, "
+            f"not_connected={rtu_stats.get('rtu_not_connected')}",
+        )
+    except Exception as exc:
+        log_run(db, run.id, SyncLogLevel.error, f"RTU flags failed: {exc}")
+        tracker.fail("rtu_flags", str(exc))
+
+
+def _run_geographic_from_regions(
+    db: Session,
+    *,
+    run: SyncRun,
+    tracker: SyncProgressTracker,
+    category_stats: dict[str, Any],
+) -> None:
+    tracker.begin("geographic_from_regions", "Разбор городских по справочнику Регионы")
+    try:
+        from app.modules.catalog.geographic_from_regions import (
+            apply_geographic_from_regions,
+        )
+
+        geo_stats = apply_geographic_from_regions(db)
+        db.commit()
+        category_stats["geographic_from_regions"] = geo_stats
+        log_run(
+            db,
+            run.id,
+            SyncLogLevel.info,
+            (
+                "Geographic ABC from regions_directory "
+                f"directory={geo_stats.get('directory')} "
+                f"matched={geo_stats.get('matched')} "
+                f"reset={geo_stats.get('reset')}"
+            ),
+            geo_stats,
+        )
+        tracker.end(
+            "geographic_from_regions",
+            f"directory={geo_stats.get('directory')}, matched={geo_stats.get('matched')}, "
+            f"reset={geo_stats.get('reset')}",
+        )
+    except Exception as exc:
+        log_run(
+            db,
+            run.id,
+            SyncLogLevel.error,
+            f"Geographic ABC from regions failed: {exc}",
+        )
+        tracker.fail("geographic_from_regions", str(exc))
+
+
+def _run_catalog_snapshot(
+    db: Session,
+    *,
+    run: SyncRun,
+    tracker: SyncProgressTracker,
+    schedule: bool,
+) -> None:
+    if not schedule:
+        tracker.skip("catalog_snapshot", "пропуск: нет успешной загрузки")
+        return
+    tracker.begin("catalog_snapshot", "Снимок каталога XLSX")
+    try:
+        from app.services.numbers_export_jobs import schedule_snapshot_rebuild
+
+        schedule_snapshot_rebuild()
+        log_run(
+            db,
+            run.id,
+            SyncLogLevel.info,
+            "Scheduled catalog XLSX snapshot rebuild",
+        )
+        tracker.end("catalog_snapshot", "запущено в фоне")
+    except Exception as exc:
+        log_run(db, run.id, SyncLogLevel.error, f"Catalog snapshot failed: {exc}")
+        tracker.fail("catalog_snapshot", str(exc))

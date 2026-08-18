@@ -628,7 +628,8 @@ def _catalog_row(
         "msisdn": num.msisdn,
         "region_external_id": num.region_external_id,
         "city_external_id": num.city_external_id,
-        # Catalog Город/Регион come only from PSTN garTerritory at operator_enrichment.
+        # City/region stay empty here. PSTN fills mobile/800; geographic rows are
+        # filled later from regions_directory (geographic_from_regions stage).
         "region_name": None,
         "city_name": None,
         "buy_price": num.buy_price,

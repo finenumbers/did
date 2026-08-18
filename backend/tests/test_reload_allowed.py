@@ -77,6 +77,7 @@ def test_build_inventory_summary_was_became():
                 "purchased_numbers": {"previous": 10, "upserted": 8},
             },
             "operator_enrichment": {"updated": 1},
+            "geographic_from_regions": {"directory": 2, "matched": 1, "reset": 0},
         }
     )
     by_label = {r["label"]: r for r in rows}
