@@ -145,3 +145,9 @@ export interface ProviderHealth {
   purchased_count: number;
   limitations: string[];
 }
+
+export interface RegionCityItem {
+  abc: string | null;
+  city_name: string;
+  region_name: string | null;
+}
