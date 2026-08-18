@@ -594,6 +594,20 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
                 ),
                 rtu_stats,
             )
+        from app.modules.catalog.abc_from_regions import apply_catalog_abc_from_regions
+
+        split_stats = apply_catalog_abc_from_regions(db)
+        db.commit()
+        log_run(
+            db,
+            run.id,
+            SyncLogLevel.info,
+            (
+                "Catalog ABC split from Regions capacities "
+                f"scanned={split_stats.get('scanned')} updated={split_stats.get('updated')}"
+            ),
+            split_stats,
+        )
         db.refresh(run)
         summary = dict(run.stats or summary)
         summary["categories"] = category_stats

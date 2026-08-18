@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from uuid import UUID
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.catalog import NumbersCatalogNormalized
 from app.models.enums import InventoryKind
 from app.models.regions_directory import RegionsDirectory
 from app.providers.finenumbers.contract import OPERATOR_NOT_IN_REGISTRY
-from app.schemas.regions import RegionCityItem, RegionsLoadResult
+from app.providers.msisdn_split import DIGIT_CAPACITY_DEFAULT
+from app.schemas.regions import RegionCapacitySaveItem, RegionCityItem, RegionsLoadResult
 
-DIGIT_CAPACITY = 7
+DIGIT_CAPACITY = DIGIT_CAPACITY_DEFAULT
 
 
 def catalog_region_pair(
@@ -28,7 +30,7 @@ def catalog_region_pair(
 
 
 class RegionsService:
-    """Local Regions page table. Snapshot from catalog city/region, only via load button."""
+    """Local Regions page table. Snapshot from catalog city/region, only via load/save buttons."""
 
     def __init__(self, db: Session):
         self.db = db
@@ -46,9 +48,11 @@ class RegionsService:
             if pair is None:
                 continue
             city, region = pair
+            cap = int(row.digit_capacity) if row.digit_capacity else DIGIT_CAPACITY_DEFAULT
             items.append(
                 RegionCityItem(
-                    digit_capacity=DIGIT_CAPACITY,
+                    id=row.id,
+                    digit_capacity=cap,
                     city_name=city,
                     region_name=region,
                 )
@@ -90,21 +94,58 @@ class RegionsService:
                 continue
             seen.add(key)
             mapped.append((city, region))
+
+        existing_keys: set[tuple[str, str]] = set()
+        for row in self.db.scalars(select(RegionsDirectory)).all():
+            pair = catalog_region_pair(row.city_name, row.region_name)
+            if pair is None:
+                continue
+            existing_keys.add((pair[0], pair[1] or ""))
+
         loaded_at = datetime.now(timezone.utc)
-        self.db.execute(delete(RegionsDirectory))
-        self.db.add_all(
-            [
+        to_add: list[RegionsDirectory] = []
+        for city, region in mapped:
+            key = (city, region or "")
+            if key in existing_keys:
+                continue
+            existing_keys.add(key)
+            to_add.append(
                 RegionsDirectory(
                     city_name=city,
                     region_name=region,
+                    digit_capacity=DIGIT_CAPACITY_DEFAULT,
                     loaded_at=loaded_at,
                 )
-                for city, region in mapped
-            ]
+            )
+        if to_add:
+            self.db.add_all(to_add)
+            self.db.commit()
+        else:
+            self.db.commit()
+        return RegionsLoadResult(
+            ok=True,
+            count=len(to_add),
+            message=f"Добавлено комбинаций: {len(to_add)}",
         )
+
+    def save_capacities(self, items: list[RegionCapacitySaveItem]) -> RegionsLoadResult:
+        if not items:
+            return RegionsLoadResult(ok=True, count=0, message="Нет изменений")
+        by_id: dict[UUID, int] = {}
+        for item in items:
+            by_id[item.id] = item.digit_capacity
+        rows = self.db.scalars(
+            select(RegionsDirectory).where(RegionsDirectory.id.in_(by_id.keys()))
+        ).all()
+        found = {row.id for row in rows}
+        missing = set(by_id) - found
+        if missing:
+            raise ValueError("Строка регионов не найдена")
+        for row in rows:
+            row.digit_capacity = by_id[row.id]
         self.db.commit()
         return RegionsLoadResult(
             ok=True,
-            count=len(mapped),
-            message=f"Загружено комбинаций: {len(mapped)}",
+            count=len(rows),
+            message=f"Сохранено: {len(rows)}",
         )

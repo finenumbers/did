@@ -22,14 +22,39 @@ def normalize_phone(value: Any) -> str | None:
 
 
 
+DIGIT_CAPACITY_DEFAULT = 7
+DIGIT_CAPACITY_MIN = 5
+DIGIT_CAPACITY_MAX = 7
+
+
 def split_msisdn(msisdn: str | None) -> tuple[str | None, str | None]:
     """Return (abc_code, number_local) for 7XXXXXXXXXX; otherwise (None, None)."""
-    if not msisdn:
+    parts = split_msisdn_by_capacity(msisdn, DIGIT_CAPACITY_DEFAULT)
+    if parts is None:
         return None, None
+    return parts
+
+
+def split_msisdn_by_capacity(
+    msisdn: str | None, capacity: int
+) -> tuple[str, str] | None:
+    """Strip leading 7, then split remaining 10 digits by local-part length."""
+    if capacity < DIGIT_CAPACITY_MIN or capacity > DIGIT_CAPACITY_MAX:
+        return None
+    if not msisdn:
+        return None
     digits = "".join(ch for ch in str(msisdn).strip() if ch.isdigit())
-    if len(digits) == 11 and digits.startswith("7"):
-        return digits[1:4], digits[4:]
-    return None, None
+    if len(digits) != 11 or not digits.startswith("7"):
+        return None
+    national = digits[1:]
+    abc_len = 10 - capacity
+    if abc_len < 1:
+        return None
+    abc = national[:abc_len]
+    local = national[abc_len:]
+    if not abc or not local:
+        return None
+    return abc, local
 
 
 def split_from_parts(

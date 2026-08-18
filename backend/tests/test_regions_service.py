@@ -1,12 +1,14 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+from uuid import uuid4
+
+import pytest
+from pydantic import ValidationError
 
 from app.providers.finenumbers.contract import OPERATOR_NOT_IN_REGISTRY
-from app.services.regions_service import (
-    DIGIT_CAPACITY,
-    RegionsService,
-    catalog_region_pair,
-)
+from app.providers.msisdn_split import DIGIT_CAPACITY_DEFAULT, split_msisdn, split_msisdn_by_capacity
+from app.schemas.regions import RegionCapacitySaveItem
+from app.services.regions_service import RegionsService, catalog_region_pair
 
 
 def _db_with_rows(rows: list) -> MagicMock:
@@ -36,53 +38,109 @@ def test_list_cities_empty():
     assert RegionsService(_db_with_rows([])).list_cities() == []
 
 
-def test_list_cities_skips_blank_and_sets_digit_capacity():
+def test_list_cities_uses_stored_digit_capacity():
+    samara_id = uuid4()
+    moscow_id = uuid4()
+    perm_id = uuid4()
     rows = [
-        SimpleNamespace(city_name="  ", region_name="Игнор"),
-        SimpleNamespace(city_name=None, region_name="Игнор"),
-        SimpleNamespace(city_name="Самара", region_name="Самарская область"),
-        SimpleNamespace(city_name="  Москва  ", region_name="  Московская область  "),
-        SimpleNamespace(city_name="Без региона", region_name=""),
+        SimpleNamespace(id=uuid4(), city_name="  ", region_name="Игнор", digit_capacity=7),
         SimpleNamespace(
+            id=samara_id,
+            city_name="Самара",
+            region_name="Самарская область",
+            digit_capacity=6,
+        ),
+        SimpleNamespace(
+            id=moscow_id,
+            city_name="  Москва  ",
+            region_name="  Московская область  ",
+            digit_capacity=7,
+        ),
+        SimpleNamespace(id=perm_id, city_name="Без региона", region_name="", digit_capacity=5),
+        SimpleNamespace(
+            id=uuid4(),
             city_name=OPERATOR_NOT_IN_REGISTRY,
             region_name=OPERATOR_NOT_IN_REGISTRY,
+            digit_capacity=7,
         ),
     ]
     items = RegionsService(_db_with_rows(rows)).list_cities()
-    assert [(i.digit_capacity, i.city_name, i.region_name) for i in items] == [
-        (DIGIT_CAPACITY, "Самара", "Самарская область"),
-        (DIGIT_CAPACITY, "Москва", "Московская область"),
-        (DIGIT_CAPACITY, "Без региона", None),
+    assert [(i.id, i.digit_capacity, i.city_name, i.region_name) for i in items] == [
+        (samara_id, 6, "Самара", "Самарская область"),
+        (moscow_id, 7, "Москва", "Московская область"),
+        (perm_id, 5, "Без региона", None),
     ]
 
 
-def test_load_from_catalog_replaces_local_table():
+def test_load_from_catalog_merges_and_keeps_existing_capacity():
     select_result = MagicMock()
     select_result.all.return_value = [
         ("Самара", "Самарская область"),
-        ("Самара", "Самарская область"),
-        ("  Москва  ", "Москва"),
+        ("Москва", "Москва"),
         (OPERATOR_NOT_IN_REGISTRY, OPERATOR_NOT_IN_REGISTRY),
-        ("", "Игнор"),
         ("Казань", OPERATOR_NOT_IN_REGISTRY),
         ("Пермь", None),
     ]
+    existing = [
+        SimpleNamespace(city_name="Самара", region_name="Самарская область", digit_capacity=6),
+    ]
     db = MagicMock()
-    db.execute.side_effect = [select_result, MagicMock()]
+    db.execute.return_value.all.return_value = select_result.all.return_value
+    db.scalars.return_value.all.return_value = existing
     added: list = []
     db.add_all.side_effect = added.extend
 
     out = RegionsService(db).load_from_catalog()
 
     assert out.ok is True
-    assert out.count == 3
-    assert {(row.city_name, row.region_name) for row in added} == {
-        ("Самара", "Самарская область"),
-        ("Москва", "Москва"),
-        ("Пермь", None),
+    assert out.count == 2
+    assert {(row.city_name, row.region_name, row.digit_capacity) for row in added} == {
+        ("Москва", "Москва", DIGIT_CAPACITY_DEFAULT),
+        ("Пермь", None, DIGIT_CAPACITY_DEFAULT),
     }
-    assert all(row.loaded_at is not None for row in added)
-    assert db.execute.call_count == 2
     db.add_all.assert_called_once()
     db.commit.assert_called_once()
     assert "SipOut" not in out.message
+
+
+def test_save_capacities_updates_found_rows():
+    row_id = uuid4()
+    row = SimpleNamespace(id=row_id, digit_capacity=7)
+    db = MagicMock()
+    db.scalars.return_value.all.return_value = [row]
+    out = RegionsService(db).save_capacities(
+        [RegionCapacitySaveItem(id=row_id, digit_capacity=6)]
+    )
+    assert out.ok is True
+    assert out.count == 1
+    assert row.digit_capacity == 6
+    db.commit.assert_called_once()
+
+
+def test_save_capacities_rejects_unknown_id():
+    db = MagicMock()
+    db.scalars.return_value.all.return_value = []
+    with pytest.raises(ValueError, match="не найдена"):
+        RegionsService(db).save_capacities(
+            [RegionCapacitySaveItem(id=uuid4(), digit_capacity=6)]
+        )
+
+
+def test_save_item_rejects_out_of_range_capacity():
+    with pytest.raises(ValidationError):
+        RegionCapacitySaveItem(id=uuid4(), digit_capacity=4)
+    with pytest.raises(ValidationError):
+        RegionCapacitySaveItem(id=uuid4(), digit_capacity=8)
+
+
+def test_split_msisdn_default_is_three_plus_seven():
+    assert split_msisdn("73833999999") == ("383", "3999999")
+    assert split_msisdn("not-a-number") == (None, None)
+
+
+def test_split_msisdn_by_capacity():
+    assert split_msisdn_by_capacity("73833999999", 7) == ("383", "3999999")
+    assert split_msisdn_by_capacity("73842399999", 6) == ("3842", "399999")
+    assert split_msisdn_by_capacity("73842399999", 5) == ("38423", "99999")
+    assert split_msisdn_by_capacity("73842399999", 4) is None
+    assert split_msisdn_by_capacity("3842399999", 6) is None

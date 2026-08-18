@@ -177,6 +177,7 @@ button.nav-logout:hover {
 .regions-toolbar {
   display: flex;
   justify-content: flex-end;
+  gap: 0.5rem;
   margin-bottom: 0.5rem;
 }
 
@@ -314,6 +315,11 @@ mark.search-hit {
 .numbers-panel .regions-table th:nth-child(3),
 .numbers-panel .regions-table td:nth-child(3) {
   width: auto;
+}
+
+.regions-capacity-input {
+  width: 4.25rem;
+  padding: 0.15rem 0.35rem;
 }
 
 .table-scroll thead th {
