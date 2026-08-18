@@ -58,3 +58,43 @@ def test_bisect_picks_covering_range():
     cache.finalize()
     assert cache.resolve_parts("999", 50).operator == "A"
     assert cache.resolve_parts("999", 150).operator == "B"
+
+
+def test_add_from_api_row_skips_gar_for_geographic_abc():
+    cache = OperatorRangeCache()
+    cache.add_from_api_row(
+        {
+            "abc": "495",
+            "rangeStart": 1000000,
+            "rangeEnd": 1000000,
+            "operator": "CachedOp",
+            "garTerritory": "г.о. город Екатеринбург|Свердловская область",
+        }
+    )
+    cache.finalize()
+    match = cache.resolve_parts("495", 1000000)
+    assert match is not None
+    assert match.operator == "CachedOp"
+    assert match.city_name is None
+    assert match.region_name is None
+    assert match.apply_geo is False
+
+
+def test_add_from_api_row_parses_gar_for_mobile_abc():
+    cache = OperatorRangeCache()
+    cache.add_from_api_row(
+        {
+            "abc": "900",
+            "rangeStart": 1111111,
+            "rangeEnd": 1111111,
+            "operator": "CachedOp",
+            "garTerritory": "г. Москва|г. Москва",
+        }
+    )
+    cache.finalize()
+    match = cache.resolve_parts("900", 1111111)
+    assert match is not None
+    assert match.operator == "CachedOp"
+    assert match.city_name == "Москва"
+    assert match.region_name == "Москва"
+    assert match.apply_geo is True

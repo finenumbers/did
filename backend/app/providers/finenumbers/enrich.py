@@ -176,8 +176,12 @@ class OperatorRangeCache:
     def add_from_api_row(self, row: dict) -> str | None:
         abc = str(row.get("abc") or "").strip()
         operator = str(row.get("operator") or "").strip()
-        city_name, region_name = parse_gar_territory(row.get("garTerritory"))
-        clear_geo = gar_clears_geo(row.get("garTerritory"))
+        category = classify_number_category(abc)
+        if category in (CATEGORY_MOBILE, CATEGORY_TOLLFREE):
+            city_name, region_name = parse_gar_territory(row.get("garTerritory"))
+            clear_geo = gar_clears_geo(row.get("garTerritory"))
+        else:
+            city_name, region_name, clear_geo = None, None, False
         try:
             start = int(row["rangeStart"])
             end = int(row["rangeEnd"])
