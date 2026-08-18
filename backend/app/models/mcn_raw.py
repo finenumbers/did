@@ -31,8 +31,6 @@ class McnFreeNumberRaw(RawSyncMixin, Base):
     __tablename__ = "mcn_free_numbers_raw"
 
     phone: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
-    type_name: Mapped[str | None] = mapped_column(Text, nullable=True)
-    category_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     region_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     install_fee: Mapped[float | None] = mapped_column(Numeric(18, 4), nullable=True)
     subscription_fee: Mapped[float | None] = mapped_column(Numeric(18, 4), nullable=True)

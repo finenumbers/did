@@ -12,7 +12,6 @@ class UisFreeNumberRaw(RawSyncMixin, Base):
     __tablename__ = "uis_free_numbers_raw"
 
     phone: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
-    category: Mapped[str | None] = mapped_column(Text, nullable=True)
     location_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     location_mnemonic: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -25,6 +24,3 @@ class UisPurchasedNumberRaw(RawSyncMixin, Base):
     phone: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
     external_id: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
     status: Mapped[str | None] = mapped_column(Text, nullable=True)
-    category: Mapped[str | None] = mapped_column(Text, nullable=True)
-    name: Mapped[str | None] = mapped_column(Text, nullable=True)
-    comment: Mapped[str | None] = mapped_column(Text, nullable=True)

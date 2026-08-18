@@ -12,7 +12,6 @@ class AuroraFreeNumberRaw(RawSyncMixin, Base):
     __tablename__ = "aurora_free_numbers_raw"
 
     phone: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
-    number_type: Mapped[str | None] = mapped_column(Text, nullable=True)
     period_price_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
     region_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
     city_name: Mapped[str | None] = mapped_column(Text, nullable=True)

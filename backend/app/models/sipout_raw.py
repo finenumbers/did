@@ -45,10 +45,5 @@ class SipoutPurchasedNumberRaw(RawSyncMixin, Base):
     __tablename__ = "sipout_purchased_numbers_raw"
 
     did: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
-    user_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
-    order_id: Mapped[str | None] = mapped_column(Text, nullable=True)
-    doc_status: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str | None] = mapped_column(Text, nullable=True)
     city_id: Mapped[str | None] = mapped_column(Text, nullable=True)
-    has_sms: Mapped[str | None] = mapped_column(Text, nullable=True)
-    sign: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -21,14 +21,9 @@ export interface NumberItem {
   period_price: string | null;
   mask: string | null;
   display_mask: string | null;
-  number_type: string | null;
-  points: string | null;
-  notes: string | null;
-  class: string | null;
   operator: string | null;
   rtu_connected?: string | null;
   is_currently_present: boolean;
-  mapping_confidence: string;
 }
 
 export interface FacetItem {

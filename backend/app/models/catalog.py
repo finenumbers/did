@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
-from app.models.enums import HistoryChangeSource, InventoryKind, MappingConfidence
+from app.models.enums import HistoryChangeSource, InventoryKind
 
 
 class NumbersCatalogNormalized(Base, TimestampMixin):
@@ -46,10 +46,6 @@ class NumbersCatalogNormalized(Base, TimestampMixin):
     # has_sms / tariff_name / price_currency / status_normalized: raw-only (not in catalog)
     mask: Mapped[str | None] = mapped_column(Text, nullable=True)
     display_mask: Mapped[str | None] = mapped_column(Text, nullable=True)
-    number_type: Mapped[str | None] = mapped_column(Text, nullable=True)
-    points: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    number_class: Mapped[str | None] = mapped_column("class", Text, nullable=True)
     operator: Mapped[str | None] = mapped_column(Text, nullable=True)
     rtu_connected: Mapped[str | None] = mapped_column(Text, nullable=True)
     raw_source_table: Mapped[str] = mapped_column(Text, nullable=False)
@@ -58,11 +54,6 @@ class NumbersCatalogNormalized(Base, TimestampMixin):
         UUID(as_uuid=True), ForeignKey("sync_jobs.id"), nullable=True
     )
     field_verification: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    mapping_confidence: Mapped[MappingConfidence] = mapped_column(
-        Enum(MappingConfidence, name="mapping_confidence"),
-        nullable=False,
-        default=MappingConfidence.low,
-    )
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     is_currently_present: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

@@ -6,7 +6,7 @@ import { ActiveFiltersBar } from "@/components/numbers/ActiveFiltersBar";
 import { HighlightText } from "@/components/numbers/HighlightText";
 import { ColumnFilterDropdown } from "@/components/numbers/ColumnFilterDropdown";
 import { InfiniteScrollSentinel } from "@/components/table/InfiniteScrollSentinel";
-import { formatCount, formatPoints, formatPrice } from "@/lib/format";
+import { formatCount, formatPrice } from "@/lib/format";
 import { API_URL, apiDownload, apiFetch } from "@/lib/api/client";
 import { useInfinitePage } from "@/lib/hooks/useInfinitePage";
 import { displayProviderCode, encodeFilters } from "@/lib/numbers/filters";
@@ -75,41 +75,16 @@ const CATALOG_COLUMNS: Col[] = [
     header: "Маска",
     value: (r) => r.mask,
   },
-  {
-    key: "display_mask",
-    header: "Display mask",
-    value: (r) => r.display_mask,
-  },
-  {
-    key: "number_type",
-    header: "Тип",
-    value: (r) => r.number_type,
-  },
-  {
-    key: "points",
-    header: "Баллы",
-    value: (r) => formatPoints(r.points),
-  },
-  {
-    key: "rtu_connected",
-    header: "Подключено в РТУ",
-    value: (r) => r.rtu_connected,
-  },
-  {
-    key: "notes",
-    header: "notes",
-    value: (r) => r.notes,
-  },
-  {
-    key: "class",
-    header: "Класс",
-    value: (r) => r.class,
-  },
-  {
-    key: "mapping_confidence",
-    header: "confidence",
-    value: (r) => r.mapping_confidence,
-  },
+    {
+        key: "display_mask",
+        header: "Display mask",
+        value: (r) => r.display_mask,
+    },
+    {
+        key: "rtu_connected",
+        header: "Подключено в РТУ",
+        value: (r) => r.rtu_connected,
+    },
 ];
 
 function formatExportEta(startedMs: number, done: number, total: number): string | null {
@@ -399,7 +374,7 @@ export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
           <thead>
             <tr>
               {columns.map((col) => (
-                <th key={col.key}>
+                <th key={col.key} className={col.key === "number_local" ? "col-number-local" : undefined}>
                   <ColumnFilterDropdown
                     kind={kind}
                     column={col.key}
@@ -433,7 +408,7 @@ export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
                 }
               >
                 {columns.map((col) => (
-                  <td key={col.key}>
+                  <td key={col.key} className={col.key === "number_local" ? "col-number-local" : undefined}>
                     <HighlightText
                       text={cellText(col.value(row))}
                       query={col.key === "number_local" ? numberLocalQ : undefined}

@@ -30,12 +30,7 @@ EXPORT_COLUMNS: list[tuple[str, str]] = [
     ("period_price", "Абонплата"),
     ("mask", "Маска"),
     ("display_mask", "Display mask"),
-    ("number_type", "Тип"),
-    ("points", "Баллы"),
     ("rtu_connected", "Подключено в РТУ"),
-    ("notes", "notes"),
-    ("class", "Класс"),
-    ("mapping_confidence", "confidence"),
 ]
 
 RTU_NOT_CONNECTED_FILL = "#FFC7CE"
@@ -61,12 +56,7 @@ _HEADER_MIN_CHARS: dict[str, int] = {
     "Абонплата": 12,
     "Маска": 14,
     "Display mask": 16,
-    "Тип": 10,
-    "Баллы": 8,
     "Подключено в РТУ": 18,
-    "notes": 12,
-    "Класс": 10,
-    "confidence": 12,
 }
 
 _EXPORT_LOAD_ONLY = (
@@ -81,12 +71,7 @@ _EXPORT_LOAD_ONLY = (
     NumbersCatalogNormalized.period_price,
     NumbersCatalogNormalized.mask,
     NumbersCatalogNormalized.display_mask,
-    NumbersCatalogNormalized.number_type,
-    NumbersCatalogNormalized.points,
     NumbersCatalogNormalized.rtu_connected,
-    NumbersCatalogNormalized.notes,
-    NumbersCatalogNormalized.number_class,
-    NumbersCatalogNormalized.mapping_confidence,
 )
 
 ProgressCb = Callable[..., None]
@@ -122,29 +107,13 @@ def _format_price(value: Any) -> str:
     return sign + " ".join(reversed(parts))
 
 
-def _format_points(value: Any) -> str:
-    if value is None or value == "":
-        return ""
-    try:
-        return f"{Decimal(str(value)):.2f}"
-    except (InvalidOperation, ValueError, TypeError):
-        return str(value)
-
-
 def _cell_value(key: str, row: NumbersCatalogNormalized, provider_code: str) -> Any:
     if key == "provider_code":
         return provider_code
-    if key == "class":
-        return row.number_class or ""
     if key == "buy_price":
         return _format_price(row.buy_price)
     if key == "period_price":
         return _format_price(row.period_price)
-    if key == "points":
-        return _format_points(row.points)
-    if key == "mapping_confidence":
-        conf = row.mapping_confidence
-        return conf.value if hasattr(conf, "value") else (str(conf) if conf else "")
     val = getattr(row, key, None)
     return "" if val is None else val
 

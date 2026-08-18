@@ -231,6 +231,12 @@ th, td {
 }
 th { color: var(--muted); font-weight: 600; font-size: 0.8rem; }
 
+.numbers-panel table th.col-number-local,
+.numbers-panel table td.col-number-local {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Sync stage tables: full-width blocks; col1/col2 hug max content; detail flexes. */
 .panel:has(.sync-stages-table) {
   width: 100%;

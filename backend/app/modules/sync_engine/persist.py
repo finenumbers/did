@@ -156,10 +156,6 @@ def _catalog_extra_fields(num: NormalizedNumber) -> dict[str, Any]:
         "number_local": num.number_local,
         "mask": num.mask,
         "display_mask": num.display_mask,
-        "number_type": num.number_type,
-        "points": num.points,
-        "notes": num.notes,
-        "number_class": num.number_class,
         "operator": num.operator,
         "rtu_connected": num.rtu_connected,
     }
@@ -616,10 +612,6 @@ def _catalog_row(
     loaded: datetime,
 ) -> dict[str, Any]:
     extra = _catalog_extra_fields(num)
-    if "number_class" in extra:
-        extra["class"] = extra.pop("number_class")
-    conf = num.mapping_confidence
-    conf_val = conf.value if hasattr(conf, "value") else conf
     return {
         "id": uuid.uuid4(),
         "provider_id": provider_id,
@@ -638,7 +630,6 @@ def _catalog_row(
         "raw_source_id": raw_id,
         "last_sync_job_id": job_id,
         "field_verification": {},
-        "mapping_confidence": conf_val,
         "first_seen_at": loaded,
         "last_seen_at": loaded,
         "is_currently_present": True,
@@ -711,31 +702,6 @@ def persist_sipout_numbers(
                     "did": num.provider_number_key,
                     "status": num.status_raw,
                     "city_id": num.city_external_id,
-                    "has_sms": (
-                        str(num.raw_payload.get("has_sms"))
-                        if num.raw_payload.get("has_sms") is not None
-                        else None
-                    ),
-                    "user_comment": (
-                        str(num.raw_payload.get("user_comment"))
-                        if num.raw_payload.get("user_comment") is not None
-                        else None
-                    ),
-                    "order_id": (
-                        str(num.raw_payload.get("order_id"))
-                        if num.raw_payload.get("order_id") is not None
-                        else None
-                    ),
-                    "doc_status": (
-                        str(num.raw_payload.get("doc_status"))
-                        if num.raw_payload.get("doc_status") is not None
-                        else None
-                    ),
-                    "sign": (
-                        str(num.raw_payload.get("sign"))
-                        if num.raw_payload.get("sign") is not None
-                        else None
-                    ),
                     "created_at": loaded,
                 }
             )
@@ -958,7 +924,6 @@ def persist_uis_numbers(
                     "payload_hash": ph,
                     "external_key": num.provider_number_key,
                     "phone": num.msisdn or num.provider_number_key,
-                    "category": num.number_type,
                     "location_name": num.region_name,
                     "location_mnemonic": num.region_external_id,
                     "created_at": loaded,
@@ -977,17 +942,6 @@ def persist_uis_numbers(
                     "phone": num.msisdn,
                     "external_id": str(ext) if ext is not None else None,
                     "status": num.status_raw,
-                    "category": num.number_type,
-                    "name": (
-                        str(num.raw_payload.get("name"))
-                        if num.raw_payload.get("name") is not None
-                        else None
-                    ),
-                    "comment": (
-                        str(num.raw_payload.get("comment"))
-                        if num.raw_payload.get("comment") is not None
-                        else None
-                    ),
                     "created_at": loaded,
                 }
             )
@@ -1082,7 +1036,6 @@ def persist_aurora_numbers(
                 "payload_hash": ph,
                 "external_key": num.provider_number_key,
                 "phone": num.msisdn or num.provider_number_key,
-                "number_type": num.number_type,
                 "period_price_raw": (
                     str(raw_payload.get("period_price_raw"))
                     if raw_payload.get("period_price_raw") is not None
@@ -1444,8 +1397,6 @@ def persist_exolve_numbers(
                 "payload_hash": ph,
                 "external_key": num.provider_number_key,
                 "phone": num.msisdn or num.provider_number_key,
-                "type_name": num.number_type,
-                "category_name": num.number_class,
                 "region_name": num.region_name or num.city_name,
                 "install_fee": buy,
                 "subscription_fee": period,
@@ -1551,8 +1502,6 @@ def persist_voximplant_numbers(
                 "payload_hash": ph,
                 "external_key": num.provider_number_key,
                 "phone": num.msisdn or num.provider_number_key,
-                "type_name": num.number_type,
-                "category_name": num.number_class,
                 "region_name": num.region_name or num.city_name,
                 "install_fee": buy,
                 "subscription_fee": period,
@@ -1658,8 +1607,6 @@ def persist_mcn_numbers(
                 "payload_hash": ph,
                 "external_key": num.provider_number_key,
                 "phone": num.msisdn or num.provider_number_key,
-                "type_name": num.number_type,
-                "category_name": num.number_class,
                 "region_name": num.region_name or num.city_name,
                 "install_fee": buy,
                 "subscription_fee": period,

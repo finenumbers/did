@@ -10,7 +10,7 @@ from sqlalchemy.sql import ColumnElement
 from sqlalchemy.types import String
 
 from app.models.catalog import NumbersCatalogNormalized
-from app.models.enums import InventoryKind, MappingConfidence, ProviderCode
+from app.models.enums import InventoryKind, ProviderCode
 from app.models.providers import Provider
 from app.schemas.common import Page
 from app.schemas.numbers import FacetItem, FacetResponse, NumberItem
@@ -34,24 +34,7 @@ def _format_price_value(value: Any) -> str:
     return sign + " ".join(reversed(parts))
 
 
-def _format_points_value(value: Any) -> str:
-    if value is None:
-        return ""
-    try:
-        return f"{Decimal(str(value)):.2f}"
-    except (InvalidOperation, ValueError, TypeError):
-        return str(value)
-
-
 def _parse_price_token(token: str) -> Decimal | None:
-    raw = token.replace(" ", "").replace(",", ".")
-    try:
-        return Decimal(raw)
-    except (InvalidOperation, ValueError):
-        return None
-
-
-def _parse_points_token(token: str) -> Decimal | None:
     raw = token.replace(" ", "").replace(",", ".")
     try:
         return Decimal(raw)
@@ -72,9 +55,6 @@ class NumbersService:
         "city_name": NumbersCatalogNormalized.city_name,
         "mask": NumbersCatalogNormalized.mask,
         "display_mask": NumbersCatalogNormalized.display_mask,
-        "number_type": NumbersCatalogNormalized.number_type,
-        "notes": NumbersCatalogNormalized.notes,
-        "class": NumbersCatalogNormalized.number_class,
         "operator": NumbersCatalogNormalized.operator,
         "rtu_connected": NumbersCatalogNormalized.rtu_connected,
     }
@@ -83,9 +63,7 @@ class NumbersService:
         "buy_price": NumbersCatalogNormalized.buy_price,
         "period_price": NumbersCatalogNormalized.period_price,
     }
-    POINTS_COLUMN = "points"
     PROVIDER_CODE = "provider_code"
-    MAPPING_CONFIDENCE = "mapping_confidence"
 
     FACET_COLUMNS = frozenset(
         {
@@ -99,13 +77,8 @@ class NumbersService:
             "period_price",
             "mask",
             "display_mask",
-            "number_type",
-            POINTS_COLUMN,
-            "notes",
-            "class",
             "operator",
             "rtu_connected",
-            MAPPING_CONFIDENCE,
         }
     )
 
@@ -117,15 +90,11 @@ class NumbersService:
         "provider_number_key": NumbersCatalogNormalized.provider_number_key,
         "buy_price": NumbersCatalogNormalized.buy_price,
         "period_price": NumbersCatalogNormalized.period_price,
-        "points": NumbersCatalogNormalized.points,
         "region_name": NumbersCatalogNormalized.region_name,
         "city_name": NumbersCatalogNormalized.city_name,
         "mask": NumbersCatalogNormalized.mask,
-        "number_type": NumbersCatalogNormalized.number_type,
-        "class": NumbersCatalogNormalized.number_class,
         "operator": NumbersCatalogNormalized.operator,
         "rtu_connected": NumbersCatalogNormalized.rtu_connected,
-        "mapping_confidence": NumbersCatalogNormalized.mapping_confidence,
     }
 
     def __init__(self, db: Session):
@@ -230,40 +199,12 @@ class NumbersService:
                     stmt = stmt.where(or_(*preds) if len(preds) > 1 else preds[0])
                 continue
 
-            if field == self.MAPPING_CONFIDENCE:
-                enums: list[MappingConfidence] = []
-                for v in concrete:
-                    try:
-                        enums.append(MappingConfidence(v))
-                    except ValueError:
-                        continue
-                preds = []
-                if enums:
-                    preds.append(NumbersCatalogNormalized.mapping_confidence.in_(enums))
-                if include_empty:
-                    preds.append(NumbersCatalogNormalized.mapping_confidence.is_(None))
-                if preds:
-                    stmt = stmt.where(or_(*preds) if len(preds) > 1 else preds[0])
-                continue
-
             if field in self.PRICE_COLUMNS:
                 col = self.PRICE_COLUMNS[field]
                 preds = []
                 nums = [n for n in (_parse_price_token(v) for v in concrete) if n is not None]
                 if nums:
                     preds.append(func.round(col).in_([int(n) for n in nums]))
-                if include_empty:
-                    preds.append(col.is_(None))
-                if preds:
-                    stmt = stmt.where(or_(*preds) if len(preds) > 1 else preds[0])
-                continue
-
-            if field == self.POINTS_COLUMN:
-                col = NumbersCatalogNormalized.points
-                preds = []
-                nums = [n for n in (_parse_points_token(v) for v in concrete) if n is not None]
-                if nums:
-                    preds.append(func.round(col, 2).in_(nums))
                 if include_empty:
                     preds.append(col.is_(None))
                 if preds:
@@ -351,14 +292,9 @@ class NumbersService:
             period_price=row.period_price,
             mask=row.mask,
             display_mask=row.display_mask,
-            number_type=row.number_type,
-            points=row.points,
-            notes=row.notes,
-            number_class=row.number_class,
             operator=row.operator,
             rtu_connected=row.rtu_connected,
             is_currently_present=row.is_currently_present,
-            mapping_confidence=row.mapping_confidence.value,
         )
 
     def order_by_clauses(self, sort_by: str | None, sort_dir: str) -> list[Any]:
@@ -430,12 +366,8 @@ class NumbersService:
     def _facet_value_expr(self, column: str) -> ColumnElement[Any]:
         if column == self.PROVIDER_CODE:
             return cast(Provider.code, String)
-        if column == self.MAPPING_CONFIDENCE:
-            return cast(NumbersCatalogNormalized.mapping_confidence, String)
         if column in self.PRICE_COLUMNS:
             return func.round(self.PRICE_COLUMNS[column])
-        if column == self.POINTS_COLUMN:
-            return func.round(NumbersCatalogNormalized.points, 2)
         col = self.TEXT_COLUMNS.get(column)
         if col is None:
             raise ValueError(f"Unsupported facet column: {column}")
@@ -446,9 +378,7 @@ class NumbersService:
             return ""
         if column in self.PRICE_COLUMNS:
             return _format_price_value(raw)
-        if column == self.POINTS_COLUMN:
-            return _format_points_value(raw)
-        if column in (self.PROVIDER_CODE, self.MAPPING_CONFIDENCE):
+        if column == self.PROVIDER_CODE:
             return raw.value if hasattr(raw, "value") else str(raw)
         return str(raw)
 

@@ -1,7 +1,7 @@
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 
 class NumberItem(BaseModel):
@@ -21,14 +21,9 @@ class NumberItem(BaseModel):
     period_price: Decimal | None = None
     mask: str | None = None
     display_mask: str | None = None
-    number_type: str | None = None
-    points: Decimal | None = None
-    notes: str | None = None
-    number_class: str | None = Field(default=None, serialization_alias="class")
     operator: str | None = None
     rtu_connected: str | None = None
     is_currently_present: bool
-    mapping_confidence: str
 
 
 class FacetItem(BaseModel):
