@@ -83,3 +83,13 @@ def test_oblast_only_not_collapsed():
     assert catalog_city_region(
         "900", "79001234567", "Московская область", "Московская область"
     ) == ("Московская область", "Московская область")
+
+
+def test_coverage_list_nulls_each_field():
+    blob = (
+        "Республика Адыгея, Республика Башкортостан, Республика Бурятия, "
+        "Республика Алтай, Город Байконур"
+    )
+    assert catalog_city_region("495", "74951234567", blob, blob) == (None, None)
+    assert catalog_city_region("900", "79001234567", blob, blob) == (None, None)
+    assert catalog_city_region("495", "74951234567", "Майкоп", blob) == ("Майкоп", None)

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.models.catalog import NumbersCatalogNormalized
 from app.models.enums import InventoryKind
 from app.models.regions_directory import RegionsDirectory
+from app.modules.catalog.gar_territory import is_coverage_value
 from app.providers.finenumbers.contract import OPERATOR_NOT_IN_REGISTRY
 from app.providers.msisdn_split import DIGIT_CAPACITY_DEFAULT
 from app.schemas.regions import RegionCapacitySaveItem, RegionCityItem, RegionsLoadResult
@@ -23,9 +24,13 @@ def catalog_region_pair(
     city = (city_name or "").strip()
     if not city or city == OPERATOR_NOT_IN_REGISTRY:
         return None
+    if is_coverage_value(city):
+        return None
     region = (region_name or "").strip() or None
     if region == OPERATOR_NOT_IN_REGISTRY:
         return None
+    if is_coverage_value(region):
+        region = None
     return city, region
 
 
@@ -94,21 +99,28 @@ class RegionsService:
                 continue
             seen.add(key)
             mapped.append((city, region))
+        wanted = {(city, region or "") for city, region in mapped}
 
-        existing_keys: set[tuple[str, str]] = set()
-        for row in self.db.scalars(select(RegionsDirectory)).all():
+        existing_rows = list(self.db.scalars(select(RegionsDirectory)).all())
+        existing_by_key: dict[tuple[str, str], RegionsDirectory] = {}
+        to_delete: list[RegionsDirectory] = []
+        for row in existing_rows:
             pair = catalog_region_pair(row.city_name, row.region_name)
             if pair is None:
+                to_delete.append(row)
                 continue
-            existing_keys.add((pair[0], pair[1] or ""))
+            key = (pair[0], pair[1] or "")
+            if key not in wanted:
+                to_delete.append(row)
+                continue
+            existing_by_key[key] = row
 
         loaded_at = datetime.now(timezone.utc)
         to_add: list[RegionsDirectory] = []
         for city, region in mapped:
             key = (city, region or "")
-            if key in existing_keys:
+            if key in existing_by_key:
                 continue
-            existing_keys.add(key)
             to_add.append(
                 RegionsDirectory(
                     city_name=city,
@@ -117,15 +129,15 @@ class RegionsService:
                     loaded_at=loaded_at,
                 )
             )
+        for row in to_delete:
+            self.db.delete(row)
         if to_add:
             self.db.add_all(to_add)
-            self.db.commit()
-        else:
-            self.db.commit()
+        self.db.commit()
         return RegionsLoadResult(
             ok=True,
             count=len(to_add),
-            message=f"Добавлено комбинаций: {len(to_add)}",
+            message=f"Добавлено комбинаций: {len(to_add)}, удалено: {len(to_delete)}",
         )
 
     def save_capacities(self, items: list[RegionCapacitySaveItem]) -> RegionsLoadResult:

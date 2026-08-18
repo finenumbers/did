@@ -132,12 +132,10 @@ def test_map_number_prices_and_msisdn():
     assert num.normalized_payload.get("phone_id") == 10
 
 
-def test_iter_free_slice_completeness_fail():
+def test_iter_free_slice_shortfall_is_warning():
     client = VoximplantClient(_conn())
 
     async def fake_page(*, category, region_id, offset, count=None):
-        # Always return 1 of total 5 → never completes → incomplete after empty? 
-        # Simulate: first page 1 item total 5, second empty → shortfall
         if offset == 0:
             return (
                 [{"phone_number": "74950000001"}],
@@ -150,11 +148,64 @@ def test_iter_free_slice_completeness_fail():
     client.get_new_phones_page = fake_page  # type: ignore[method-assign]
 
     async def run():
-        try:
-            await client.iter_free_slice(category="GEOGRAPHIC", region_id=1)
-            assert False, "expected incomplete"
-        except ProviderError as exc:
-            assert exc.code == "VOXIMPLANT_SLICE_INCOMPLETE"
+        items, _envs, meta = await client.iter_free_slice(
+            category="GEOGRAPHIC", region_id=1
+        )
+        assert len(items) == 1
+        assert meta.get("slice_incomplete") is True
+        assert meta["total_count"] == 5
+
+    asyncio.run(run())
+
+
+def test_iter_free_slice_uses_len_page_not_api_count():
+    client = VoximplantClient(_conn(), page_limit=2)
+    all_nums = [{"phone_number": f"7495000000{i}"} for i in range(1, 4)]
+
+    async def fake_page(*, category, region_id, offset, count=None):
+        page = all_nums[offset : offset + 1]
+        return (
+            page,
+            3,
+            2,
+            RawHttpResult(200, "{}", {}, {}, 1, "u"),
+        )
+
+    client.get_new_phones_page = fake_page  # type: ignore[method-assign]
+
+    async def run():
+        items, _envs, meta = await client.iter_free_slice(
+            category="GEOGRAPHIC", region_id=1
+        )
+        phones = {str(it["phone_number"]) for it in items}
+        assert phones == {"74950000001", "74950000002", "74950000003"}
+        assert meta.get("slice_incomplete") is None
+
+    asyncio.run(run())
+
+
+def test_iter_free_slice_follows_shrinking_total_count():
+    client = VoximplantClient(_conn(), page_limit=2)
+
+    async def fake_page(*, category, region_id, offset, count=None):
+        if offset == 0:
+            return (
+                [{"phone_number": "74950000001"}, {"phone_number": "74950000002"}],
+                5,
+                2,
+                RawHttpResult(200, "{}", {}, {}, 1, "u"),
+            )
+        return ([], 2, 0, RawHttpResult(200, "{}", {}, {}, 1, "u"))
+
+    client.get_new_phones_page = fake_page  # type: ignore[method-assign]
+
+    async def run():
+        items, _envs, meta = await client.iter_free_slice(
+            category="GEOGRAPHIC", region_id=1
+        )
+        assert len(items) == 2
+        assert meta["total_count"] == 2
+        assert meta.get("slice_incomplete") is None
 
     asyncio.run(run())
 
@@ -193,8 +244,8 @@ def test_provider_capabilities():
     assert caps["dictionaries"]["supported"] is True
 
 
-def test_free_incomplete_on_unique_keys_shortfall():
-    """Global gate fails when unique mapped keys < sum(total_count)."""
+def test_free_incomplete_is_warning_not_abort():
+    """Global shortfall is a warning; fetched numbers are still returned."""
     from unittest.mock import AsyncMock, MagicMock
 
     provider = VoximplantProvider()
@@ -240,10 +291,9 @@ def test_free_incomplete_on_unique_keys_shortfall():
     provider._client = lambda connection, **kwargs: client  # type: ignore[method-assign]
 
     async def run():
-        try:
-            await provider.sync_free_numbers(conn)
-            assert False, "expected incomplete"
-        except ProviderError as exc:
-            assert exc.code == "VOXIMPLANT_FREE_INCOMPLETE"
+        result = await provider.sync_free_numbers(conn)
+        assert len(result.items) == 2
+        assert any("unique_keys=2" in w for w in result.warnings)
+        assert result.extra_stats["integrity"]["incomplete"] is True
 
     asyncio.run(run())

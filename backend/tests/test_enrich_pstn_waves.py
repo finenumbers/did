@@ -516,6 +516,42 @@ def test_lookup_applies_gar_territory(monkeypatch):
     assert written == [_upd(cat_id, "FromApi", True, "Санкт-Петербург", "Санкт-Петербург")]
 
 
+def test_coverage_list_clears_catalog_geo(monkeypatch):
+    written: list[tuple] = []
+    blob = (
+        "Республика Адыгея, Республика Башкортостан, Республика Бурятия, "
+        "Республика Алтай, Город Байконур, Херсонская область"
+    )
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich.load_enabled_ranges_for_enrich",
+        lambda db: [
+            {
+                "abc": "900",
+                "rangeStart": 1000000,
+                "rangeEnd": 1000000,
+                "operator": "MTT",
+                "garTerritory": blob,
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "app.providers.finenumbers.enrich._bulk_update_operators",
+        lambda db, pairs: written.extend(pairs) or len(pairs),
+    )
+
+    cat_id = uuid.uuid4()
+    db = _mock_db([_cat(cat_id, "79001000000", "OldOp", "900", 1000000, blob, blob)])
+    asyncio.run(
+        enrich_catalog_operators(
+            db,
+            connection=_conn(),
+            require_full_coverage=False,
+            concurrency=2,
+        )
+    )
+    assert written == [_upd(cat_id, "MTT", True, None, None)]
+
+
 def test_enrich_refreshes_cache_when_gar_missing(monkeypatch):
     written: list[tuple] = []
     refresh_calls: list[int] = []

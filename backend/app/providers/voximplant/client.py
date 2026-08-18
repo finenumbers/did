@@ -180,8 +180,8 @@ class VoximplantClient:
         on_progress: Callable[..., Any] | None = None,
         expected_phone_count: int | None = None,
     ) -> tuple[list[dict[str, Any]], list[RawHttpResult], dict[str, Any]]:
-        """Paginate one category×region until total_count exhausted. Fail on shortfall."""
-        items: list[dict[str, Any]] = []
+        """Paginate one category×region. Shortfall after a tail retry is a warning."""
+        by_phone: dict[str, dict[str, Any]] = {}
         envelopes: list[RawHttpResult] = []
         offset = 0
         page_limit = self.page_limit
@@ -190,28 +190,35 @@ class VoximplantClient:
             on_progress,
             f"Voximplant free {category} region={region_id}",
         )
-        while offset <= contract.MAX_OFFSET:
-            page, total, returned, raw = await self.get_new_phones_page(
-                category=category,
-                region_id=region_id,
-                offset=offset,
-                count=page_limit,
-            )
-            envelopes.append(raw)
-            if total_count is None and total is not None:
-                total_count = total
-            if not page:
-                break
+
+        def _ingest(page: list[dict[str, Any]]) -> None:
             for it in page:
                 row = dict(it)
                 row["_vox_category"] = category
                 row["_vox_region_id"] = region_id
                 if region_name:
                     row["_vox_region_name"] = region_name
-                items.append(row)
-            # Prefer API returned count; fall back to len(page)
-            step = returned if returned > 0 else len(page)
-            offset += step
+                phone = str(row.get("phone_number") or "").strip()
+                key = phone or f"_anon_{offset}_{len(by_phone)}"
+                by_phone[key] = row
+
+        async def _page(at: int) -> tuple[list[dict[str, Any]], int | None, int, RawHttpResult]:
+            return await self.get_new_phones_page(
+                category=category,
+                region_id=region_id,
+                offset=at,
+                count=page_limit,
+            )
+
+        while offset <= contract.MAX_OFFSET:
+            page, total, _returned, raw = await _page(offset)
+            envelopes.append(raw)
+            if total is not None:
+                total_count = total
+            if not page:
+                break
+            _ingest(page)
+            offset += len(page)
             if total_count is not None and offset >= total_count:
                 break
             if len(page) < page_limit and (
@@ -229,13 +236,23 @@ class VoximplantClient:
                         "category": category,
                         "region_id": region_id,
                         "offset": offset,
-                        "fetched": len(items),
+                        "fetched": len(by_phone),
                         "total_count": total_count,
                         "expected_phone_count": expected_phone_count,
                     },
                 )
 
-        meta = {
+        if total_count is not None and len(by_phone) < total_count:
+            page, total, _returned, raw = await _page(offset)
+            envelopes.append(raw)
+            if total is not None:
+                total_count = total
+            if page:
+                _ingest(page)
+                offset += len(page)
+
+        items = list(by_phone.values())
+        meta: dict[str, Any] = {
             "category": category,
             "region_id": region_id,
             "fetched": len(items),
@@ -243,12 +260,12 @@ class VoximplantClient:
             "expected_phone_count": expected_phone_count,
         }
         if total_count is not None and len(items) < total_count:
-            raise ProviderError(
-                (
-                    f"Voximplant slice incomplete category={category} "
-                    f"region={region_id}: fetched={len(items)} total_count={total_count}"
-                ),
-                code="VOXIMPLANT_SLICE_INCOMPLETE",
-                details=meta,
+            meta["slice_incomplete"] = True
+            logger.warning(
+                "Voximplant slice incomplete category=%s region=%s fetched=%s total_count=%s",
+                category,
+                region_id,
+                len(items),
+                total_count,
             )
         return items, envelopes, meta

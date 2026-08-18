@@ -32,6 +32,12 @@ def test_catalog_region_pair_drops_blank_and_sentinel():
     assert catalog_region_pair(OPERATOR_NOT_IN_REGISTRY, OPERATOR_NOT_IN_REGISTRY) is None
     assert catalog_region_pair("Казань", OPERATOR_NOT_IN_REGISTRY) is None
     assert catalog_region_pair(OPERATOR_NOT_IN_REGISTRY, "Татарстан") is None
+    blob = (
+        "Республика Адыгея, Республика Башкортостан, Республика Бурятия, "
+        "Город Байконур, Херсонская область"
+    )
+    assert catalog_region_pair(blob, blob) is None
+    assert catalog_region_pair("Майкоп", blob) == ("Майкоп", None)
 
 
 def test_list_cities_empty():
@@ -72,35 +78,51 @@ def test_list_cities_uses_stored_digit_capacity():
     ]
 
 
-def test_load_from_catalog_merges_and_keeps_existing_capacity():
-    select_result = MagicMock()
-    select_result.all.return_value = [
+def test_load_from_catalog_rebuilds_keeps_capacity_deletes_stale():
+    blob = (
+        "Республика Адыгея, Республика Башкортостан, Республика Бурятия, "
+        "Город Байконур, Херсонская область"
+    )
+    existing_samara = SimpleNamespace(
+        city_name="Самара", region_name="Самарская область", digit_capacity=6
+    )
+    existing_blob = SimpleNamespace(city_name=blob, region_name=blob, digit_capacity=7)
+    existing_gone = SimpleNamespace(
+        city_name="Старый город", region_name="Старый регион", digit_capacity=6
+    )
+    db = MagicMock()
+    db.execute.return_value.all.return_value = [
         ("Самара", "Самарская область"),
         ("Москва", "Москва"),
         (OPERATOR_NOT_IN_REGISTRY, OPERATOR_NOT_IN_REGISTRY),
         ("Казань", OPERATOR_NOT_IN_REGISTRY),
         ("Пермь", None),
+        (blob, blob),
     ]
-    existing = [
-        SimpleNamespace(city_name="Самара", region_name="Самарская область", digit_capacity=6),
+    db.scalars.return_value.all.return_value = [
+        existing_samara,
+        existing_blob,
+        existing_gone,
     ]
-    db = MagicMock()
-    db.execute.return_value.all.return_value = select_result.all.return_value
-    db.scalars.return_value.all.return_value = existing
     added: list = []
+    deleted: list = []
     db.add_all.side_effect = added.extend
+    db.delete.side_effect = deleted.append
 
     out = RegionsService(db).load_from_catalog()
 
     assert out.ok is True
     assert out.count == 2
+    assert "удалено: 2" in out.message
     assert {(row.city_name, row.region_name, row.digit_capacity) for row in added} == {
         ("Москва", "Москва", DIGIT_CAPACITY_DEFAULT),
         ("Пермь", None, DIGIT_CAPACITY_DEFAULT),
     }
+    assert existing_blob in deleted
+    assert existing_gone in deleted
+    assert existing_samara not in deleted
     db.add_all.assert_called_once()
     db.commit.assert_called_once()
-    assert "SipOut" not in out.message
 
 
 def test_save_capacities_updates_found_rows():

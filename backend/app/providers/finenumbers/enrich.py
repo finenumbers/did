@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.types import Text
 
 from app.models.catalog import NumbersCatalogNormalized
-from app.modules.catalog.gar_territory import parse_gar_territory
+from app.modules.catalog.gar_territory import gar_clears_geo, parse_gar_territory
 from app.modules.catalog.geo_policy import catalog_city_region
 from app.modules.catalog.number_category import (
     CATEGORY_TOLLFREE,
@@ -87,10 +87,11 @@ class RangeMatch:
     operator: str
     city_name: str | None = None
     region_name: str | None = None
+    clear_geo: bool = False
 
     @property
     def apply_geo(self) -> bool:
-        return self.city_name is not None or self.region_name is not None
+        return self.clear_geo or self.city_name is not None or self.region_name is not None
 
 
 @dataclass(frozen=True)
@@ -102,6 +103,7 @@ class OperatorRange:
     order: int = 0
     city_name: str | None = None
     region_name: str | None = None
+    clear_geo: bool = False
 
     def covers(self, abc: str, local: int) -> bool:
         return self.abc == abc and self.start <= local <= self.end
@@ -111,6 +113,7 @@ class OperatorRange:
             operator=self.operator,
             city_name=self.city_name,
             region_name=self.region_name,
+            clear_geo=self.clear_geo,
         )
 
 
@@ -132,6 +135,7 @@ class OperatorRangeCache:
         *,
         city_name: str | None = None,
         region_name: str | None = None,
+        clear_geo: bool = False,
     ) -> None:
         if not abc or not operator or end < start:
             return
@@ -139,8 +143,8 @@ class OperatorRangeCache:
         bucket = self._by_abc.setdefault(abc, [])
         for idx, existing in enumerate(bucket):
             if existing.start == start and existing.end == end:
-                if (city_name or region_name) and not (
-                    existing.city_name or existing.region_name
+                if (city_name or region_name or clear_geo) and not (
+                    existing.city_name or existing.region_name or existing.clear_geo
                 ):
                     bucket[idx] = OperatorRange(
                         abc=existing.abc,
@@ -150,6 +154,7 @@ class OperatorRangeCache:
                         order=existing.order,
                         city_name=city_name,
                         region_name=region_name,
+                        clear_geo=clear_geo,
                     )
                 return
         self._order += 1
@@ -162,6 +167,7 @@ class OperatorRangeCache:
                 order=self._order,
                 city_name=city_name,
                 region_name=region_name,
+                clear_geo=clear_geo,
             )
         )
 
@@ -169,6 +175,7 @@ class OperatorRangeCache:
         abc = str(row.get("abc") or "").strip()
         operator = str(row.get("operator") or "").strip()
         city_name, region_name = parse_gar_territory(row.get("garTerritory"))
+        clear_geo = gar_clears_geo(row.get("garTerritory"))
         try:
             start = int(row["rangeStart"])
             end = int(row["rangeEnd"])
@@ -182,6 +189,7 @@ class OperatorRangeCache:
                 operator,
                 city_name=city_name,
                 region_name=region_name,
+                clear_geo=clear_geo,
             )
         return operator or None
 
@@ -485,6 +493,7 @@ async def _enrich_catalog_operators_inner(
                 current_region=current_region,
                 city=match.city_name,
                 region=match.region_name,
+                apply_geo=match.apply_geo,
                 abc_code=str(abc_code).strip() if abc_code else None,
                 msisdn=msisdn_s,
             )
@@ -629,6 +638,7 @@ async def _enrich_catalog_operators_inner(
                     current_region=current_region,
                     city=match.city_name,
                     region=match.region_name,
+                    apply_geo=match.apply_geo,
                     abc_code=str(abc_code).strip() if abc_code else None,
                     msisdn=msisdn_s,
                 )
@@ -715,6 +725,7 @@ async def _enrich_catalog_operators_inner(
                 current_region=current_region,
                 city=match.city_name,
                 region=match.region_name,
+                apply_geo=match.apply_geo,
                 abc_code=str(abc_code).strip() if abc_code else None,
                 msisdn=msisdn_s,
             )

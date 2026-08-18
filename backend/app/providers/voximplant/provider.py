@@ -320,18 +320,20 @@ class VoximplantProvider(AbstractProvider):
             "pagination_truncated": False,
         }
         logger.warning("Voximplant free integrity %s", integrity)
-
+        warnings = [
+            f"slices={len(slices)}",
+            f"fetched_raw={len(all_items)} mapped={len(mapped)}",
+            f"sum_total_count={expected_total}",
+            f"currency={account.get('currency')}",
+        ]
         if expected_total and len(mapped) < expected_total:
-            # Gate on unique mapped keys (not raw length) so dedupe/map drops cannot
-            # hide an incomplete inventory. Small overshoot of raw vs sum is OK.
-            raise ProviderError(
-                (
-                    f"Voximplant free incomplete: unique_keys={len(mapped)} "
-                    f"< sum(total_count)={expected_total}"
-                ),
-                code="VOXIMPLANT_FREE_INCOMPLETE",
-                details=integrity,
+            warning = (
+                f"Voximplant free incomplete: unique_keys={len(mapped)} "
+                f"< sum(total_count)={expected_total}"
             )
+            logger.warning(warning)
+            warnings.append(warning)
+            integrity["incomplete"] = True
 
         return SyncResult(
             fetched=len(all_items),
@@ -339,12 +341,7 @@ class VoximplantProvider(AbstractProvider):
             items=mapped,
             unmapped_raw=unmapped_raw,
             raw_envelopes=envelopes,
-            warnings=[
-                f"slices={len(slices)}",
-                f"fetched_raw={len(all_items)} mapped={len(mapped)}",
-                f"sum_total_count={expected_total}",
-                f"currency={account.get('currency')}",
-            ],
+            warnings=warnings,
             extra_stats={"integrity": integrity},
         )
 
