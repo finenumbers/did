@@ -5,16 +5,13 @@ from uuid import uuid4
 
 import pytest
 from openpyxl import load_workbook
-from pydantic import ValidationError
 
-from app.providers.finenumbers.contract import OPERATOR_NOT_IN_REGISTRY
-from app.providers.msisdn_split import DIGIT_CAPACITY_DEFAULT, split_msisdn, split_msisdn_by_capacity
-from app.schemas.regions import RegionCapacitySaveItem
 from app.services.regions_service import (
     REGIONS_XLSX_HEADERS,
     RegionsService,
-    catalog_region_pair,
+    parse_regions_xlsx,
 )
+from app.services.xlsx_style import StyledSheetWriter, open_styled_workbook
 
 
 def _db_with_rows(rows: list) -> MagicMock:
@@ -23,184 +20,166 @@ def _db_with_rows(rows: list) -> MagicMock:
     return db
 
 
-def test_catalog_region_pair_keeps_real_geo():
-    assert catalog_region_pair("  Самара  ", "  Самарская область  ") == (
-        "Самара",
-        "Самарская область",
-    )
-    assert catalog_region_pair("Казань", "") == ("Казань", None)
-    assert catalog_region_pair("Казань", None) == ("Казань", None)
+def _xlsx_bytes(path: Path, rows: list[list[object]]) -> bytes:
+    wb = open_styled_workbook(str(path), constant_memory=True)
+    try:
+        ws = wb.add_worksheet("Sheet1")
+        writer = StyledSheetWriter(wb, ws, REGIONS_XLSX_HEADERS)
+        for row in rows:
+            writer.write_row(row)
+        writer.finalize()
+    finally:
+        wb.close()
+    return path.read_bytes()
 
 
-def test_catalog_region_pair_drops_blank_and_sentinel():
-    assert catalog_region_pair("  ", "Игнор") is None
-    assert catalog_region_pair(None, "Игнор") is None
-    assert catalog_region_pair(OPERATOR_NOT_IN_REGISTRY, OPERATOR_NOT_IN_REGISTRY) is None
-    assert catalog_region_pair("Казань", OPERATOR_NOT_IN_REGISTRY) is None
-    assert catalog_region_pair(OPERATOR_NOT_IN_REGISTRY, "Татарстан") is None
-    blob = (
-        "Республика Адыгея, Республика Башкортостан, Республика Бурятия, "
-        "Город Байконур, Херсонская область"
-    )
-    assert catalog_region_pair(blob, blob) is None
-    assert catalog_region_pair("Майкоп", blob) == ("Майкоп", None)
-
-
-def test_list_cities_empty():
-    assert RegionsService(_db_with_rows([])).list_cities() == []
-
-
-def test_list_cities_uses_stored_digit_capacity():
-    samara_id = uuid4()
-    moscow_id = uuid4()
-    perm_id = uuid4()
+def test_list_cities_includes_abc_and_same_geo():
+    id_495 = uuid4()
+    id_499 = uuid4()
     rows = [
-        SimpleNamespace(id=uuid4(), city_name="  ", region_name="Игнор", digit_capacity=7),
         SimpleNamespace(
-            id=samara_id,
-            city_name="Самара",
-            region_name="Самарская область",
-            digit_capacity=6,
+            id=id_495,
+            abc="495",
+            digit_capacity=7,
+            city_name="Москва",
+            region_name="Москва",
         ),
         SimpleNamespace(
-            id=moscow_id,
-            city_name="  Москва  ",
-            region_name="  Московская область  ",
+            id=id_499,
+            abc="499",
             digit_capacity=7,
-        ),
-        SimpleNamespace(id=perm_id, city_name="Без региона", region_name="", digit_capacity=5),
-        SimpleNamespace(
-            id=uuid4(),
-            city_name=OPERATOR_NOT_IN_REGISTRY,
-            region_name=OPERATOR_NOT_IN_REGISTRY,
-            digit_capacity=7,
+            city_name="Москва",
+            region_name="Москва",
         ),
     ]
     items = RegionsService(_db_with_rows(rows)).list_cities()
-    assert [(i.id, i.digit_capacity, i.city_name, i.region_name) for i in items] == [
-        (samara_id, 6, "Самара", "Самарская область"),
-        (moscow_id, 7, "Москва", "Московская область"),
-        (perm_id, 5, "Без региона", None),
+    assert [(i.abc, i.digit_capacity, i.city_name, i.region_name) for i in items] == [
+        ("495", 7, "Москва", "Москва"),
+        ("499", 7, "Москва", "Москва"),
     ]
 
 
-def test_load_from_catalog_rebuilds_keeps_capacity_deletes_stale():
-    blob = (
-        "Республика Адыгея, Республика Башкортостан, Республика Бурятия, "
-        "Город Байконур, Херсонская область"
+def test_parse_numeric_excel_cells(tmp_path: Path):
+    data = _xlsx_bytes(
+        tmp_path / "num.xlsx",
+        [[495, 7.0, "Москва", "Москва"]],
     )
-    existing_samara = SimpleNamespace(
-        city_name="Самара", region_name="Самарская область", digit_capacity=6
+    rows = parse_regions_xlsx(data)
+    assert len(rows) == 1
+    assert rows[0].abc == "495"
+    assert rows[0].digit_capacity == 7
+    assert rows[0].city_name == "Москва"
+    assert rows[0].region_name == "Москва"
+
+
+def test_parse_two_abc_same_city_region(tmp_path: Path):
+    data = _xlsx_bytes(
+        tmp_path / "msk.xlsx",
+        [
+            ["495", 7, "Москва", "Москва"],
+            ["499", 7, "Москва", "Москва"],
+        ],
     )
-    existing_blob = SimpleNamespace(city_name=blob, region_name=blob, digit_capacity=7)
-    existing_gone = SimpleNamespace(
-        city_name="Старый город", region_name="Старый регион", digit_capacity=6
+    rows = parse_regions_xlsx(data)
+    assert [r.abc for r in rows] == ["495", "499"]
+    assert all(r.city_name == "Москва" and r.region_name == "Москва" for r in rows)
+
+
+def test_parse_header_only_is_empty(tmp_path: Path):
+    assert parse_regions_xlsx(_xlsx_bytes(tmp_path / "empty.xlsx", [])) == []
+
+
+def test_parse_rejects_duplicate_abc(tmp_path: Path):
+    data = _xlsx_bytes(
+        tmp_path / "dup.xlsx",
+        [
+            ["495", 7, "Москва", "Москва"],
+            ["495", 7, "Химки", "МО"],
+        ],
     )
-    db = MagicMock()
-    db.execute.return_value.all.return_value = [
-        ("Самара", "Самарская область"),
-        ("Москва", "Москва"),
-        (OPERATOR_NOT_IN_REGISTRY, OPERATOR_NOT_IN_REGISTRY),
-        ("Казань", OPERATOR_NOT_IN_REGISTRY),
-        ("Пермь", None),
-        (blob, blob),
-    ]
-    db.scalars.return_value.all.return_value = [
-        existing_samara,
-        existing_blob,
-        existing_gone,
-    ]
-    added: list = []
-    deleted: list = []
-    db.add_all.side_effect = added.extend
-    db.delete.side_effect = deleted.append
-
-    out = RegionsService(db).load_from_catalog()
-
-    assert out.ok is True
-    assert out.count == 2
-    assert "удалено: 2" in out.message
-    assert {(row.city_name, row.region_name, row.digit_capacity) for row in added} == {
-        ("Москва", "Москва", DIGIT_CAPACITY_DEFAULT),
-        ("Пермь", None, DIGIT_CAPACITY_DEFAULT),
-    }
-    assert existing_blob in deleted
-    assert existing_gone in deleted
-    assert existing_samara not in deleted
-    db.add_all.assert_called_once()
-    db.commit.assert_called_once()
+    with pytest.raises(ValueError, match="повторяется ABC"):
+        parse_regions_xlsx(data)
 
 
-def test_save_capacities_updates_found_rows():
-    row_id = uuid4()
-    row = SimpleNamespace(id=row_id, digit_capacity=7)
-    db = MagicMock()
-    db.scalars.return_value.all.return_value = [row]
-    out = RegionsService(db).save_capacities(
-        [RegionCapacitySaveItem(id=row_id, digit_capacity=6)]
-    )
-    assert out.ok is True
-    assert out.count == 1
-    assert row.digit_capacity == 6
-    db.commit.assert_called_once()
-
-
-def test_save_capacities_rejects_unknown_id():
-    db = MagicMock()
-    db.scalars.return_value.all.return_value = []
-    with pytest.raises(ValueError, match="не найдена"):
-        RegionsService(db).save_capacities(
-            [RegionCapacitySaveItem(id=uuid4(), digit_capacity=6)]
+def test_parse_rejects_capacity_and_abc_len(tmp_path: Path):
+    with pytest.raises(ValueError, match="разрядность"):
+        parse_regions_xlsx(
+            _xlsx_bytes(tmp_path / "cap.xlsx", [["495", 4, "Москва", "Москва"]])
+        )
+    with pytest.raises(ValueError, match="давать 10"):
+        parse_regions_xlsx(
+            _xlsx_bytes(tmp_path / "len.xlsx", [["495", 6, "Москва", "Москва"]])
         )
 
 
-def test_save_item_rejects_out_of_range_capacity():
-    with pytest.raises(ValidationError):
-        RegionCapacitySaveItem(id=uuid4(), digit_capacity=4)
-    with pytest.raises(ValidationError):
-        RegionCapacitySaveItem(id=uuid4(), digit_capacity=8)
+def test_parse_rejects_wrong_headers(tmp_path: Path):
+    path = tmp_path / "bad.xlsx"
+    wb = open_styled_workbook(str(path), constant_memory=True)
+    try:
+        ws = wb.add_worksheet("data")
+        writer = StyledSheetWriter(wb, ws, ["A", "B", "C", "D"])
+        writer.write_row(["495", 7, "Москва", "Москва"])
+        writer.finalize()
+    finally:
+        wb.close()
+    with pytest.raises(ValueError, match="Заголовки"):
+        parse_regions_xlsx(path.read_bytes())
 
 
-def test_split_msisdn_default_is_three_plus_seven():
-    assert split_msisdn("73833999999") == ("383", "3999999")
-    assert split_msisdn("not-a-number") == (None, None)
+def test_replace_skips_db_on_parse_error():
+    db = MagicMock()
+    with pytest.raises(ValueError):
+        RegionsService(db).replace_from_xlsx(b"not-xlsx")
+    db.execute.assert_not_called()
+    db.commit.assert_not_called()
+    db.add_all.assert_not_called()
 
 
-def test_split_msisdn_by_capacity():
-    assert split_msisdn_by_capacity("73833999999", 7) == ("383", "3999999")
-    assert split_msisdn_by_capacity("73842399999", 6) == ("3842", "399999")
-    assert split_msisdn_by_capacity("73842399999", 5) == ("38423", "99999")
-    assert split_msisdn_by_capacity("73842399999", 4) is None
-    assert split_msisdn_by_capacity("3842399999", 6) is None
+def test_replace_from_xlsx_writes_parsed_rows(tmp_path: Path):
+    db = MagicMock()
+    data = _xlsx_bytes(
+        tmp_path / "ok.xlsx",
+        [
+            ["3842", 6, "Кемерово", "Кемеровская область"],
+            ["495", 7, "Москва", "Москва"],
+        ],
+    )
+    out = RegionsService(db).replace_from_xlsx(data)
+    assert out.ok is True
+    assert out.count == 2
+    db.execute.assert_called_once()
+    added = db.add_all.call_args[0][0]
+    assert {(row.abc, row.digit_capacity, row.city_name) for row in added} == {
+        ("3842", 6, "Кемерово"),
+        ("495", 7, "Москва"),
+    }
+    db.commit.assert_called_once()
 
 
-def test_write_xlsx_matches_table_columns(tmp_path: Path):
-    samara_id = uuid4()
-    perm_id = uuid4()
+def test_write_xlsx_columns_and_roundtrip(tmp_path: Path):
+    id_495 = uuid4()
     rows = [
         SimpleNamespace(
-            id=samara_id,
-            city_name="Самара",
-            region_name="Самарская область",
-            digit_capacity=6,
-        ),
-        SimpleNamespace(id=perm_id, city_name="Пермь", region_name=None, digit_capacity=7),
+            id=id_495,
+            abc="495",
+            digit_capacity=7,
+            city_name="Москва",
+            region_name="Москва",
+        )
     ]
-    path = tmp_path / "regions.xlsx"
+    path = tmp_path / "out.xlsx"
     count = RegionsService(_db_with_rows(rows)).write_xlsx(path)
-    assert count == 2
+    assert count == 1
     wb = load_workbook(path)
     try:
         sheet = wb.active
-        assert [sheet.cell(1, col).value for col in range(1, 4)] == list(REGIONS_XLSX_HEADERS)
-        assert [sheet.cell(2, col).value for col in range(1, 4)] == [
-            6,
-            "Самара",
-            "Самарская область",
-        ]
-        perm = [sheet.cell(3, col).value for col in range(1, 4)]
-        assert perm[0] == 7
-        assert perm[1] == "Пермь"
-        assert perm[2] in (None, "")
+        assert [sheet.cell(1, col).value for col in range(1, 5)] == list(REGIONS_XLSX_HEADERS)
+        assert sheet.cell(2, 1).value in ("495", 495)
+        assert sheet.cell(2, 2).value == 7
+        assert sheet.cell(2, 3).value == "Москва"
+        assert sheet.cell(2, 4).value == "Москва"
     finally:
         wb.close()
+    parsed = parse_regions_xlsx(path.read_bytes())
+    assert parsed[0].abc == "495"
+    assert parsed[0].digit_capacity == 7

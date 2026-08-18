@@ -73,6 +73,33 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   return data as T;
 }
 
+/** Authenticated multipart upload. Do not set Content-Type — browser sets the boundary. */
+export async function apiUpload<T>(path: string, body: FormData): Promise<T> {
+  const headers: Record<string, string> = {};
+  const token = getAccessToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers,
+    body,
+    cache: "no-store",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const parsed = errorMessageFromBody(data, res.statusText || "Upload failed");
+    if (res.status === 401 && typeof window !== "undefined") {
+      clearSession();
+      if (!window.location.pathname.startsWith("/login")) {
+        window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+      }
+    }
+    throw new ApiError(parsed.message, parsed.code, parsed.details);
+  }
+  return data as T;
+}
+
 /** Authenticated binary download (Authorization header — no token in URL). */
 export async function apiDownload(path: string): Promise<Blob> {
   const headers: Record<string, string> = {};

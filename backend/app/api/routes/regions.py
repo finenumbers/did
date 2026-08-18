@@ -1,12 +1,12 @@
 import tempfile
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.schemas.regions import RegionCityItem, RegionsLoadResult, RegionsSaveRequest
-from app.services.regions_service import RegionsService
+from app.schemas.regions import RegionCityItem, RegionsLoadResult
+from app.services.regions_service import MAX_IMPORT_BYTES, RegionsService
 
 router = APIRouter(prefix="/regions", tags=["Regions"])
 
@@ -16,37 +16,16 @@ _XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
 @router.get(
     "",
     response_model=list[RegionCityItem],
-    summary="City and region dictionary (local snapshot from catalog)",
+    summary="Regions directory (ABC, digit capacity, city, region)",
 )
 def list_regions(db: Session = Depends(get_db)) -> list[RegionCityItem]:
     return RegionsService(db).list_cities()
 
 
-@router.post(
-    "/load",
-    response_model=RegionsLoadResult,
-    summary="Merge new catalog city/region pairs into the local regions table",
-)
-def load_regions(db: Session = Depends(get_db)) -> RegionsLoadResult:
-    return RegionsService(db).load_from_catalog()
-
-
-@router.post(
-    "/save",
-    response_model=RegionsLoadResult,
-    summary="Save edited digit capacity values",
-)
-def save_regions(body: RegionsSaveRequest, db: Session = Depends(get_db)) -> RegionsLoadResult:
-    try:
-        return RegionsService(db).save_capacities(body.items)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
 @router.get(
     "/export.xlsx",
     response_class=FileResponse,
-    summary="Download Regions table as XLSX (digit capacity, city, region)",
+    summary="Download Regions table as XLSX",
 )
 def export_regions_xlsx(db: Session = Depends(get_db)) -> FileResponse:
     tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
@@ -57,3 +36,21 @@ def export_regions_xlsx(db: Session = Depends(get_db)) -> FileResponse:
         media_type=_XLSX_MEDIA,
         filename="regions.xlsx",
     )
+
+
+@router.post(
+    "/import.xlsx",
+    response_model=RegionsLoadResult,
+    summary="Replace Regions table from XLSX (full replace)",
+)
+async def import_regions_xlsx(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> RegionsLoadResult:
+    data = await file.read()
+    if len(data) > MAX_IMPORT_BYTES:
+        raise HTTPException(status_code=400, detail="Файл слишком большой")
+    try:
+        return RegionsService(db).replace_from_xlsx(data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
