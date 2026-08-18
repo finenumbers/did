@@ -19,7 +19,11 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.execute("TRUNCATE TABLE regions_directory")
     op.execute("DROP INDEX IF EXISTS uq_regions_directory_city_region")
-    op.add_column("regions_directory", sa.Column("abc", sa.Text(), nullable=False))
+    op.add_column(
+        "regions_directory",
+        sa.Column("abc", sa.Text(), nullable=False, server_default=""),
+    )
+    op.alter_column("regions_directory", "abc", server_default=None)
     op.create_index("uq_regions_directory_abc", "regions_directory", ["abc"], unique=True)
 
 
