@@ -1,7 +1,7 @@
 import { clearSession, getAccessToken } from "@/lib/auth";
 
 /** Browser calls Next proxy by default. */
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
 
 export class ApiError extends Error {
   code: string;

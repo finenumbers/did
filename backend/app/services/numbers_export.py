@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import time
 from datetime import datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any, Callable
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from app.core.db import SessionLocal
 from app.models.catalog import NumbersCatalogNormalized
@@ -42,10 +43,67 @@ RTU_EXTERNAL_FILL = "#FFEB9C"
 OPERATOR_NOT_IN_REGISTRY_FILL = "#BDD7EE"
 
 _BATCH = 5_000
+_PROGRESS_EVERY_ROWS = 1_000
+_PROGRESS_EVERY_SEC = 0.5
 DEFAULT_SORT_BY = "abc_code"
 DEFAULT_SORT_DIR = "asc"
 
-ProgressCb = Callable[[int, int | None], None]
+# Header-based widths for catalog export (no per-cell display_len).
+_HEADER_MIN_CHARS: dict[str, int] = {
+    "Провайдер": 14,
+    "ABC": 8,
+    "Номер": 12,
+    "Категория": 12,
+    "Город": 16,
+    "Регион": 18,
+    "Оператор": 18,
+    "Покупка": 10,
+    "Абонплата": 12,
+    "Маска": 14,
+    "Display mask": 16,
+    "Тип": 10,
+    "Баллы": 8,
+    "Подключено в РТУ": 18,
+    "notes": 12,
+    "Класс": 10,
+    "confidence": 12,
+}
+
+_EXPORT_LOAD_ONLY = (
+    NumbersCatalogNormalized.provider_id,
+    NumbersCatalogNormalized.abc_code,
+    NumbersCatalogNormalized.number_local,
+    NumbersCatalogNormalized.number_category,
+    NumbersCatalogNormalized.city_name,
+    NumbersCatalogNormalized.region_name,
+    NumbersCatalogNormalized.operator,
+    NumbersCatalogNormalized.buy_price,
+    NumbersCatalogNormalized.period_price,
+    NumbersCatalogNormalized.mask,
+    NumbersCatalogNormalized.display_mask,
+    NumbersCatalogNormalized.number_type,
+    NumbersCatalogNormalized.points,
+    NumbersCatalogNormalized.rtu_connected,
+    NumbersCatalogNormalized.notes,
+    NumbersCatalogNormalized.number_class,
+    NumbersCatalogNormalized.mapping_confidence,
+)
+
+ProgressCb = Callable[..., None]
+
+
+def _call_progress(
+    on_progress: ProgressCb | None,
+    done: int,
+    tot: int | None,
+    phase: str,
+) -> None:
+    if on_progress is None:
+        return
+    try:
+        on_progress(done, tot, phase)
+    except TypeError:
+        on_progress(done, tot)
 
 
 def _format_price(value: Any) -> str:
@@ -107,18 +165,26 @@ def is_default_export_query(
     return sb == DEFAULT_SORT_BY and sd == DEFAULT_SORT_DIR
 
 
+def _iso_dt(value: Any) -> str | None:
+    return value.isoformat() if isinstance(value, datetime) else None
+
+
 def catalog_fingerprint(db: Session, inventory_kind: InventoryKind) -> dict[str, Any]:
-    count, max_seen = db.execute(
+    count, max_seen, max_updated = db.execute(
         select(
             func.count(),
             func.max(NumbersCatalogNormalized.last_seen_at),
+            func.max(NumbersCatalogNormalized.updated_at),
         ).where(
             NumbersCatalogNormalized.inventory_kind == inventory_kind,
             NumbersCatalogNormalized.is_currently_present.is_(True),
         )
     ).one()
-    max_iso = max_seen.isoformat() if isinstance(max_seen, datetime) else None
-    return {"count": int(count or 0), "max_last_seen_at": max_iso}
+    return {
+        "count": int(count or 0),
+        "max_last_seen_at": _iso_dt(max_seen),
+        "max_updated_at": _iso_dt(max_updated),
+    }
 
 
 class NumbersExportService:
@@ -162,6 +228,7 @@ class NumbersExportService:
             number_local_q=number_local_q,
         )
         stmt = stmt.order_by(*self.numbers.order_by_clauses(sort_by, sort_dir))
+        stmt = stmt.options(load_only(*_EXPORT_LOAD_ONLY))
 
         if rows_total is None:
             rows_total = self.count_filtered(
@@ -183,9 +250,30 @@ class NumbersExportService:
         ]
         headers = [header for _, header in columns]
         keys = [key for key, _ in columns]
-        writer = StyledSheetWriter(workbook, ws, headers)
+        writer = StyledSheetWriter(
+            workbook,
+            ws,
+            headers,
+            track_content_width=False,
+            min_chars=[_HEADER_MIN_CHARS.get(h, 12) for h in headers],
+        )
 
         row_count = 0
+        last_progress_t = time.monotonic()
+        last_progress_n = 0
+
+        def maybe_progress(*, force: bool = False, phase: str = "writing") -> None:
+            nonlocal last_progress_t, last_progress_n
+            now = time.monotonic()
+            if (
+                force
+                or row_count - last_progress_n >= _PROGRESS_EVERY_ROWS
+                or now - last_progress_t >= _PROGRESS_EVERY_SEC
+            ):
+                _call_progress(on_progress, row_count, rows_total, phase)
+                last_progress_t = now
+                last_progress_n = row_count
+
         result = self.db.execute(stmt.execution_options(yield_per=_BATCH))
         try:
             for row, code in result:
@@ -204,14 +292,12 @@ class NumbersExportService:
                     fill_color=fill,
                 )
                 row_count += 1
-                if on_progress and row_count % _BATCH == 0:
-                    on_progress(row_count, rows_total)
+                maybe_progress()
             writer.finalize()
+            _call_progress(on_progress, row_count, rows_total, "closing")
         finally:
             workbook.close()
 
-        if on_progress:
-            on_progress(row_count, rows_total)
         return row_count
 
 

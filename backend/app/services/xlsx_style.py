@@ -5,7 +5,7 @@ Standard:
 - no cell fills
 - header row: bold + centered
 - single-line row height
-- column widths from max content length
+- column widths from header presets (catalog) or max content (small sheets)
 - autofilter on header
 """
 
@@ -59,12 +59,22 @@ class StyledSheetWriter:
         workbook: xlsxwriter.Workbook,
         worksheet: Worksheet,
         headers: Sequence[str],
+        *,
+        track_content_width: bool = True,
+        min_chars: Sequence[int] | None = None,
     ):
         self.workbook = workbook
         self.ws = worksheet
         self.headers = list(headers)
         self.ncols = len(self.headers)
-        self._max_lens = [display_len(h) for h in self.headers]
+        self._track_content_width = track_content_width
+        self._max_lens = [
+            max(
+                display_len(h),
+                int(min_chars[i]) if min_chars is not None and i < len(min_chars) else 0,
+            )
+            for i, h in enumerate(self.headers)
+        ]
         self._row = 0
 
         self.header_fmt = workbook.add_format(
@@ -95,15 +105,18 @@ class StyledSheetWriter:
                     }
                 )
             cell_fmt = self._fill_fmts[fill_color]
+        row_vals: list[Any] = []
         for col_idx in range(self.ncols):
             value = values[col_idx] if col_idx < len(values) else ""
             if value is None:
                 value = ""
-            if cell_fmt is not None:
-                self.ws.write(excel_row, col_idx, value, cell_fmt)
-            else:
-                self.ws.write(excel_row, col_idx, value)
-            self._max_lens[col_idx] = max(self._max_lens[col_idx], display_len(value))
+            row_vals.append(value)
+            if self._track_content_width:
+                self._max_lens[col_idx] = max(self._max_lens[col_idx], display_len(value))
+        if cell_fmt is not None:
+            self.ws.write_row(excel_row, 0, row_vals, cell_fmt)
+        else:
+            self.ws.write_row(excel_row, 0, row_vals)
         self._row += 1
 
     def write_rows(self, rows: Iterable[Sequence[Any]]) -> int:

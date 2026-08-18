@@ -54,3 +54,27 @@ def test_styled_sheet_writer_format(tmp_path: Path):
         assert sheet.column_dimensions["B"].width <= expected + 2
     finally:
         loaded.close()
+
+
+def test_styled_sheet_writer_preset_widths_skip_content(tmp_path: Path):
+    path = tmp_path / "preset.xlsx"
+    wb = open_styled_workbook(str(path), constant_memory=True)
+    try:
+        ws = wb.add_worksheet("data")
+        writer = StyledSheetWriter(
+            wb, ws, ["City"], track_content_width=False, min_chars=[12]
+        )
+        writer.write_row(["Saint Petersburg"])
+        writer.finalize()
+    finally:
+        wb.close()
+
+    loaded = load_workbook(path)
+    try:
+        sheet = loaded.active
+        expected = excel_col_width(12)
+        assert sheet.column_dimensions["A"].width >= expected - 1
+        assert sheet.column_dimensions["A"].width <= expected + 2
+        assert sheet.auto_filter.ref == "A1:A2"
+    finally:
+        loaded.close()

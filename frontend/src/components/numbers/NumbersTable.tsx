@@ -7,7 +7,7 @@ import { HighlightText } from "@/components/numbers/HighlightText";
 import { ColumnFilterDropdown } from "@/components/numbers/ColumnFilterDropdown";
 import { InfiniteScrollSentinel } from "@/components/table/InfiniteScrollSentinel";
 import { formatCount, formatPoints, formatPrice } from "@/lib/format";
-import { apiDownload, apiFetch } from "@/lib/api/client";
+import { API_URL, apiDownload, apiFetch } from "@/lib/api/client";
 import { useInfinitePage } from "@/lib/hooks/useInfinitePage";
 import { displayProviderCode, encodeFilters } from "@/lib/numbers/filters";
 
@@ -112,6 +112,75 @@ const CATALOG_COLUMNS: Col[] = [
   },
 ];
 
+function formatExportEta(startedMs: number, done: number, total: number): string | null {
+  if (done < 2000 || total <= 0 || done >= total) return null;
+  const elapsed = (Date.now() - startedMs) / 1000;
+  if (elapsed < 1) return null;
+  const left = (elapsed / done) * (total - done);
+  if (left < 15) return "меньше минуты";
+  if (left < 90) return "~1 мин";
+  return `~${Math.round(left / 60)} мин`;
+}
+
+type ExportJob = {
+  id: string;
+  status: string;
+  phase?: string | null;
+  rows_done: number;
+  rows_total: number | null;
+  from_snapshot?: boolean;
+  error?: string | null;
+  filename?: string;
+  ticket?: string | null;
+};
+
+function exportStatusText(
+  job: ExportJob,
+  fallbackTotal: number,
+): { label: string; pct: number | null } {
+  const done = job.rows_done || 0;
+  const total = job.rows_total != null ? job.rows_total : fallbackTotal;
+  const pct =
+    total > 0 ? Math.min(99, Math.floor((done / total) * 100)) : null;
+  if (job.phase === "closing") {
+    return { label: "Сохранение файла на сервере…", pct: pct == null ? 99 : Math.max(pct, 99) };
+  }
+  if (job.status === "queued" || job.phase === "queued") {
+    return { label: "В очереди…", pct: 0 };
+  }
+  const verb = job.from_snapshot ? "Запись снимка" : "Запись XLSX";
+  const counts = `${formatCount(done)} / ${total > 0 ? formatCount(total) : "…"}`;
+  const percent = pct != null ? ` (${pct}%)` : "";
+  return { label: `${verb}: ${counts}${percent}`, pct };
+}
+
+function triggerNativeDownload(path: string, filename: string) {
+  const a = document.createElement("a");
+  a.href = `${API_URL}${path}`;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+async function downloadExportFile(job: ExportJob, kind: "free" | "purchased") {
+  const filename = job.filename || `${kind}-numbers.xlsx`;
+  if (job.ticket) {
+    triggerNativeDownload(
+      `/api/v1/numbers/export-jobs/${job.id}/download?ticket=${encodeURIComponent(job.ticket)}`,
+      filename,
+    );
+    return;
+  }
+  const blob = await apiDownload(`/api/v1/numbers/export-jobs/${job.id}/download`);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 const HEADER_MAP = Object.fromEntries(CATALOG_COLUMNS.map((c) => [c.key, c.header]));
 
 export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
@@ -124,6 +193,7 @@ export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
   const [scrollRoot, setScrollRoot] = useState<HTMLElement | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<string | null>(null);
+  const [exportPct, setExportPct] = useState<number | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
 
   const columns = useMemo(
@@ -194,19 +264,11 @@ export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
   const exportXlsx = () => {
     setExporting(true);
     setExportError(null);
+    setExportPct(total > 0 ? 0 : null);
     setExportProgress(total > 0 ? `0 / ${formatCount(total)}` : "запуск…");
 
     void (async () => {
       try {
-        type ExportJob = {
-          id: string;
-          status: string;
-          rows_done: number;
-          rows_total: number | null;
-          from_snapshot?: boolean;
-          error?: string | null;
-          filename?: string;
-        };
         const job = await apiFetch<ExportJob>(`/api/v1/numbers/${kind}/export-jobs`, {
           method: "POST",
           body: JSON.stringify({
@@ -220,16 +282,31 @@ export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
         let current = job;
         const started = Date.now();
         const maxWaitMs = 30 * 60 * 1000;
+
+        const applyProgress = (next: ExportJob) => {
+          if (next.status === "ready") {
+            setExportPct(100);
+            setExportProgress("Скачивание файла…");
+            return;
+          }
+          const { label, pct } = exportStatusText(next, total);
+          const eta = formatExportEta(
+            started,
+            next.rows_done || 0,
+            next.rows_total != null ? next.rows_total : total,
+          );
+          setExportPct(pct);
+          setExportProgress(eta ? `${label} · ${eta}` : label);
+        };
+
+        applyProgress(current);
         while (current.status === "queued" || current.status === "running") {
           if (Date.now() - started > maxWaitMs) {
             throw new Error("Экспорт превысил 30 минут ожидания");
           }
-          const done = formatCount(current.rows_done || 0);
-          const tot =
-            current.rows_total != null ? formatCount(current.rows_total) : formatCount(total);
-          setExportProgress(`${done} / ${tot}`);
-          await new Promise((r) => setTimeout(r, 1500));
+          await new Promise((r) => setTimeout(r, 800));
           current = await apiFetch<ExportJob>(`/api/v1/numbers/export-jobs/${job.id}`);
+          applyProgress(current);
         }
 
         if (current.status === "failed") {
@@ -239,22 +316,15 @@ export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
           throw new Error(`Неожиданный статус экспорта: ${current.status}`);
         }
 
-        setExportProgress(
-          current.from_snapshot
-            ? "скачивание готового файла…"
-            : `скачивание ${formatCount(current.rows_done || total)} строк…`,
-        );
-        const blob = await apiDownload(`/api/v1/numbers/export-jobs/${job.id}/download`);
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = current.filename || `${kind}-numbers.xlsx`;
-        a.click();
-        URL.revokeObjectURL(a.href);
+        setExportProgress("Скачивание файла…");
+        setExportPct(100);
+        await downloadExportFile(current, kind);
       } catch (e) {
         setExportError(e instanceof Error ? e.message : "Ошибка экспорта");
       } finally {
         setExporting(false);
         setExportProgress(null);
+        setExportPct(null);
       }
     })();
   };
@@ -284,7 +354,11 @@ export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
           disabled={exporting || (loading && items.length === 0)}
           onClick={() => void exportXlsx()}
         >
-          {exporting ? "Экспорт…" : "Экспорт XLSX"}
+          {exporting
+            ? exportPct != null
+              ? `Экспорт… ${exportPct}%`
+              : "Экспорт…"
+            : "Экспорт XLSX"}
         </button>
         {!exporting && !loading && (
           <span className="filters-meta">
@@ -298,9 +372,12 @@ export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
       </div>
       {exporting && (
         <div className="export-banner" role="status">
-          Формируется XLSX
-          {total > 0 ? ` по ${formatCount(total)} строкам` : ""}
-          {exportProgress ? ` — ${exportProgress}` : ""} — дождитесь скачивания в браузере.
+          {exportProgress || "Экспорт…"}
+          {exportPct != null && (
+            <div className="export-progress-track" aria-hidden="true">
+              <div className="export-progress-bar" style={{ width: `${exportPct}%` }} />
+            </div>
+          )}
         </div>
       )}
       {exportError && <div className="state error">{exportError}</div>}

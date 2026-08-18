@@ -367,6 +367,21 @@ mark.search-hit {
   font-size: 0.9rem;
 }
 
+.export-progress-track {
+  margin-top: 0.45rem;
+  height: 6px;
+  background: #d5e2ec;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.export-progress-bar {
+  height: 100%;
+  background: #2f6f9f;
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
 .active-filters {
   display: flex;
   flex-wrap: wrap;

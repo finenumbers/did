@@ -13,6 +13,7 @@ from app.services.numbers_export_jobs import (
     copy_job_file_for_download,
     create_export_job,
     get_job,
+    job_ticket_matches,
 )
 from app.services.numbers_service import NumbersService
 
@@ -231,9 +232,14 @@ def get_export_job(job_id: str) -> ExportJobOut:
     summary="Download completed export XLSX",
     response_class=FileResponse,
 )
-def download_export_job(job_id: str) -> FileResponse:
+def download_export_job(
+    job_id: str,
+    ticket: str | None = Query(default=None),
+) -> FileResponse:
     job = get_job(job_id)
     if job is None:
+        raise HTTPException(status_code=404, detail="Export job not found")
+    if ticket and ticket.strip() and not job_ticket_matches(job, ticket):
         raise HTTPException(status_code=404, detail="Export job not found")
     if job.status != "ready":
         raise HTTPException(

@@ -14,10 +14,12 @@ class ExportJobOut(BaseModel):
     id: str
     inventory_kind: str
     status: str
+    phase: str | None = None
     rows_done: int = 0
     rows_total: int | None = None
     from_snapshot: bool = False
     error: str | None = None
     filename: str
+    ticket: str | None = None
     created_at: str | None = None
     finished_at: str | None = None
