@@ -11,7 +11,7 @@ router = APIRouter(prefix="/regions", tags=["Regions"])
 @router.get(
     "",
     response_model=list[RegionCityItem],
-    summary="City and region dictionary (local table, SipOut load)",
+    summary="City and region dictionary (local snapshot from catalog)",
 )
 def list_regions(db: Session = Depends(get_db)) -> list[RegionCityItem]:
     return RegionsService(db).list_cities()
@@ -20,7 +20,7 @@ def list_regions(db: Session = Depends(get_db)) -> list[RegionCityItem]:
 @router.post(
     "/load",
     response_model=RegionsLoadResult,
-    summary="Replace local regions table from SipOut did/get_cities",
+    summary="Replace local regions table from current free/purchased catalog pairs",
 )
-async def load_regions(db: Session = Depends(get_db)) -> RegionsLoadResult:
-    return await RegionsService(db).load_from_sipout()
+def load_regions(db: Session = Depends(get_db)) -> RegionsLoadResult:
+    return RegionsService(db).load_from_catalog()

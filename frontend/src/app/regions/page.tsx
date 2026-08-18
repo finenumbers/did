@@ -4,9 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError, apiFetch } from "@/lib/api/client";
 import type { RegionCityItem, RegionsLoadResult } from "@/lib/types/api";
 
-function cellText(value: string | null | undefined): string {
+function cellText(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === "") return "—";
-  return value;
+  return String(value);
 }
 
 export default function RegionsPage() {
@@ -32,14 +32,14 @@ export default function RegionsPage() {
     void loadList({ asInitial: true });
   }, [loadList]);
 
-  async function loadFromSipout() {
+  async function loadFromCatalog() {
     setReloading(true);
     setError(null);
     try {
       await apiFetch<RegionsLoadResult>("/api/v1/regions/load", { method: "POST" });
       await loadList();
     } catch (err: unknown) {
-      setError(err instanceof ApiError ? err.message : "Не удалось загрузить данные SipOut");
+      setError(err instanceof ApiError ? err.message : "Не удалось загрузить данные");
     } finally {
       setReloading(false);
     }
@@ -49,7 +49,7 @@ export default function RegionsPage() {
     <div className="numbers-page">
       <div className="panel numbers-panel">
         <div className="regions-toolbar">
-          <button type="button" disabled={reloading} onClick={() => void loadFromSipout()}>
+          <button type="button" disabled={reloading} onClick={() => void loadFromCatalog()}>
             {reloading ? "Загрузка…" : "Загрузить данные"}
           </button>
         </div>
@@ -58,7 +58,7 @@ export default function RegionsPage() {
           <table className="regions-table">
             <thead>
               <tr>
-                <th>ABC</th>
+                <th>Разрядность номера</th>
                 <th>Город</th>
                 <th>Регион</th>
               </tr>
@@ -66,7 +66,7 @@ export default function RegionsPage() {
             <tbody>
               {items.map((row, idx) => (
                 <tr key={`${row.city_name}|${row.region_name ?? ""}|${idx}`}>
-                  <td>{cellText(row.abc)}</td>
+                  <td>{cellText(row.digit_capacity)}</td>
                   <td>{row.city_name}</td>
                   <td>{cellText(row.region_name)}</td>
                 </tr>

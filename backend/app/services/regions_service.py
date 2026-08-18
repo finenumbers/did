@@ -1,60 +1,34 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from sqlalchemy import delete, select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import delete, func, or_, select
+from sqlalchemy.orm import Session
 
-from app.models.enums import ProviderCode
-from app.models.providers import Provider
+from app.models.catalog import NumbersCatalogNormalized
+from app.models.enums import InventoryKind
 from app.models.regions_directory import RegionsDirectory
-from app.providers.dto.common import ConnectionConfig
-from app.providers.dto.geo import ParsedCity, ParsedRegion
-from app.providers.errors import ProviderError
-from app.providers.sipout.client import SipOutClient
-from app.providers.sipout.parser import parse_geo
+from app.providers.finenumbers.contract import OPERATOR_NOT_IN_REGISTRY
 from app.schemas.regions import RegionCityItem, RegionsLoadResult
 
-
-@dataclass(frozen=True, slots=True)
-class DirectoryRow:
-    city_name: str
-    region_name: str | None
-    city_external_id: str | None
-    region_external_id: str | None
+DIGIT_CAPACITY = 7
 
 
-def directory_rows_from_sipout(
-    regions: list[ParsedRegion],
-    cities: list[ParsedCity],
-) -> list[DirectoryRow]:
-    """Join SipOut cities to region names by region_id. ABC is not in get_cities."""
-    region_names: dict[str, str] = {}
-    for region in regions:
-        rid = (region.region_external_id or "").strip()
-        name = (region.name or "").strip()
-        if rid and name:
-            region_names[rid] = name
-    rows: list[DirectoryRow] = []
-    for city in cities:
-        city_name = (city.name or "").strip()
-        if not city_name:
-            continue
-        rid = (city.region_external_id or "").strip() or None
-        rows.append(
-            DirectoryRow(
-                city_name=city_name,
-                region_name=region_names.get(rid) if rid else None,
-                city_external_id=(city.city_external_id or "").strip() or None,
-                region_external_id=rid,
-            )
-        )
-    return rows
+def catalog_region_pair(
+    city_name: str | None, region_name: str | None
+) -> tuple[str, str | None] | None:
+    """Return a real city/region pair, or None for blank/sentinel error rows."""
+    city = (city_name or "").strip()
+    if not city or city == OPERATOR_NOT_IN_REGISTRY:
+        return None
+    region = (region_name or "").strip() or None
+    if region == OPERATOR_NOT_IN_REGISTRY:
+        return None
+    return city, region
 
 
 class RegionsService:
-    """Local Regions page table. Source: SipOut `did/get_cities`, only via load button."""
+    """Local Regions page table. Snapshot from catalog city/region, only via load button."""
 
     def __init__(self, db: Session):
         self.db = db
@@ -68,50 +42,69 @@ class RegionsService:
         ).all()
         items: list[RegionCityItem] = []
         for row in rows:
-            city = (row.city_name or "").strip()
-            if not city:
+            pair = catalog_region_pair(row.city_name, row.region_name)
+            if pair is None:
                 continue
-            region = (row.region_name or "").strip() or None
-            items.append(RegionCityItem(abc=None, city_name=city, region_name=region))
+            city, region = pair
+            items.append(
+                RegionCityItem(
+                    digit_capacity=DIGIT_CAPACITY,
+                    city_name=city,
+                    region_name=region,
+                )
+            )
         return items
 
-    async def load_from_sipout(self) -> RegionsLoadResult:
-        provider = self.db.scalar(
-            select(Provider)
-            .where(Provider.code == ProviderCode.sipout)
-            .options(joinedload(Provider.connection))
+    def load_from_catalog(self) -> RegionsLoadResult:
+        city_expr = func.btrim(NumbersCatalogNormalized.city_name)
+        region_expr = func.nullif(func.btrim(NumbersCatalogNormalized.region_name), "")
+        stmt = (
+            select(city_expr, region_expr)
+            .where(NumbersCatalogNormalized.is_currently_present.is_(True))
+            .where(
+                NumbersCatalogNormalized.inventory_kind.in_(
+                    (InventoryKind.free, InventoryKind.purchased)
+                )
+            )
+            .where(NumbersCatalogNormalized.city_name.is_not(None))
+            .where(city_expr != "")
+            .where(city_expr != OPERATOR_NOT_IN_REGISTRY)
+            .where(
+                or_(
+                    NumbersCatalogNormalized.region_name.is_(None),
+                    func.btrim(NumbersCatalogNormalized.region_name) == "",
+                    region_expr != OPERATOR_NOT_IN_REGISTRY,
+                )
+            )
+            .distinct()
         )
-        if not provider:
-            raise ProviderError("Провайдер SipOut не найден", code="SIPOUT_NOT_FOUND")
-        conn = provider.connection
-        if not conn:
-            raise ProviderError("Нет настроек подключения SipOut", code="SIPOUT_NOT_CONFIGURED")
-        cfg = ConnectionConfig(
-            base_url=conn.base_url,
-            auth_settings=dict(conn.auth_settings or {}),
-            extra_settings=conn.extra_settings or {},
-        )
-        raw = await SipOutClient(cfg).get_cities()
-        regions, cities = parse_geo(raw)
-        mapped = directory_rows_from_sipout(regions, cities)
+        mapped: list[tuple[str, str | None]] = []
+        seen: set[tuple[str, str]] = set()
+        for city_raw, region_raw in self.db.execute(stmt).all():
+            pair = catalog_region_pair(city_raw, region_raw)
+            if pair is None:
+                continue
+            city, region = pair
+            key = (city, region or "")
+            if key in seen:
+                continue
+            seen.add(key)
+            mapped.append((city, region))
         loaded_at = datetime.now(timezone.utc)
         self.db.execute(delete(RegionsDirectory))
         self.db.add_all(
             [
                 RegionsDirectory(
-                    abc=None,
-                    city_name=row.city_name,
-                    region_name=row.region_name,
-                    city_external_id=row.city_external_id,
-                    region_external_id=row.region_external_id,
+                    city_name=city,
+                    region_name=region,
                     loaded_at=loaded_at,
                 )
-                for row in mapped
+                for city, region in mapped
             ]
         )
         self.db.commit()
         return RegionsLoadResult(
             ok=True,
             count=len(mapped),
-            message=f"Загружено городов: {len(mapped)}",
+            message=f"Загружено комбинаций: {len(mapped)}",
         )

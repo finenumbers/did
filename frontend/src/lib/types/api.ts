@@ -130,7 +130,7 @@ export interface ProviderHealth {
 }
 
 export interface RegionCityItem {
-  abc: string | null;
+  digit_capacity: number;
   city_name: string;
   region_name: string | null;
 }
