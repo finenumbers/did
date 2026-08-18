@@ -93,3 +93,12 @@ def test_coverage_list_nulls_each_field():
     assert catalog_city_region("495", "74951234567", blob, blob) == (None, None)
     assert catalog_city_region("900", "79001234567", blob, blob) == (None, None)
     assert catalog_city_region("495", "74951234567", "Майкоп", blob) == ("Майкоп", None)
+
+
+def test_catalog_city_alias_and_honorary_prefix():
+    assert catalog_city_region(
+        "495", "74951234567", "Кемеровский", "Кемеровская область"
+    ) == ("Кемерово", "Кемеровская область")
+    assert catalog_city_region(
+        "384", "73842123456", "город-курорт Сочи", "Краснодарский край"
+    ) == ("Сочи", "Краснодарский край")

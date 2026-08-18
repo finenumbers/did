@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from app.modules.catalog.gar_territory import is_coverage_value, strip_gar_prefix
+from app.modules.catalog.gar_territory import (
+    is_coverage_value,
+    normalize_catalog_city,
+    strip_gar_prefix,
+)
 from app.modules.catalog.number_category import (
     CATEGORY_MOBILE,
     CATEGORY_TOLLFREE,
@@ -71,6 +75,7 @@ def catalog_city_region(
         city = None
     if is_coverage_value(region):
         region = None
+    city = normalize_catalog_city(city)
     if category == CATEGORY_MOBILE:
         return collapse_mobile_capitals(city, region)
     return city, region
