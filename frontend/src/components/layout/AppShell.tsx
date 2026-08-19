@@ -23,8 +23,10 @@ const externalLinks: { href: string; label: string; dividerBefore?: boolean }[] 
   { href: "https://pstn.finenumbers.com/", label: "PSTN Platform" },
   { href: "https://sms-adm.finenumbers.com/", label: "SMS Platform" },
   { href: "https://check.finenumbers.com/", label: "Check Platform" },
+  { href: "https://geoip.finenumbers.com/", label: "GeoIP Platform" },
   { href: "https://admin.finenumbers.cloud/", label: "iTooLabs Platform", dividerBefore: true },
   { href: "https://5.227.161.180:8445/", label: "RTU Softswitch" },
+  { href: "http://5.227.161.171/lbweb-admin/", label: "Billing System" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
