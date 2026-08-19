@@ -18,16 +18,3 @@ export function formatPrice(
   const abs = Math.abs(int).toString();
   return sign + abs.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
-
-/** Format points with two decimal places, e.g. "10.00", "6.25". */
-export function formatPoints(
-  value: string | number | null | undefined,
-): string | null {
-  if (value === null || value === undefined || value === "") return null;
-  const raw =
-    typeof value === "number"
-      ? value
-      : Number(String(value).replace(/\s/g, "").replace(",", "."));
-  if (!Number.isFinite(raw)) return null;
-  return raw.toFixed(2);
-}

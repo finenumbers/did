@@ -71,6 +71,13 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _rollback_session(db: Session) -> None:
+    try:
+        db.rollback()
+    except Exception:
+        pass
+
+
 def mark_stale_runs(db: Session) -> int:
     """Age-out pending always; age-out running only when sync advisory lock is free."""
     from app.modules.sync_engine.locks import SYNC_LOCK_KEY, advisory_unlock, try_advisory_lock
@@ -980,6 +987,7 @@ def _run_rtu_flags(
             f"not_connected={rtu_stats.get('rtu_not_connected')}",
         )
     except Exception as exc:
+        _rollback_session(db)
         log_run(db, run.id, SyncLogLevel.error, f"RTU flags failed: {exc}")
         tracker.fail("rtu_flags", str(exc))
 
@@ -1018,6 +1026,7 @@ def _run_geographic_from_regions(
             f"reset={geo_stats.get('reset')}",
         )
     except Exception as exc:
+        _rollback_session(db)
         log_run(
             db,
             run.id,
@@ -1062,6 +1071,7 @@ def _run_mask_types(
             f"matched={stats.get('matched')}, updated={stats.get('updated')}",
         )
     except Exception as exc:
+        _rollback_session(db)
         log_run(
             db,
             run.id,

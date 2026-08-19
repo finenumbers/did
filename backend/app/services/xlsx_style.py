@@ -11,7 +11,7 @@ Standard:
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Sequence
+from typing import Any, Sequence
 
 import xlsxwriter
 from xlsxwriter.worksheet import Worksheet
@@ -118,17 +118,6 @@ class StyledSheetWriter:
                 self._max_lens[col_idx] = max(self._max_lens[col_idx], display_len(value))
         self.ws.write_row(excel_row, 0, row_vals, cell_fmt)
         self._row += 1
-
-    def write_rows(self, rows: Iterable[Sequence[Any]]) -> int:
-        n = 0
-        for row in rows:
-            self.write_row(row)
-            n += 1
-        return n
-
-    @property
-    def data_rows(self) -> int:
-        return max(0, self._row - 1)
 
     def finalize(self) -> None:
         """Apply column widths and autofilter. Call before workbook.close()."""

@@ -117,14 +117,6 @@ export interface SyncRun {
   created_at: string;
 }
 
-export interface ProviderHealth {
-  provider_code: string;
-  connection_status: string;
-  free_count: number;
-  purchased_count: number;
-  limitations: string[];
-}
-
 export interface RegionCityItem {
   id: string;
   abc: string;
