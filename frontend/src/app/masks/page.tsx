@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { DirectoryExplorer } from "@/components/directory/DirectoryExplorer";
-import { ApiError, apiDownload, apiFetch, apiUpload } from "@/lib/api/client";
+import { ApiError, apiDownload, apiUpload } from "@/lib/api/client";
 import type { DirectoryColumn } from "@/lib/directory/filters";
 import { formatPrice } from "@/lib/format";
-import type { MaskTypeItem, MaskTypesLoadResult } from "@/lib/types/api";
+import { encodeFilters } from "@/lib/numbers/filters";
+import type { ColumnFilters, MaskTypeItem, MaskTypesLoadResult } from "@/lib/types/api";
 
 function cellText(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === "") return "—";
@@ -45,6 +46,7 @@ const COLUMNS: DirectoryColumn<MaskTypeItem>[] = [
     text: (r) => r.mask,
     facet: (r) => r.mask,
     highlight: true,
+    cellClassName: "col-number-local",
   },
   {
     key: "type_label",
@@ -79,29 +81,42 @@ function maskRowClass(row: MaskTypeItem): string | undefined {
   return undefined;
 }
 
+function maskListPath(
+  page: number,
+  pageSize: number,
+  query: { searchQ: string; filters: ColumnFilters },
+): string {
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: String(pageSize),
+  });
+  const encoded = encodeFilters(query.filters);
+  if (encoded) params.set("filters", encoded);
+  const q = query.searchQ.trim();
+  if (q) params.set("mask_q", q);
+  return `/api/v1/mask-types?${params}`;
+}
+
+function maskFacetsPath(args: {
+  column: string;
+  filters: ColumnFilters;
+  searchQ: string;
+  q: string;
+}): string {
+  const params = new URLSearchParams({ column: args.column, limit: "200" });
+  const encoded = encodeFilters(args.filters);
+  if (encoded) params.set("filters", encoded);
+  const mq = args.searchQ.trim();
+  if (mq) params.set("mask_q", mq);
+  if (args.q) params.set("q", args.q);
+  return `/api/v1/mask-types/facets?${params}`;
+}
+
 export default function MasksPage() {
-  const [items, setItems] = useState<MaskTypeItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const loadList = useCallback(async ({ asInitial = false } = {}) => {
-    if (asInitial) setLoading(true);
-    setError(null);
-    try {
-      const rows = await apiFetch<MaskTypeItem[]>("/api/v1/mask-types");
-      setItems(rows);
-    } catch (err: unknown) {
-      setError(err instanceof ApiError ? err.message : "Не удалось загрузить маски и типы");
-    } finally {
-      if (asInitial) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadList({ asInitial: true });
-  }, [loadList]);
+  const [reloadToken, setReloadToken] = useState(0);
 
   async function exportXlsx() {
     setExporting(true);
@@ -131,7 +146,7 @@ export default function MasksPage() {
       const body = new FormData();
       body.append("file", file);
       await apiUpload<MaskTypesLoadResult>("/api/v1/mask-types/import.xlsx", body);
-      await loadList();
+      setReloadToken((n) => n + 1);
     } catch (err: unknown) {
       setError(err instanceof ApiError ? err.message : "Не удалось импортировать XLSX");
     } finally {
@@ -143,13 +158,13 @@ export default function MasksPage() {
     <div className="numbers-page">
       <div className="panel numbers-panel">
         <DirectoryExplorer
-          items={items}
+          items={[]}
           columns={COLUMNS}
           searchPlaceholder="Маска"
           searchChipLabel="Маска"
           searchValue={maskSearch}
           tableClassName="masks-table"
-          loading={loading}
+          loading={false}
           error={error}
           exporting={exporting}
           importing={importing}
@@ -157,6 +172,9 @@ export default function MasksPage() {
           onExport={() => void exportXlsx()}
           onImport={(file) => void importXlsx(file)}
           rowClassName={maskRowClass}
+          getServerPath={maskListPath}
+          getServerFacets={maskFacetsPath}
+          reloadToken={reloadToken}
         />
       </div>
     </div>

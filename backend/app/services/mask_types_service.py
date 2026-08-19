@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from io import BytesIO
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import uuid4
 
 from openpyxl import load_workbook
-from sqlalchemy import select
+from sqlalchemy import Select, cast, func, or_, select
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import ColumnElement
+from sqlalchemy.types import String
 
 from app.models.mask_types import MaskType
 from app.modules.catalog.apply_mask_types import normalize_key_part
@@ -24,7 +27,9 @@ from app.modules.catalog.mask_type_policy import (
     normalize_import_category,
     required_categories,
 )
+from app.schemas.common import Page
 from app.schemas.mask_types import MaskTypeItem, MaskTypesLoadResult
+from app.schemas.numbers import FacetItem, FacetResponse
 from app.services.xlsx_style import StyledSheetWriter, open_styled_workbook
 
 MASK_TYPES_XLSX_HEADERS = (
@@ -39,6 +44,7 @@ MASK_TYPES_XLSX_HEADERS = (
 MASK_TYPES_XLSX_SHEET = "Маски"
 MAX_IMPORT_BYTES = 5 * 1024 * 1024
 _IMPORT_WIDTH = len(MASK_TYPES_XLSX_HEADERS)
+EMPTY_TOKEN = "__empty__"
 
 
 @dataclass(frozen=True)
@@ -96,6 +102,43 @@ def _xlsx_price(value: Decimal | None) -> object:
     if value == value.to_integral_value():
         return int(value)
     return float(value)
+
+
+def _format_price_value(value: Any) -> str:
+    if value is None:
+        return ""
+    try:
+        n = int(Decimal(str(value)).to_integral_value(rounding=ROUND_HALF_UP))
+    except (InvalidOperation, ValueError, TypeError):
+        return str(value)
+    sign = "-" if n < 0 else ""
+    digits = str(abs(n))
+    parts: list[str] = []
+    while digits:
+        parts.append(digits[-3:])
+        digits = digits[:-3]
+    return sign + " ".join(reversed(parts))
+
+
+def _parse_price_token(token: str) -> Decimal | None:
+    raw = token.replace(" ", "").replace(",", ".")
+    try:
+        return Decimal(raw)
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _item_from_row(row: MaskType) -> MaskTypeItem:
+    return MaskTypeItem(
+        id=row.id,
+        digit_capacity=row.digit_capacity,
+        category=row.category,
+        abc=row.abc,
+        mask=row.mask,
+        type_label=row.type_label,
+        premium=row.premium,
+        purchase=row.purchase,
+    )
 
 
 def row_key(row: _KeyedRow) -> tuple[str, str, str, str]:
@@ -195,6 +238,7 @@ def _backfill_digit_capacity(db: Session, by_key: dict[tuple[str, str, str, str]
         target = (derived, row.category or "", row.abc or "", row.mask)
         occupied = by_key.get(target)
         if occupied is not None and occupied is not row:
+            _merge_payload(occupied, row)
             by_key.pop(row_key(row), None)
             db.delete(row)
             continue
@@ -258,32 +302,198 @@ def ensure_mask_types_seeded(db: Session) -> int:
 
 
 class MaskTypesService:
+    TEXT_COLUMNS: dict[str, Any] = {
+        "digit_capacity": MaskType.digit_capacity,
+        "category": MaskType.category,
+        "abc": MaskType.abc,
+        "mask": MaskType.mask,
+        "type_label": MaskType.type_label,
+    }
+    PRICE_COLUMNS = {
+        "premium": MaskType.premium,
+        "purchase": MaskType.purchase,
+    }
+    FACET_COLUMNS = frozenset({*TEXT_COLUMNS, *PRICE_COLUMNS})
+    _ORDER = (
+        MaskType.mask.asc(),
+        MaskType.digit_capacity.asc(),
+        MaskType.category.asc(),
+        MaskType.abc.asc(),
+    )
+
     def __init__(self, db: Session):
         self.db = db
 
+    @staticmethod
+    def parse_filters(filters: str | dict[str, list[str]] | None) -> dict[str, list[str]]:
+        if filters is None or filters == "":
+            return {}
+        if isinstance(filters, dict):
+            data = filters
+        else:
+            try:
+                data = json.loads(filters)
+            except json.JSONDecodeError as exc:
+                raise ValueError("filters must be a JSON object") from exc
+        if not isinstance(data, dict):
+            raise ValueError("filters must be a JSON object")
+        out: dict[str, list[str]] = {}
+        for key, values in data.items():
+            if not isinstance(key, str):
+                continue
+            if isinstance(values, str):
+                values = [values]
+            if not isinstance(values, list):
+                continue
+            cleaned = [str(v) for v in values if v is not None]
+            if cleaned:
+                out[key] = cleaned
+        return out
+
+    def _empty_predicate(self, col: ColumnElement[Any]) -> ColumnElement[Any]:
+        return or_(col.is_(None), cast(col, String) == "")
+
+    def _apply_mask_q(self, stmt: Select, mask_q: str | None) -> Select:
+        if mask_q:
+            stmt = stmt.where(MaskType.mask.ilike(f"%{mask_q}%"))
+        return stmt
+
+    def _apply_facet_filters(
+        self,
+        stmt: Select,
+        filters: dict[str, list[str]],
+        *,
+        exclude_column: str | None = None,
+    ) -> Select:
+        for field, values in filters.items():
+            if field == exclude_column:
+                continue
+            if field not in self.FACET_COLUMNS:
+                continue
+            if not values:
+                continue
+            include_empty = EMPTY_TOKEN in values or "" in values
+            concrete = [v for v in values if v not in (EMPTY_TOKEN, "")]
+            if field in self.PRICE_COLUMNS:
+                col = self.PRICE_COLUMNS[field]
+                preds = []
+                nums = [n for n in (_parse_price_token(v) for v in concrete) if n is not None]
+                if nums:
+                    preds.append(func.round(col).in_([int(n) for n in nums]))
+                if include_empty:
+                    preds.append(col.is_(None))
+                if preds:
+                    stmt = stmt.where(or_(*preds) if len(preds) > 1 else preds[0])
+                continue
+            col = self.TEXT_COLUMNS[field]
+            preds = []
+            if concrete:
+                preds.append(col.in_(concrete))
+            if include_empty:
+                preds.append(self._empty_predicate(col))
+            if preds:
+                stmt = stmt.where(or_(*preds) if len(preds) > 1 else preds[0])
+        return stmt
+
+    def _filtered_stmt(
+        self,
+        *,
+        mask_q: str | None = None,
+        filters: dict[str, list[str]] | None = None,
+        exclude_column: str | None = None,
+    ) -> Select:
+        stmt = select(MaskType)
+        stmt = self._apply_facet_filters(stmt, filters or {}, exclude_column=exclude_column)
+        return self._apply_mask_q(stmt, mask_q)
+
     def list_items(self) -> list[MaskTypeItem]:
-        ensure_mask_types_seeded(self.db)
-        rows = self.db.scalars(
-            select(MaskType).order_by(
-                MaskType.mask.asc(),
-                MaskType.digit_capacity.asc(),
-                MaskType.category.asc(),
-                MaskType.abc.asc(),
+        rows = self.db.scalars(select(MaskType).order_by(*self._ORDER)).all()
+        return [_item_from_row(row) for row in rows]
+
+    def list_page(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        mask_q: str | None = None,
+        filters: dict[str, list[str]] | None = None,
+    ) -> Page[MaskTypeItem]:
+        stmt = self._filtered_stmt(mask_q=mask_q, filters=filters)
+        count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
+        total = self.db.scalar(count_stmt) or 0
+        stmt = stmt.order_by(*self._ORDER)
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+        rows = self.db.scalars(stmt).all()
+        return Page.of(
+            [_item_from_row(row) for row in rows],
+            page=page,
+            page_size=page_size,
+            total=total,
+        )
+
+    def _facet_value_expr(self, column: str) -> ColumnElement[Any]:
+        if column in self.PRICE_COLUMNS:
+            return func.round(self.PRICE_COLUMNS[column])
+        col = self.TEXT_COLUMNS.get(column)
+        if col is None:
+            raise ValueError(f"Unsupported facet column: {column}")
+        return col
+
+    def _format_facet_value(self, column: str, raw: Any) -> str:
+        if raw is None:
+            return ""
+        if column in self.PRICE_COLUMNS:
+            return _format_price_value(raw)
+        return str(raw)
+
+    def list_facets(
+        self,
+        *,
+        column: str,
+        filters: dict[str, list[str]] | None = None,
+        mask_q: str | None = None,
+        q: str | None = None,
+        limit: int = 200,
+        offset: int = 0,
+    ) -> FacetResponse:
+        if column not in self.FACET_COLUMNS:
+            raise ValueError(f"Unsupported facet column: {column}")
+
+        value_expr = self._facet_value_expr(column)
+        if column in self.TEXT_COLUMNS:
+            value_expr = func.nullif(func.btrim(cast(value_expr, String)), "")
+
+        stmt = self._filtered_stmt(
+            mask_q=mask_q,
+            filters=filters,
+            exclude_column=column,
+        )
+        base = (
+            stmt.with_only_columns(
+                value_expr.label("facet_value"),
+                MaskType.id.label("row_id"),
             )
-        ).all()
-        return [
-            MaskTypeItem(
-                id=row.id,
-                digit_capacity=row.digit_capacity,
-                category=row.category,
-                abc=row.abc,
-                mask=row.mask,
-                type_label=row.type_label,
-                premium=row.premium,
-                purchase=row.purchase,
-            )
-            for row in rows
+            .order_by(None)
+            .subquery()
+        )
+        grouped = select(
+            base.c.facet_value,
+            func.count().label("cnt"),
+        ).group_by(base.c.facet_value)
+        if q:
+            grouped = grouped.where(cast(base.c.facet_value, String).ilike(f"%{q}%"))
+        grouped = grouped.order_by(
+            func.count().desc(),
+            cast(base.c.facet_value, String).asc().nulls_last(),
+        )
+        rows = self.db.execute(grouped.offset(offset).limit(limit + 1)).all()
+        truncated = len(rows) > limit
+        rows = rows[:limit]
+        items = [
+            FacetItem(value=self._format_facet_value(column, raw), count=int(cnt))
+            for raw, cnt in rows
         ]
+        return FacetResponse(column=column, items=items, truncated=truncated)
 
     def write_xlsx(self, path: str | Path) -> int:
         items = self.list_items()

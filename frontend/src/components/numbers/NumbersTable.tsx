@@ -379,7 +379,7 @@ export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
           <thead>
             <tr>
               {columns.map((col) => (
-                <th key={col.key} className={col.key === "number_local" ? "col-number-local" : undefined}>
+                <th key={col.key}>
                   <ColumnFilterDropdown
                     kind={kind}
                     column={col.key}

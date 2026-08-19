@@ -4,13 +4,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActiveFiltersBar } from "@/components/numbers/ActiveFiltersBar";
 import { ColumnFilterDropdown } from "@/components/numbers/ColumnFilterDropdown";
 import { HighlightText } from "@/components/numbers/HighlightText";
+import { InfiniteScrollSentinel } from "@/components/table/InfiniteScrollSentinel";
 import {
   applyDirectoryFilters,
   computeFacets,
   type DirectoryColumn,
 } from "@/lib/directory/filters";
+import { apiFetch } from "@/lib/api/client";
 import { formatCount } from "@/lib/format";
+import { useInfinitePage } from "@/lib/hooks/useInfinitePage";
+import { encodeFilters } from "@/lib/numbers/filters";
 import type { ColumnFilters, FacetResponse } from "@/lib/types/api";
+
+export type DirectoryServerQuery = {
+  searchQ: string;
+  filters: ColumnFilters;
+};
 
 type Props<T extends { id: string }> = {
   items: T[];
@@ -27,6 +36,18 @@ type Props<T extends { id: string }> = {
   onExport: () => void;
   onImport: (file: File) => void;
   rowClassName?: (row: T) => string | undefined;
+  getServerPath?: (
+    page: number,
+    pageSize: number,
+    query: DirectoryServerQuery,
+  ) => string;
+  getServerFacets?: (args: {
+    column: string;
+    filters: ColumnFilters;
+    searchQ: string;
+    q: string;
+  }) => string;
+  reloadToken?: number;
 };
 
 export function DirectoryExplorer<T extends { id: string }>({
@@ -44,8 +65,12 @@ export function DirectoryExplorer<T extends { id: string }>({
   onExport,
   onImport,
   rowClassName,
+  getServerPath,
+  getServerFacets,
+  reloadToken = 0,
 }: Props<T>) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [scrollRoot, setScrollRoot] = useState<HTMLElement | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [searchQ, setSearchQ] = useState("");
   const [filters, setFilters] = useState<ColumnFilters>({});
@@ -61,10 +86,36 @@ export function DirectoryExplorer<T extends { id: string }>({
     [columns],
   );
 
-  const visible = useMemo(
-    () => applyDirectoryFilters(items, columns, filters, searchQ, searchValue),
-    [items, columns, filters, searchQ, searchValue],
+  const filtersKey = useMemo(() => encodeFilters(filters) ?? "", [filters]);
+  const serverEnabled = Boolean(getServerPath);
+
+  const getPath = useCallback(
+    (page: number, pageSize: number) => {
+      if (!getServerPath) return null;
+      return getServerPath(page, pageSize, { searchQ, filters });
+    },
+    [getServerPath, searchQ, filters],
   );
+
+  const server = useInfinitePage<T>({
+    getPath,
+    deps: [searchQ, filtersKey, reloadToken],
+    enabled: serverEnabled,
+  });
+
+  const visible = useMemo(
+    () =>
+      serverEnabled
+        ? server.items
+        : applyDirectoryFilters(items, columns, filters, searchQ, searchValue),
+    [serverEnabled, server.items, items, columns, filters, searchQ, searchValue],
+  );
+
+  const listLoading = serverEnabled ? server.loading : loading;
+  const listLoadingMore = serverEnabled ? server.loadingMore : false;
+  const displayError = error || (serverEnabled ? server.error : null);
+  const total = serverEnabled ? server.total : items.length;
+  const sourceCount = serverEnabled ? server.items.length : items.length;
 
   const hasActiveFilters =
     Object.keys(filters).length > 0 || searchInput.trim().length > 0;
@@ -104,10 +155,40 @@ export function DirectoryExplorer<T extends { id: string }>({
       filters: ColumnFilters;
       searchQ: string;
       q: string;
-    }): Promise<FacetResponse> =>
-      computeFacets(items, columns, column, facetFilters, qSearch, searchValue, q),
-    [items, columns, searchValue],
+    }): Promise<FacetResponse> => {
+      if (getServerFacets) {
+        return apiFetch<FacetResponse>(
+          getServerFacets({
+            column,
+            filters: facetFilters,
+            searchQ: qSearch,
+            q,
+          }),
+        );
+      }
+      return computeFacets(
+        items,
+        columns,
+        column,
+        facetFilters,
+        qSearch,
+        searchValue,
+        q,
+      );
+    },
+    [getServerFacets, items, columns, searchValue],
   );
+
+  const meta = (() => {
+    if (serverEnabled) {
+      if (visible.length > 0) {
+        return `загружено ${formatCount(visible.length)} из ${formatCount(total)}`;
+      }
+      return total === 0 ? "0 записей" : null;
+    }
+    if (items.length === 0) return "0 записей";
+    return `загружено ${formatCount(visible.length)} из ${formatCount(items.length)}`;
+  })();
 
   return (
     <>
@@ -131,7 +212,7 @@ export function DirectoryExplorer<T extends { id: string }>({
         <button
           type="button"
           className="secondary"
-          disabled={busy || loading}
+          disabled={busy || listLoading}
           onClick={onExport}
         >
           {exporting ? "Экспорт…" : "Экспорт XLSX"}
@@ -139,7 +220,7 @@ export function DirectoryExplorer<T extends { id: string }>({
         <button
           type="button"
           className="secondary"
-          disabled={busy || loading}
+          disabled={busy || listLoading}
           onClick={() => fileInputRef.current?.click()}
         >
           {importing ? "Импорт…" : "Импорт XLSX"}
@@ -155,12 +236,8 @@ export function DirectoryExplorer<T extends { id: string }>({
             if (fileInputRef.current) fileInputRef.current.value = "";
           }}
         />
-        {!exporting && !loading && (
-          <span className="filters-meta">
-            {items.length === 0
-              ? "0 записей"
-              : `загружено ${formatCount(visible.length)} из ${formatCount(items.length)}`}
-          </span>
+        {!exporting && !listLoading && meta && (
+          <span className="filters-meta">{meta}</span>
         )}
       </div>
       <ActiveFiltersBar
@@ -174,8 +251,8 @@ export function DirectoryExplorer<T extends { id: string }>({
           setSearchQ("");
         }}
       />
-      {error && <div className="state error">{error}</div>}
-      <div className="table-scroll">
+      {displayError && <div className="state error">{displayError}</div>}
+      <div className="table-scroll" ref={setScrollRoot}>
         <table className={tableClassName}>
           <thead>
             <tr>
@@ -205,7 +282,7 @@ export function DirectoryExplorer<T extends { id: string }>({
                 {columns.map((col) => {
                   const display = col.text(row);
                   return (
-                    <td key={col.key}>
+                    <td key={col.key} className={col.cellClassName}>
                       {col.highlight ? (
                         <HighlightText text={display} query={searchQ} />
                       ) : (
@@ -218,12 +295,21 @@ export function DirectoryExplorer<T extends { id: string }>({
             ))}
           </tbody>
         </table>
-        {loading && items.length === 0 && <div className="state">Загрузка…</div>}
-        {!loading && !importing && !error && items.length === 0 && (
-          <div className="state">{emptyText}</div>
+        {listLoading && sourceCount === 0 && <div className="state">Загрузка…</div>}
+        {!listLoading && !importing && !displayError && visible.length === 0 && (
+          <div className="state">
+            {hasActiveFilters ? "Нет данных. Сбросьте фильтры." : emptyText}
+          </div>
         )}
-        {!loading && !error && items.length > 0 && visible.length === 0 && (
-          <div className="state">Нет данных. Сбросьте фильтры.</div>
+        {serverEnabled && (
+          <InfiniteScrollSentinel
+            root={scrollRoot}
+            hasMore={server.hasMore}
+            loading={listLoadingMore || (listLoading && visible.length > 0)}
+            onLoadMore={server.loadMore}
+            loadedCount={visible.length}
+            total={total}
+          />
         )}
       </div>
     </>

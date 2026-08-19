@@ -172,16 +172,8 @@ button.nav-logout:hover {
 }
 
 .numbers-panel .filters,
-.numbers-panel .active-filters,
-.numbers-panel .regions-toolbar {
+.numbers-panel .active-filters {
   flex-shrink: 0;
-}
-
-.regions-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
 }
 
 h1 { margin: 0 0 1rem; font-size: 1.35rem; }
@@ -231,7 +223,13 @@ th, td {
 }
 th { color: var(--muted); font-weight: 600; font-size: 0.8rem; }
 
-.numbers-panel table th.col-number-local,
+.numbers-panel .table-scroll thead th {
+  text-align: center;
+}
+.numbers-panel .table-scroll thead .col-header {
+  display: flex;
+  justify-content: center;
+}
 .numbers-panel table td.col-number-local {
   text-align: right;
   font-variant-numeric: tabular-nums;

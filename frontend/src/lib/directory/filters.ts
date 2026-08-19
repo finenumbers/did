@@ -9,17 +9,19 @@ export type DirectoryColumn<T> = {
   /** Canonical value for facet/filter tokens; "" if empty. */
   facet: (row: T) => string;
   highlight?: boolean;
+  /** Applied to tbody cells only (headers stay centered). */
+  cellClassName?: string;
 };
 
 const FACET_LIMIT = 200;
 
-export function matchesSearch(value: string, query: string): boolean {
+function matchesSearch(value: string, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   return value.toLowerCase().includes(q);
 }
 
-export function rowMatchesFilters<T>(
+function rowMatchesFilters<T>(
   row: T,
   columns: DirectoryColumn<T>[],
   filters: ColumnFilters,
