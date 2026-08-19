@@ -1,12 +1,46 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { DirectoryExplorer } from "@/components/directory/DirectoryExplorer";
 import { ApiError, apiDownload, apiFetch, apiUpload } from "@/lib/api/client";
+import type { DirectoryColumn } from "@/lib/directory/filters";
 import type { RegionCityItem, RegionsLoadResult } from "@/lib/types/api";
 
 function cellText(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === "") return "—";
   return String(value);
+}
+
+const COLUMNS: DirectoryColumn<RegionCityItem>[] = [
+  {
+    key: "abc",
+    header: "ABC",
+    text: (r) => r.abc,
+    facet: (r) => r.abc,
+  },
+  {
+    key: "digit_capacity",
+    header: "Разрядность",
+    text: (r) => String(r.digit_capacity),
+    facet: (r) => String(r.digit_capacity),
+  },
+  {
+    key: "city_name",
+    header: "Город",
+    text: (r) => r.city_name,
+    facet: (r) => r.city_name,
+    highlight: true,
+  },
+  {
+    key: "region_name",
+    header: "Регион",
+    text: (r) => cellText(r.region_name),
+    facet: (r) => r.region_name || "",
+  },
+];
+
+function citySearch(row: RegionCityItem): string {
+  return row.city_name;
 }
 
 export default function RegionsPage() {
@@ -15,7 +49,6 @@ export default function RegionsPage() {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadList = useCallback(async ({ asInitial = false } = {}) => {
     if (asInitial) setLoading(true);
@@ -65,69 +98,27 @@ export default function RegionsPage() {
       setError(err instanceof ApiError ? err.message : "Не удалось импортировать XLSX");
     } finally {
       setImporting(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
-
-  const busy = exporting || importing;
 
   return (
     <div className="numbers-page">
       <div className="panel numbers-panel">
-        <div className="regions-toolbar">
-          <button
-            type="button"
-            className="secondary"
-            disabled={busy || loading}
-            onClick={() => void exportXlsx()}
-          >
-            {exporting ? "Экспорт…" : "Экспорт XLSX"}
-          </button>
-          <button
-            type="button"
-            disabled={busy || loading}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {importing ? "Импорт…" : "Импорт XLSX"}
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            hidden
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void importXlsx(file);
-            }}
-          />
-        </div>
-        {error && <div className="state error">{error}</div>}
-        <div className="table-scroll">
-          <table className="regions-table">
-            <thead>
-              <tr>
-                <th>ABC</th>
-                <th>Разрядность</th>
-                <th>Город</th>
-                <th>Регион</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((row) => (
-                <tr key={row.id}>
-                  <td>{row.abc}</td>
-                  <td>{row.digit_capacity}</td>
-                  <td>{row.city_name}</td>
-                  <td>{cellText(row.region_name)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {loading && items.length === 0 && <div className="state">Загрузка…</div>}
-          {!loading && !importing && !error && items.length === 0 && (
-            <div className="state">Нет данных. Нажмите «Импорт XLSX».</div>
-          )}
-        </div>
+        <DirectoryExplorer
+          items={items}
+          columns={COLUMNS}
+          searchPlaceholder="Город"
+          searchChipLabel="Город"
+          searchValue={citySearch}
+          tableClassName="regions-table"
+          loading={loading}
+          error={error}
+          exporting={exporting}
+          importing={importing}
+          emptyText="Нет данных. Нажмите «Импорт XLSX»."
+          onExport={() => void exportXlsx()}
+          onImport={(file) => void importXlsx(file)}
+        />
       </div>
     </div>
   );

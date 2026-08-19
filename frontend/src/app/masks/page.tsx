@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { DirectoryExplorer } from "@/components/directory/DirectoryExplorer";
 import { ApiError, apiDownload, apiFetch, apiUpload } from "@/lib/api/client";
+import type { DirectoryColumn } from "@/lib/directory/filters";
 import { formatPrice } from "@/lib/format";
 import type { MaskTypeItem, MaskTypesLoadResult } from "@/lib/types/api";
 
@@ -14,13 +16,66 @@ function priceText(value: string | number | null | undefined): string {
   return formatPrice(value) ?? "—";
 }
 
+function priceFacet(value: string | number | null | undefined): string {
+  return formatPrice(value) ?? "";
+}
+
+const COLUMNS: DirectoryColumn<MaskTypeItem>[] = [
+  {
+    key: "digit_capacity",
+    header: "Разрядность",
+    text: (r) => cellText(r.digit_capacity),
+    facet: (r) => r.digit_capacity || "",
+  },
+  {
+    key: "category",
+    header: "Категория",
+    text: (r) => cellText(r.category),
+    facet: (r) => r.category || "",
+  },
+  {
+    key: "abc",
+    header: "ABC",
+    text: (r) => cellText(r.abc),
+    facet: (r) => r.abc || "",
+  },
+  {
+    key: "mask",
+    header: "Маска",
+    text: (r) => r.mask,
+    facet: (r) => r.mask,
+    highlight: true,
+  },
+  {
+    key: "type_label",
+    header: "Тип",
+    text: (r) => cellText(r.type_label),
+    facet: (r) => r.type_label || "",
+  },
+  {
+    key: "premium",
+    header: "Премиум",
+    text: (r) => priceText(r.premium),
+    facet: (r) => priceFacet(r.premium),
+  },
+  {
+    key: "purchase",
+    header: "Покупка",
+    text: (r) => priceText(r.purchase),
+    facet: (r) => priceFacet(r.purchase),
+  },
+];
+
+function maskSearch(row: MaskTypeItem): string {
+  return row.mask;
+}
+
 export default function MasksPage() {
   const [items, setItems] = useState<MaskTypeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadList = useCallback(async ({ asInitial = false } = {}) => {
     if (asInitial) setLoading(true);
@@ -58,7 +113,7 @@ export default function MasksPage() {
 
   async function importXlsx(file: File) {
     const ok = window.confirm(
-      "Обновить справочник из файла? Новые комбинации добавятся, строки не удаляются.",
+      "Обновить справочник из файла? Файл затирает категорию, ABC, тип и цены (включая пустые ячейки). Разрядность считается по маске и из файла не берётся.",
     );
     if (!ok) return;
     setImporting(true);
@@ -72,75 +127,27 @@ export default function MasksPage() {
       setError(err instanceof ApiError ? err.message : "Не удалось импортировать XLSX");
     } finally {
       setImporting(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
-
-  const busy = exporting || importing;
 
   return (
     <div className="numbers-page">
       <div className="panel numbers-panel">
-        <div className="regions-toolbar">
-          <button
-            type="button"
-            className="secondary"
-            disabled={busy || loading}
-            onClick={() => void exportXlsx()}
-          >
-            {exporting ? "Экспорт…" : "Экспорт XLSX"}
-          </button>
-          <button
-            type="button"
-            disabled={busy || loading}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {importing ? "Импорт…" : "Импорт XLSX"}
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            hidden
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void importXlsx(file);
-            }}
-          />
-        </div>
-        {error && <div className="state error">{error}</div>}
-        <div className="table-scroll">
-          <table className="masks-table">
-            <thead>
-              <tr>
-                <th>Разрядность</th>
-                <th>Категория</th>
-                <th>ABC</th>
-                <th>Маска</th>
-                <th>Тип</th>
-                <th>Премиум</th>
-                <th>Покупка</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((row) => (
-                <tr key={row.id}>
-                  <td>{cellText(row.digit_capacity)}</td>
-                  <td>{cellText(row.category)}</td>
-                  <td>{cellText(row.abc)}</td>
-                  <td>{row.mask}</td>
-                  <td>{cellText(row.type_label)}</td>
-                  <td>{priceText(row.premium)}</td>
-                  <td>{priceText(row.purchase)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {loading && items.length === 0 && <div className="state">Загрузка…</div>}
-          {!loading && !importing && !error && items.length === 0 && (
-            <div className="state">Нет данных.</div>
-          )}
-        </div>
+        <DirectoryExplorer
+          items={items}
+          columns={COLUMNS}
+          searchPlaceholder="Маска"
+          searchChipLabel="Маска"
+          searchValue={maskSearch}
+          tableClassName="masks-table"
+          loading={loading}
+          error={error}
+          exporting={exporting}
+          importing={importing}
+          emptyText="Нет данных."
+          onExport={() => void exportXlsx()}
+          onImport={(file) => void importXlsx(file)}
+        />
       </div>
     </div>
   );

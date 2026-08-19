@@ -12,7 +12,13 @@ import {
 } from "@/lib/numbers/filters";
 
 type Props = {
-  kind: "free" | "purchased";
+  kind?: "free" | "purchased";
+  facetLoader?: (args: {
+    column: string;
+    filters: ColumnFilters;
+    searchQ: string;
+    q: string;
+  }) => Promise<FacetResponse>;
   column: string;
   header: string;
   open: boolean;
@@ -26,6 +32,7 @@ type Props = {
 
 export function ColumnFilterDropdown({
   kind,
+  facetLoader,
   column,
   header,
   open,
@@ -84,15 +91,27 @@ export function ColumnFilterDropdown({
       setLoading(true);
       setError(null);
       try {
-        const params = new URLSearchParams({ column, limit: "200" });
-        const encoded = encodeFilters(filters);
-        if (encoded) params.set("filters", encoded);
-        if (numberLocalQ) params.set("number_local_q", numberLocalQ);
-        if (q) params.set("q", q);
-        const res = await apiFetch<FacetResponse>(
-          `/api/v1/numbers/${kind}/facets?${params}`,
-        );
-        if (!cancelled) setData(res);
+        if (facetLoader) {
+          const res = await facetLoader({
+            column,
+            filters,
+            searchQ: numberLocalQ,
+            q,
+          });
+          if (!cancelled) setData(res);
+        } else if (kind) {
+          const params = new URLSearchParams({ column, limit: "200" });
+          const encoded = encodeFilters(filters);
+          if (encoded) params.set("filters", encoded);
+          if (numberLocalQ) params.set("number_local_q", numberLocalQ);
+          if (q) params.set("q", q);
+          const res = await apiFetch<FacetResponse>(
+            `/api/v1/numbers/${kind}/facets?${params}`,
+          );
+          if (!cancelled) setData(res);
+        } else {
+          throw new Error("Не задан источник значений фильтра");
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Ошибка загрузки");
       } finally {
@@ -103,7 +122,7 @@ export function ColumnFilterDropdown({
     return () => {
       cancelled = true;
     };
-  }, [open, kind, column, filters, numberLocalQ, q]);
+  }, [open, kind, facetLoader, column, filters, numberLocalQ, q]);
 
   useEffect(() => {
     if (!open) return;

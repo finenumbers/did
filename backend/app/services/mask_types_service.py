@@ -4,15 +4,20 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from pathlib import Path
+from typing import Protocol
 from uuid import uuid4
 
 from openpyxl import load_workbook
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.mask_types import MaskType
 from app.modules.catalog.apply_mask_types import normalize_key_part
-from app.modules.catalog.beauty_mask import all_beauty_masks, canonical_beauty_masks
+from app.modules.catalog.beauty_mask import (
+    all_beauty_masks,
+    canonical_beauty_masks,
+    mask_digit_capacity,
+)
 from app.schemas.mask_types import MaskTypeItem, MaskTypesLoadResult
 from app.services.xlsx_style import StyledSheetWriter, open_styled_workbook
 
@@ -27,7 +32,6 @@ MASK_TYPES_XLSX_HEADERS = (
 )
 MASK_TYPES_XLSX_SHEET = "Маски"
 MAX_IMPORT_BYTES = 5 * 1024 * 1024
-EXPECTED_SEED_COUNT = 5220
 _IMPORT_WIDTH = len(MASK_TYPES_XLSX_HEADERS)
 
 
@@ -40,6 +44,13 @@ class MaskTypeImportRow:
     type_label: str | None
     premium: Decimal | None
     purchase: Decimal | None
+
+
+class _KeyedRow(Protocol):
+    digit_capacity: str
+    category: str
+    abc: str
+    mask: str
 
 
 def _cell_text(value: object) -> str:
@@ -81,6 +92,31 @@ def _xlsx_price(value: Decimal | None) -> object:
     return float(value)
 
 
+def is_mask_type_draft(row: _KeyedRow) -> bool:
+    return (row.category or "") == "" and (row.abc or "") == ""
+
+
+def key_absorbs(row: _KeyedRow, item: MaskTypeImportRow) -> bool:
+    for existing, incoming in ((row.category or "", item.category), (row.abc or "", item.abc)):
+        if existing and existing != incoming:
+            return False
+    return True
+
+
+def filled_key_count(category: str, abc: str) -> int:
+    return sum(1 for value in (category, abc) if value)
+
+
+def row_key(row: _KeyedRow) -> tuple[str, str, str, str]:
+    return (row.digit_capacity or "", row.category or "", row.abc or "", row.mask)
+
+
+def apply_payload(row: MaskType, item: MaskTypeImportRow) -> None:
+    row.type_label = item.type_label
+    row.premium = item.premium
+    row.purchase = item.purchase
+
+
 def parse_mask_types_xlsx(data: bytes) -> list[MaskTypeImportRow]:
     if not data:
         raise ValueError("Пустой файл")
@@ -117,7 +153,6 @@ def parse_mask_types_xlsx(data: bytes) -> list[MaskTypeImportRow]:
             chunk = cells[:_IMPORT_WIDTH]
             if _row_empty(chunk):
                 continue
-            cap = _cell_text(chunk[0])
             category = _cell_text(chunk[1])
             abc = _cell_text(chunk[2])
             mask = _cell_text(chunk[3])
@@ -125,6 +160,7 @@ def parse_mask_types_xlsx(data: bytes) -> list[MaskTypeImportRow]:
                 raise ValueError(f"Строка {idx}: не указана маска")
             if mask not in canonical:
                 raise ValueError(f"Строка {idx}: неизвестная маска {mask}")
+            cap = mask_digit_capacity(mask)
             key = (cap, category, abc, mask)
             if key in seen:
                 raise ValueError(
@@ -147,44 +183,54 @@ def parse_mask_types_xlsx(data: bytes) -> list[MaskTypeImportRow]:
         wb.close()
 
 
+def _backfill_digit_capacity(db: Session) -> None:
+    rows = list(db.scalars(select(MaskType)).all())
+    by_key = {row_key(row): row for row in rows}
+    for row in rows:
+        derived = mask_digit_capacity(row.mask)
+        if (row.digit_capacity or "") == derived:
+            continue
+        target = (derived, row.category or "", row.abc or "", row.mask)
+        occupied = by_key.get(target)
+        if occupied is not None and occupied is not row:
+            by_key.pop(row_key(row), None)
+            db.delete(row)
+            continue
+        by_key.pop(row_key(row), None)
+        row.digit_capacity = derived
+        by_key[target] = row
+
+
 def ensure_mask_types_seeded(db: Session) -> int:
-    seed_count = db.scalar(
-        select(func.count())
-        .select_from(MaskType)
-        .where(
-            MaskType.digit_capacity == "",
-            MaskType.category == "",
-            MaskType.abc == "",
-        )
-    )
-    if int(seed_count or 0) >= EXPECTED_SEED_COUNT:
-        return 0
-    existing = set(
-        db.scalars(
-            select(MaskType.mask).where(
-                MaskType.digit_capacity == "",
-                MaskType.category == "",
-                MaskType.abc == "",
-            )
-        ).all()
-    )
+    _backfill_digit_capacity(db)
+    existing = set(db.scalars(select(MaskType.mask)).all())
     missing = [mask for mask in all_beauty_masks() if mask not in existing]
-    if not missing:
-        return 0
-    db.add_all(
-        [
-            MaskType(
-                id=uuid4(),
-                digit_capacity="",
-                category="",
-                abc="",
-                mask=mask,
-            )
-            for mask in missing
-        ]
-    )
+    if missing:
+        db.add_all(
+            [
+                MaskType(
+                    id=uuid4(),
+                    digit_capacity=mask_digit_capacity(mask),
+                    category="",
+                    abc="",
+                    mask=mask,
+                )
+                for mask in missing
+            ]
+        )
     db.commit()
     return len(missing)
+
+
+def _pick_absorber(rows: list[MaskType], item: MaskTypeImportRow) -> MaskType | None:
+    candidates = [row for row in rows if key_absorbs(row, item)]
+    if not candidates:
+        return None
+    candidates.sort(
+        key=lambda row: filled_key_count(row.category or "", row.abc or ""),
+        reverse=True,
+    )
+    return candidates[0]
 
 
 class MaskTypesService:
@@ -241,35 +287,77 @@ class MaskTypesService:
     def upsert_from_xlsx(self, data: bytes) -> MaskTypesLoadResult:
         ensure_mask_types_seeded(self.db)
         parsed = parse_mask_types_xlsx(data)
-        existing_rows = self.db.scalars(select(MaskType)).all()
-        by_key = {
-            (row.digit_capacity, row.category, row.abc, row.mask): row
-            for row in existing_rows
-        }
+        existing_rows = list(self.db.scalars(select(MaskType)).all())
+        by_key = {row_key(row): row for row in existing_rows}
+        by_mask: dict[str, list[MaskType]] = {}
+        for row in existing_rows:
+            by_mask.setdefault(row.mask, []).append(row)
+
         inserted = 0
         updated = 0
+
+        def write_row(row: MaskType, item: MaskTypeImportRow) -> None:
+            old = row_key(row)
+            row.digit_capacity = item.digit_capacity
+            row.category = item.category
+            row.abc = item.abc
+            apply_payload(row, item)
+            new = row_key(row)
+            if old != new:
+                by_key.pop(old, None)
+                by_key[new] = row
+                self.db.flush()
+
         for item in parsed:
             key = (item.digit_capacity, item.category, item.abc, item.mask)
-            row = by_key.get(key)
-            if row is None:
-                row = MaskType(
-                    id=uuid4(),
-                    digit_capacity=item.digit_capacity,
-                    category=item.category,
-                    abc=item.abc,
-                    mask=item.mask,
-                    type_label=item.type_label,
-                    premium=item.premium,
-                    purchase=item.purchase,
-                )
-                self.db.add(row)
-                by_key[key] = row
-                inserted += 1
+            exact = by_key.get(key)
+            if exact is not None:
+                write_row(exact, item)
+                updated += 1
                 continue
-            row.type_label = item.type_label
-            row.premium = item.premium
-            row.purchase = item.purchase
-            updated += 1
+
+            absorber = _pick_absorber(by_mask.get(item.mask, []), item)
+            if absorber is not None:
+                occupied = by_key.get(key)
+                if occupied is not None and occupied is not absorber:
+                    write_row(occupied, item)
+                    updated += 1
+                    continue
+                write_row(absorber, item)
+                updated += 1
+                continue
+
+            if is_mask_type_draft(item) and any(
+                not is_mask_type_draft(row) for row in by_mask.get(item.mask, [])
+            ):
+                continue
+
+            row = MaskType(
+                id=uuid4(),
+                digit_capacity=item.digit_capacity,
+                category=item.category,
+                abc=item.abc,
+                mask=item.mask,
+                type_label=item.type_label,
+                premium=item.premium,
+                purchase=item.purchase,
+            )
+            self.db.add(row)
+            self.db.flush()
+            by_key[key] = row
+            by_mask.setdefault(item.mask, []).append(row)
+            inserted += 1
+
+        for mask, rows in list(by_mask.items()):
+            concretes = [row for row in rows if not is_mask_type_draft(row)]
+            drafts = [row for row in rows if is_mask_type_draft(row)]
+            if not concretes or not drafts:
+                continue
+            for draft in drafts:
+                by_key.pop(row_key(draft), None)
+                self.db.delete(draft)
+            by_mask[mask] = concretes
+
         self.db.commit()
         return MaskTypesLoadResult(
             ok=True,

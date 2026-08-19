@@ -71,3 +71,8 @@ def all_beauty_masks() -> tuple[str, ...]:
 @lru_cache(maxsize=1)
 def canonical_beauty_masks() -> frozenset[str]:
     return frozenset(all_beauty_masks())
+
+
+def mask_digit_capacity(mask: str) -> str:
+    """Разрядность канонической маски — её длина (5/6/7)."""
+    return str(len(mask))

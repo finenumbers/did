@@ -44,6 +44,14 @@ def test_enumerate_contains_examples():
     assert "XXXXXXX" in canonical_beauty_masks()
 
 
+def test_mask_digit_capacity_is_mask_length():
+    from app.modules.catalog.beauty_mask import mask_digit_capacity
+
+    assert mask_digit_capacity("XXXXXXX") == "7"
+    assert mask_digit_capacity("00000") == "5"
+    assert mask_digit_capacity(enumerate_beauty_masks(6)[0]) == "6"
+
+
 def test_beauty_mask_round_trip_enumerated():
     for mask in enumerate_beauty_masks(5):
         letter_to_digit: dict[str, str] = {}

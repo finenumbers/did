@@ -7,6 +7,7 @@ type Props = {
   filters: ColumnFilters;
   headers: Record<string, string>;
   numberLocalQ: string;
+  searchChipLabel?: string;
   onRemoveFacet: (field: string, value: string) => void;
   onClearNumberLocalQ: () => void;
 };
@@ -15,6 +16,7 @@ export function ActiveFiltersBar({
   filters,
   headers,
   numberLocalQ,
+  searchChipLabel = "Номер телефона",
   onRemoveFacet,
   onClearNumberLocalQ,
 }: Props) {
@@ -23,7 +25,7 @@ export function ActiveFiltersBar({
   if (numberLocalQ) {
     chips.push({
       key: "number_local_q",
-      label: `Номер телефона: ${numberLocalQ}`,
+      label: `${searchChipLabel}: ${numberLocalQ}`,
       onRemove: onClearNumberLocalQ,
     });
   }
