@@ -47,8 +47,9 @@ a { color: inherit; text-decoration: none; }
 
 .brand-logo {
   display: block;
-  width: 80%;
+  width: 132.09px;
   height: auto;
+  margin: 0 auto;
   background: transparent;
   border: none;
 }
