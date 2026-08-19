@@ -26,8 +26,8 @@ a { color: inherit; text-decoration: none; }
 
 .app-shell {
   display: grid;
-  /* text 132px + nav pad 0.7rem×2 + sidebar pad 1rem×2 */
-  grid-template-columns: 186px 1fr;
+  /* text 132px + nav pad 0.7rem×2 + sidebar pad 1rem×2 + 2px so nowrap fits */
+  grid-template-columns: 188px 1fr;
   min-height: 100vh;
   height: 100vh;
 }
@@ -56,6 +56,7 @@ a { color: inherit; text-decoration: none; }
 .nav a {
   display: block;
   padding: 0.4rem 0.7rem;
+  white-space: nowrap;
   border-radius: 6px;
   color: #f2f5f8;
   font-weight: 700;
