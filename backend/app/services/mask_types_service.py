@@ -295,43 +295,34 @@ class MaskTypesService:
 
         inserted = 0
         updated = 0
+        deleted = 0
+
+        def forget(row: MaskType) -> None:
+            by_key.pop(row_key(row), None)
+            bucket = by_mask.get(row.mask)
+            if bucket:
+                by_mask[row.mask] = [item for item in bucket if item is not row]
 
         def write_row(row: MaskType, item: MaskTypeImportRow) -> None:
+            nonlocal deleted
             old = row_key(row)
+            new = (item.digit_capacity, item.category, item.abc, item.mask)
+            occupied = by_key.get(new)
+            if occupied is not None and occupied is not row:
+                forget(occupied)
+                self.db.delete(occupied)
+                deleted += 1
+                self.db.flush()
             row.digit_capacity = item.digit_capacity
             row.category = item.category
             row.abc = item.abc
             apply_payload(row, item)
-            new = row_key(row)
             if old != new:
                 by_key.pop(old, None)
-                by_key[new] = row
-                self.db.flush()
+            by_key[new] = row
+            self.db.flush()
 
-        for item in parsed:
-            key = (item.digit_capacity, item.category, item.abc, item.mask)
-            exact = by_key.get(key)
-            if exact is not None:
-                write_row(exact, item)
-                updated += 1
-                continue
-
-            absorber = _pick_absorber(by_mask.get(item.mask, []), item)
-            if absorber is not None:
-                occupied = by_key.get(key)
-                if occupied is not None and occupied is not absorber:
-                    write_row(occupied, item)
-                    updated += 1
-                    continue
-                write_row(absorber, item)
-                updated += 1
-                continue
-
-            if is_mask_type_draft(item) and any(
-                not is_mask_type_draft(row) for row in by_mask.get(item.mask, [])
-            ):
-                continue
-
+        def add_row(item: MaskTypeImportRow) -> MaskType:
             row = MaskType(
                 id=uuid4(),
                 digit_capacity=item.digit_capacity,
@@ -344,19 +335,65 @@ class MaskTypesService:
             )
             self.db.add(row)
             self.db.flush()
-            by_key[key] = row
-            by_mask.setdefault(item.mask, []).append(row)
-            inserted += 1
+            by_key[row_key(row)] = row
+            by_mask.setdefault(row.mask, []).append(row)
+            return row
 
-        for mask, rows in list(by_mask.items()):
-            concretes = [row for row in rows if not is_mask_type_draft(row)]
-            drafts = [row for row in rows if is_mask_type_draft(row)]
-            if not concretes or not drafts:
-                continue
-            for draft in drafts:
-                by_key.pop(row_key(draft), None)
-                self.db.delete(draft)
-            by_mask[mask] = concretes
+        by_file: dict[str, list[MaskTypeImportRow]] = {}
+        for item in parsed:
+            by_file.setdefault(item.mask, []).append(item)
+
+        for mask, file_items in by_file.items():
+            db_rows = list(by_mask.get(mask, []))
+            used_ids: set[object] = set()
+            unique_pair = len(file_items) == 1 and len(db_rows) == 1
+
+            for item in file_items:
+                key = (item.digit_capacity, item.category, item.abc, item.mask)
+                exact = by_key.get(key)
+                if exact is not None and exact.mask == mask:
+                    write_row(exact, item)
+                    used_ids.add(exact.id)
+                    updated += 1
+                    continue
+
+                if unique_pair:
+                    write_row(db_rows[0], item)
+                    used_ids.add(db_rows[0].id)
+                    updated += 1
+                    continue
+
+                unused = [row for row in db_rows if row.id not in used_ids]
+                absorber = _pick_absorber(unused, item)
+                if absorber is not None:
+                    write_row(absorber, item)
+                    used_ids.add(absorber.id)
+                    updated += 1
+                    continue
+
+                add_row(item)
+                inserted += 1
+
+            desired = {(it.category, it.abc) for it in file_items}
+            for row in list(by_mask.get(mask, [])):
+                if (row.category or "", row.abc or "") not in desired:
+                    forget(row)
+                    self.db.delete(row)
+                    deleted += 1
+
+            if not by_mask.get(mask):
+                add_row(
+                    MaskTypeImportRow(
+                        digit_capacity=mask_digit_capacity(mask),
+                        category="",
+                        abc="",
+                        mask=mask,
+                        type_label=None,
+                        premium=None,
+                        purchase=None,
+                    )
+                )
+                inserted += 1
 
         self.db.commit()
         return MaskTypesLoadResult(
@@ -364,5 +401,7 @@ class MaskTypesService:
             count=len(parsed),
             updated=updated,
             inserted=inserted,
-            message=f"Обновлено: {updated}, добавлено: {inserted}",
+            message=(
+                f"Обновлено: {updated}, добавлено: {inserted}, удалено: {deleted}"
+            ),
         )

@@ -133,6 +133,17 @@ def test_parse_extra_eighth_column_ignored(tmp_path: Path):
     assert rows[0].purchase == Decimal("200")
 
 
+def test_parse_empty_type_and_prices(tmp_path: Path):
+    data = _xlsx_bytes(
+        tmp_path / "empty_payload.xlsx",
+        [[7, "Городской", "", "XXXXXXX", "", "", ""]],
+    )
+    rows = parse_mask_types_xlsx(data)
+    assert rows[0].type_label is None
+    assert rows[0].premium is None
+    assert rows[0].purchase is None
+
+
 def test_parse_non_numeric_price_rejected(tmp_path: Path):
     data = _xlsx_bytes(
         tmp_path / "bad_price.xlsx",
@@ -190,7 +201,7 @@ def test_upsert_fills_seed_category_in_place(monkeypatch):
     db.add.assert_not_called()
 
 
-def test_upsert_second_category_inserts(monkeypatch):
+def test_upsert_single_file_row_replaces_unique_mask(monkeypatch):
     existing = _row(category="Городской", abc="495", type_label="москва")
     service, db = _service(
         [existing],
@@ -198,8 +209,27 @@ def test_upsert_second_category_inserts(monkeypatch):
         [_item(category="Мобильный", abc="", type_label="моб")],
     )
     result = service.upsert_from_xlsx(b"unused")
+    assert result.inserted == 0
+    assert result.updated == 1
+    assert existing.category == "Мобильный"
+    assert existing.abc == ""
+    assert existing.type_label == "моб"
+    db.add.assert_not_called()
+
+
+def test_upsert_adds_second_category_when_both_in_file(monkeypatch):
+    existing = _row(category="Городской", abc="495", type_label="москва")
+    service, db = _service(
+        [existing],
+        monkeypatch,
+        [
+            _item(category="Городской", abc="495", type_label="москва"),
+            _item(category="Мобильный", abc="", type_label="моб"),
+        ],
+    )
+    result = service.upsert_from_xlsx(b"unused")
     assert result.inserted == 1
-    assert result.updated == 0
+    assert result.updated == 1
     assert existing.category == "Городской"
     db.add.assert_called_once()
 
@@ -236,20 +266,24 @@ def test_upsert_prefers_most_specific_absorber(monkeypatch):
     assert result.updated == 1
     assert result.inserted == 0
     assert partial.category == "Городской"
-    assert draft.category == ""
     db.add.assert_not_called()
+    db.delete.assert_called()
+    assert db.delete.call_args[0][0] is draft
 
 
-def test_upsert_skips_draft_insert_when_concrete_exists(monkeypatch):
-    concrete = _row(category="Городской", abc="")
+def test_upsert_empty_category_overwrites_unique_mask(monkeypatch):
+    concrete = _row(category="Городской", abc="", type_label="Золотой")
     service, db = _service(
         [concrete],
         monkeypatch,
-        [_item(category="", abc="", type_label="x")],
+        [_item(category="", abc="", type_label=None, premium=None, purchase=None)],
     )
     result = service.upsert_from_xlsx(b"unused")
     assert result.inserted == 0
-    assert result.updated == 0
+    assert result.updated == 1
+    assert concrete.category == ""
+    assert concrete.type_label is None
+    assert concrete.premium is None
     db.add.assert_not_called()
 
 
@@ -267,4 +301,60 @@ def test_upsert_collision_writes_existing_key(monkeypatch):
     assert draft.category == ""
     db.add.assert_not_called()
     db.delete.assert_called()
+    assert db.delete.call_args[0][0] is draft
     assert row_key(existing)[1] == "Городской"
+
+
+def test_upsert_deletes_combo_missing_from_file(monkeypatch):
+    city = _row(category="Городской", abc="")
+    mobile = _row(category="Мобильный", abc="")
+    service, db = _service(
+        [city, mobile],
+        monkeypatch,
+        [_item(category="Городской", abc="")],
+    )
+    result = service.upsert_from_xlsx(b"unused")
+    assert result.updated == 1
+    assert result.inserted == 0
+    assert city.category == "Городской"
+    db.delete.assert_called()
+    assert db.delete.call_args[0][0] is mobile
+
+
+def test_upsert_leaves_masks_not_in_file(monkeypatch):
+    other_mask = enumerate_beauty_masks(6)[0]
+    keep = _row(
+        mask=other_mask,
+        digit_capacity=mask_digit_capacity(other_mask),
+        category="Городской",
+        abc="495",
+        type_label="keep",
+    )
+    city = _row(category="Городской", abc="")
+    service, db = _service(
+        [keep, city],
+        monkeypatch,
+        [_item(category="Городской", abc="")],
+    )
+    result = service.upsert_from_xlsx(b"unused")
+    assert result.updated == 1
+    assert result.inserted == 0
+    assert keep.category == "Городской"
+    assert keep.type_label == "keep"
+    db.delete.assert_not_called()
+    db.add.assert_not_called()
+
+
+def test_upsert_empty_file_row_replaces_categories_with_draft(monkeypatch):
+    city = _row(category="Городской", abc="", type_label="a")
+    mobile = _row(category="Мобильный", abc="", type_label="b")
+    service, db = _service(
+        [city, mobile],
+        monkeypatch,
+        [_item(category="", abc="", type_label=None, premium=None, purchase=None)],
+    )
+    result = service.upsert_from_xlsx(b"unused")
+    assert result.inserted == 1
+    assert result.updated == 0
+    db.add.assert_called_once()
+    assert db.delete.call_count == 2
