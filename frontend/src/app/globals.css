@@ -343,6 +343,16 @@ mark.search-hit {
   width: auto;
 }
 
+.numbers-panel .masks-table tbody tr.masks-row-mobile td {
+  background: #c6efce;
+}
+.numbers-panel .masks-table tbody tr.masks-row-tollfree td {
+  background: #bdd7ee;
+}
+.numbers-panel .masks-table tbody tr.masks-row-premium td {
+  background: #ffeb9c;
+}
+
 .table-scroll thead th {
   position: sticky;
   top: 0;

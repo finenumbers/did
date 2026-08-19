@@ -7,15 +7,17 @@ from uuid import uuid4
 import pytest
 
 from app.modules.catalog.beauty_mask import enumerate_beauty_masks, mask_digit_capacity
+from app.modules.catalog.number_category import (
+    CATEGORY_GEOGRAPHIC,
+    CATEGORY_MOBILE,
+    CATEGORY_TOLLFREE,
+)
 from app.services.mask_types_service import (
     MASK_TYPES_XLSX_HEADERS,
     MaskTypeImportRow,
     MaskTypesService,
-    filled_key_count,
-    is_mask_type_draft,
-    key_absorbs,
+    ensure_mask_types_seeded,
     parse_mask_types_xlsx,
-    row_key,
 )
 from app.services.xlsx_style import StyledSheetWriter, open_styled_workbook
 
@@ -66,6 +68,14 @@ def _item(**kwargs: object) -> MaskTypeImportRow:
     }
     data.update(kwargs)
     return MaskTypeImportRow(**data)  # type: ignore[arg-type]
+
+
+def _required_seven(mask: str = "XXXXXXX") -> list[SimpleNamespace]:
+    return [
+        _row(mask=mask, digit_capacity="7", category=CATEGORY_GEOGRAPHIC),
+        _row(mask=mask, digit_capacity="7", category=CATEGORY_MOBILE),
+        _row(mask=mask, digit_capacity="7", category=CATEGORY_TOLLFREE),
+    ]
 
 
 def _service(rows: list[SimpleNamespace], monkeypatch: pytest.MonkeyPatch, parsed: list[MaskTypeImportRow]):
@@ -175,150 +185,151 @@ def test_parse_duplicate_key_rejected(tmp_path: Path):
         parse_mask_types_xlsx(data)
 
 
-def test_key_absorbs_draft_and_rejects_other_category():
-    draft = _row(digit_capacity="7", category="", abc="")
-    filled = _row(digit_capacity="7", category="Городской", abc="")
-    item_city = _item(category="Городской", abc="495")
-    item_mobile = _item(category="Мобильный", abc="")
-    assert key_absorbs(draft, item_city)
-    assert key_absorbs(filled, item_city)
-    assert not key_absorbs(filled, item_mobile)
-    assert filled_key_count("", "495") == 1
-    assert is_mask_type_draft(draft)
-    assert not is_mask_type_draft(filled)
+def test_parse_five_digit_forces_geographic(tmp_path: Path):
+    data = _xlsx_bytes(
+        tmp_path / "five.xlsx",
+        [[5, "Мобильный", "", "00000", "x", 1, 2]],
+    )
+    rows = parse_mask_types_xlsx(data)
+    assert rows[0].digit_capacity == "5"
+    assert rows[0].category == CATEGORY_GEOGRAPHIC
+    assert rows[0].mask == "00000"
 
 
-def test_upsert_fills_seed_category_in_place(monkeypatch):
-    seed = _row(digit_capacity="7", category="", abc="", type_label=None)
-    service, db = _service([seed], monkeypatch, [_item(abc="495")])
+def test_parse_five_digit_duplicate_after_force(tmp_path: Path):
+    data = _xlsx_bytes(
+        tmp_path / "five_dup.xlsx",
+        [
+            [5, "Городской", "", "00000", "a", 1, 2],
+            [5, "Мобильный", "", "00000", "b", 1, 2],
+        ],
+    )
+    with pytest.raises(ValueError, match="повторяется"):
+        parse_mask_types_xlsx(data)
+
+
+def test_parse_seven_empty_category_becomes_geographic(tmp_path: Path):
+    data = _xlsx_bytes(
+        tmp_path / "empty_cat.xlsx",
+        [[7, "", "", "XXXXXXX", "Золотой", 100, 200]],
+    )
+    rows = parse_mask_types_xlsx(data)
+    assert rows[0].category == CATEGORY_GEOGRAPHIC
+
+
+def test_parse_seven_unknown_category_rejected(tmp_path: Path):
+    data = _xlsx_bytes(
+        tmp_path / "bad_cat.xlsx",
+        [[7, "Бесплатный доступ", "", "XXXXXXX", "x", "", ""]],
+    )
+    with pytest.raises(ValueError, match="неизвестная категория"):
+        parse_mask_types_xlsx(data)
+
+
+def test_ensure_coerces_empty_and_adds_required(monkeypatch):
+    seed = _row(digit_capacity="7", category="", abc="", mask="XXXXXXX")
+    five = _row(
+        digit_capacity="5",
+        category=CATEGORY_MOBILE,
+        abc="",
+        mask="00000",
+    )
+    db = MagicMock()
+    db.scalars.return_value.all.return_value = [seed, five]
+    monkeypatch.setattr(
+        "app.services.mask_types_service.all_beauty_masks",
+        lambda: ("XXXXXXX", "00000"),
+    )
+    added = ensure_mask_types_seeded(db)
+    assert seed.category == CATEGORY_GEOGRAPHIC
+    assert five.category == CATEGORY_GEOGRAPHIC
+    cats = {(row.mask, row.category) for row in db.add_all.call_args[0][0]}
+    assert ("XXXXXXX", CATEGORY_MOBILE) in cats
+    assert ("XXXXXXX", CATEGORY_TOLLFREE) in cats
+    assert ("00000", CATEGORY_GEOGRAPHIC) not in cats
+    assert added == 2
+
+
+def test_upsert_abc_override_keeps_required(monkeypatch):
+    geo, mobile, toll = _required_seven()
+    service, db = _service([geo, mobile, toll], monkeypatch, [_item(abc="495")])
     result = service.upsert_from_xlsx(b"unused")
-    assert result.inserted == 0
-    assert result.updated == 1
-    assert seed.category == "Городской"
-    assert seed.abc == "495"
-    assert seed.type_label == "Золотой"
-    assert seed.premium == Decimal("100")
-    db.add.assert_not_called()
+    assert result.inserted == 1
+    assert result.updated == 0
+    assert geo.abc == ""
+    assert geo.category == CATEGORY_GEOGRAPHIC
+    db.add.assert_called_once()
+    db.delete.assert_not_called()
 
 
-def test_upsert_single_file_row_replaces_unique_mask(monkeypatch):
-    existing = _row(category="Городской", abc="495", type_label="москва")
+def test_upsert_updates_mobile_without_touching_geographic(monkeypatch):
+    geo, mobile, toll = _required_seven()
+    geo.type_label = "город"
     service, db = _service(
-        [existing],
+        [geo, mobile, toll],
         monkeypatch,
-        [_item(category="Мобильный", abc="", type_label="моб")],
+        [_item(category=CATEGORY_MOBILE, abc="", type_label="моб")],
     )
     result = service.upsert_from_xlsx(b"unused")
-    assert result.inserted == 0
     assert result.updated == 1
-    assert existing.category == "Мобильный"
-    assert existing.abc == ""
-    assert existing.type_label == "моб"
+    assert result.inserted == 0
+    assert mobile.type_label == "моб"
+    assert geo.type_label == "город"
     db.add.assert_not_called()
+    db.delete.assert_not_called()
 
 
-def test_upsert_adds_second_category_when_both_in_file(monkeypatch):
-    existing = _row(category="Городской", abc="495", type_label="москва")
+def test_upsert_file_with_both_categories_updates_and_inserts_abc(monkeypatch):
+    geo, mobile, toll = _required_seven()
+    extra = _row(category=CATEGORY_GEOGRAPHIC, abc="495", type_label="москва")
     service, db = _service(
-        [existing],
+        [geo, mobile, toll, extra],
         monkeypatch,
         [
-            _item(category="Городской", abc="495", type_label="москва"),
-            _item(category="Мобильный", abc="", type_label="моб"),
+            _item(category=CATEGORY_GEOGRAPHIC, abc="495", type_label="москва"),
+            _item(category=CATEGORY_MOBILE, abc="", type_label="моб"),
         ],
     )
     result = service.upsert_from_xlsx(b"unused")
-    assert result.inserted == 1
-    assert result.updated == 1
-    assert existing.category == "Городской"
-    db.add.assert_called_once()
+    assert result.updated == 2
+    assert result.inserted == 0
+    assert extra.type_label == "москва"
+    assert mobile.type_label == "моб"
+    db.delete.assert_not_called()
 
 
 def test_upsert_empty_payload_overwrites(monkeypatch):
-    existing = _row(
-        category="Городской",
-        abc="",
-        type_label="Золотой",
-        premium=Decimal("9"),
-        purchase=Decimal("8"),
-    )
+    geo, mobile, toll = _required_seven()
+    geo.type_label = "Золотой"
+    geo.premium = Decimal("9")
+    geo.purchase = Decimal("8")
     service, _db = _service(
-        [existing],
+        [geo, mobile, toll],
         monkeypatch,
-        [_item(category="Городской", abc="", type_label=None, premium=None, purchase=None)],
+        [_item(category=CATEGORY_GEOGRAPHIC, abc="", type_label=None, premium=None, purchase=None)],
     )
     result = service.upsert_from_xlsx(b"unused")
     assert result.updated == 1
-    assert existing.type_label is None
-    assert existing.premium is None
-    assert existing.purchase is None
+    assert geo.type_label is None
+    assert geo.premium is None
+    assert geo.purchase is None
+    assert geo.category == CATEGORY_GEOGRAPHIC
 
 
-def test_upsert_prefers_most_specific_absorber(monkeypatch):
-    draft = _row(category="", abc="")
-    partial = _row(category="", abc="495")
+def test_upsert_keeps_required_mobile_when_missing_from_file(monkeypatch):
+    geo, mobile, toll = _required_seven()
+    extra = _row(category=CATEGORY_MOBILE, abc="903", type_label="extra")
     service, db = _service(
-        [draft, partial],
+        [geo, mobile, toll, extra],
         monkeypatch,
-        [_item(category="Городской", abc="495")],
+        [_item(category=CATEGORY_GEOGRAPHIC, abc="")],
     )
     result = service.upsert_from_xlsx(b"unused")
     assert result.updated == 1
     assert result.inserted == 0
-    assert partial.category == "Городской"
-    db.add.assert_not_called()
+    assert mobile.category == CATEGORY_MOBILE
     db.delete.assert_called()
-    assert db.delete.call_args[0][0] is draft
-
-
-def test_upsert_empty_category_overwrites_unique_mask(monkeypatch):
-    concrete = _row(category="Городской", abc="", type_label="Золотой")
-    service, db = _service(
-        [concrete],
-        monkeypatch,
-        [_item(category="", abc="", type_label=None, premium=None, purchase=None)],
-    )
-    result = service.upsert_from_xlsx(b"unused")
-    assert result.inserted == 0
-    assert result.updated == 1
-    assert concrete.category == ""
-    assert concrete.type_label is None
-    assert concrete.premium is None
-    db.add.assert_not_called()
-
-
-def test_upsert_collision_writes_existing_key(monkeypatch):
-    draft = _row(category="", abc="")
-    existing = _row(category="Городской", abc="495", type_label="old")
-    service, db = _service(
-        [draft, existing],
-        monkeypatch,
-        [_item(category="Городской", abc="495", type_label="new")],
-    )
-    result = service.upsert_from_xlsx(b"unused")
-    assert result.updated == 1
-    assert existing.type_label == "new"
-    assert draft.category == ""
-    db.add.assert_not_called()
-    db.delete.assert_called()
-    assert db.delete.call_args[0][0] is draft
-    assert row_key(existing)[1] == "Городской"
-
-
-def test_upsert_deletes_combo_missing_from_file(monkeypatch):
-    city = _row(category="Городской", abc="")
-    mobile = _row(category="Мобильный", abc="")
-    service, db = _service(
-        [city, mobile],
-        monkeypatch,
-        [_item(category="Городской", abc="")],
-    )
-    result = service.upsert_from_xlsx(b"unused")
-    assert result.updated == 1
-    assert result.inserted == 0
-    assert city.category == "Городской"
-    db.delete.assert_called()
-    assert db.delete.call_args[0][0] is mobile
+    assert db.delete.call_args[0][0] is extra
 
 
 def test_upsert_leaves_masks_not_in_file(monkeypatch):
@@ -326,35 +337,20 @@ def test_upsert_leaves_masks_not_in_file(monkeypatch):
     keep = _row(
         mask=other_mask,
         digit_capacity=mask_digit_capacity(other_mask),
-        category="Городской",
+        category=CATEGORY_GEOGRAPHIC,
         abc="495",
         type_label="keep",
     )
-    city = _row(category="Городской", abc="")
+    geo, mobile, toll = _required_seven()
     service, db = _service(
-        [keep, city],
+        [keep, geo, mobile, toll],
         monkeypatch,
-        [_item(category="Городской", abc="")],
+        [_item(category=CATEGORY_GEOGRAPHIC, abc="")],
     )
     result = service.upsert_from_xlsx(b"unused")
     assert result.updated == 1
     assert result.inserted == 0
-    assert keep.category == "Городской"
+    assert keep.category == CATEGORY_GEOGRAPHIC
     assert keep.type_label == "keep"
     db.delete.assert_not_called()
     db.add.assert_not_called()
-
-
-def test_upsert_empty_file_row_replaces_categories_with_draft(monkeypatch):
-    city = _row(category="Городской", abc="", type_label="a")
-    mobile = _row(category="Мобильный", abc="", type_label="b")
-    service, db = _service(
-        [city, mobile],
-        monkeypatch,
-        [_item(category="", abc="", type_label=None, premium=None, purchase=None)],
-    )
-    result = service.upsert_from_xlsx(b"unused")
-    assert result.inserted == 1
-    assert result.updated == 0
-    db.add.assert_called_once()
-    assert db.delete.call_count == 2

@@ -234,7 +234,6 @@ class NumbersExportService:
             workbook,
             ws,
             headers,
-            track_content_width=False,
             min_chars=[_HEADER_MIN_CHARS.get(h, 12) for h in headers],
         )
 

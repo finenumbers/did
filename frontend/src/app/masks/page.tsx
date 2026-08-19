@@ -70,6 +70,15 @@ function maskSearch(row: MaskTypeItem): string {
   return row.mask;
 }
 
+function maskRowClass(row: MaskTypeItem): string | undefined {
+  if (row.category === "Мобильный") return "masks-row-mobile";
+  if (row.category === "Бесплатный вызов") return "masks-row-tollfree";
+  if (row.category === "Городской" && row.premium != null && row.premium !== "") {
+    return "masks-row-premium";
+  }
+  return undefined;
+}
+
 export default function MasksPage() {
   const [items, setItems] = useState<MaskTypeItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,7 +122,7 @@ export default function MasksPage() {
 
   async function importXlsx(file: File) {
     const ok = window.confirm(
-      "Обновить справочник из файла? Для каждой маски в файле набор строк станет как в файле: пустые ячейки затирают, отсутствующие комбинации удаляются. Если строк не осталось — останется пустая запись (маска и разрядность). Разрядность считается по маске. Маски, которых нет в файле, не меняются.",
+      "Обновить справочник из файла? Для семёрок минимум три категории (Городской, Мобильный, Бесплатный вызов) с пустым ABC — их нельзя удалить. Для 5 и 6 категория всегда Городской, из файла не берётся. Пустые тип и цены затирают эту строку. Лишние строки с ABC, которых нет в файле, удаляются. Маски, которых нет в файле, не меняются.",
     );
     if (!ok) return;
     setImporting(true);
@@ -147,6 +156,7 @@ export default function MasksPage() {
           emptyText="Нет данных."
           onExport={() => void exportXlsx()}
           onImport={(file) => void importXlsx(file)}
+          rowClassName={maskRowClass}
         />
       </div>
     </div>

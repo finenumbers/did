@@ -2,11 +2,11 @@
 
 Standard:
 - font Calibri 11
-- no cell fills
-- header row: bold + centered
+- header row: bold + centered + thin border
+- body: thin border; optional row fill
 - single-line row height
-- column widths from header presets (catalog) or max content (small sheets)
-- autofilter on header
+- column widths from max(header, min_chars, content)
+- autofilter on the used range
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ ROW_HEIGHT = 15  # single visual line for Calibri 11
 MIN_COL_WIDTH = 8
 MAX_COL_WIDTH = 60
 WIDTH_PADDING = 2
+_THIN_BORDER = 1
 
 
 def excel_col_width(max_chars: int) -> float:
@@ -77,15 +78,15 @@ class StyledSheetWriter:
         ]
         self._row = 0
 
+        base = {
+            "font_name": FONT_NAME,
+            "font_size": FONT_SIZE,
+            "border": _THIN_BORDER,
+        }
         self.header_fmt = workbook.add_format(
-            {
-                "font_name": FONT_NAME,
-                "font_size": FONT_SIZE,
-                "bold": True,
-                "align": "center",
-                "valign": "vcenter",
-            }
+            {**base, "bold": True, "align": "center", "valign": "vcenter"}
         )
+        self.body_fmt = workbook.add_format(base)
         self._fill_fmts: dict[str, Any] = {}
         worksheet.set_default_row(ROW_HEIGHT)
         for col_idx, header in enumerate(self.headers):
@@ -94,17 +95,19 @@ class StyledSheetWriter:
 
     def write_row(self, values: Sequence[Any], *, fill_color: str | None = None) -> None:
         excel_row = self._row
-        cell_fmt = None
         if fill_color:
             if fill_color not in self._fill_fmts:
                 self._fill_fmts[fill_color] = self.workbook.add_format(
                     {
                         "font_name": FONT_NAME,
                         "font_size": FONT_SIZE,
+                        "border": _THIN_BORDER,
                         "bg_color": fill_color,
                     }
                 )
             cell_fmt = self._fill_fmts[fill_color]
+        else:
+            cell_fmt = self.body_fmt
         row_vals: list[Any] = []
         for col_idx in range(self.ncols):
             value = values[col_idx] if col_idx < len(values) else ""
@@ -113,10 +116,7 @@ class StyledSheetWriter:
             row_vals.append(value)
             if self._track_content_width:
                 self._max_lens[col_idx] = max(self._max_lens[col_idx], display_len(value))
-        if cell_fmt is not None:
-            self.ws.write_row(excel_row, 0, row_vals, cell_fmt)
-        else:
-            self.ws.write_row(excel_row, 0, row_vals)
+        self.ws.write_row(excel_row, 0, row_vals, cell_fmt)
         self._row += 1
 
     def write_rows(self, rows: Iterable[Sequence[Any]]) -> int:

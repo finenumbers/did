@@ -18,6 +18,12 @@ from app.modules.catalog.beauty_mask import (
     canonical_beauty_masks,
     mask_digit_capacity,
 )
+from app.modules.catalog.mask_type_policy import (
+    is_required_key,
+    mask_row_fill_color,
+    normalize_import_category,
+    required_categories,
+)
 from app.schemas.mask_types import MaskTypeItem, MaskTypesLoadResult
 from app.services.xlsx_style import StyledSheetWriter, open_styled_workbook
 
@@ -92,21 +98,6 @@ def _xlsx_price(value: Decimal | None) -> object:
     return float(value)
 
 
-def is_mask_type_draft(row: _KeyedRow) -> bool:
-    return (row.category or "") == "" and (row.abc or "") == ""
-
-
-def key_absorbs(row: _KeyedRow, item: MaskTypeImportRow) -> bool:
-    for existing, incoming in ((row.category or "", item.category), (row.abc or "", item.abc)):
-        if existing and existing != incoming:
-            return False
-    return True
-
-
-def filled_key_count(category: str, abc: str) -> int:
-    return sum(1 for value in (category, abc) if value)
-
-
 def row_key(row: _KeyedRow) -> tuple[str, str, str, str]:
     return (row.digit_capacity or "", row.category or "", row.abc or "", row.mask)
 
@@ -161,6 +152,10 @@ def parse_mask_types_xlsx(data: bytes) -> list[MaskTypeImportRow]:
             if mask not in canonical:
                 raise ValueError(f"Строка {idx}: неизвестная маска {mask}")
             cap = mask_digit_capacity(mask)
+            try:
+                category = normalize_import_category(cap, category)
+            except ValueError as exc:
+                raise ValueError(f"Строка {idx}: {exc}") from exc
             key = (cap, category, abc, mask)
             if key in seen:
                 raise ValueError(
@@ -183,10 +178,17 @@ def parse_mask_types_xlsx(data: bytes) -> list[MaskTypeImportRow]:
         wb.close()
 
 
-def _backfill_digit_capacity(db: Session) -> None:
-    rows = list(db.scalars(select(MaskType)).all())
-    by_key = {row_key(row): row for row in rows}
-    for row in rows:
+def _merge_payload(keep: MaskType, drop: MaskType) -> None:
+    if not (keep.type_label or "") and (drop.type_label or ""):
+        keep.type_label = drop.type_label
+    if keep.premium is None and drop.premium is not None:
+        keep.premium = drop.premium
+    if keep.purchase is None and drop.purchase is not None:
+        keep.purchase = drop.purchase
+
+
+def _backfill_digit_capacity(db: Session, by_key: dict[tuple[str, str, str, str], MaskType]) -> None:
+    for row in list(by_key.values()):
         derived = mask_digit_capacity(row.mask)
         if (row.digit_capacity or "") == derived:
             continue
@@ -201,36 +203,58 @@ def _backfill_digit_capacity(db: Session) -> None:
         by_key[target] = row
 
 
+def _coerce_directory_categories(
+    db: Session, by_key: dict[tuple[str, str, str, str], MaskType]
+) -> None:
+    for row in list(by_key.values()):
+        cap = mask_digit_capacity(row.mask)
+        current = row.category or ""
+        if cap in {"5", "6"} or current == "":
+            target_cat = normalize_import_category(cap, current)
+        else:
+            continue
+        if current == target_cat and (row.digit_capacity or "") == cap:
+            continue
+        target = (cap, target_cat, row.abc or "", row.mask)
+        occupied = by_key.get(target)
+        old = row_key(row)
+        if occupied is not None and occupied is not row:
+            _merge_payload(occupied, row)
+            by_key.pop(old, None)
+            db.delete(row)
+            continue
+        by_key.pop(old, None)
+        row.digit_capacity = cap
+        row.category = target_cat
+        by_key[target] = row
+
+
 def ensure_mask_types_seeded(db: Session) -> int:
-    _backfill_digit_capacity(db)
-    existing = set(db.scalars(select(MaskType.mask)).all())
-    missing = [mask for mask in all_beauty_masks() if mask not in existing]
-    if missing:
-        db.add_all(
-            [
-                MaskType(
-                    id=uuid4(),
-                    digit_capacity=mask_digit_capacity(mask),
-                    category="",
-                    abc="",
-                    mask=mask,
-                )
-                for mask in missing
-            ]
-        )
+    rows = list(db.scalars(select(MaskType)).all())
+    by_key = {row_key(row): row for row in rows}
+    _backfill_digit_capacity(db, by_key)
+    _coerce_directory_categories(db, by_key)
+    db.flush()
+    to_add: list[MaskType] = []
+    for mask in all_beauty_masks():
+        cap = mask_digit_capacity(mask)
+        for category in required_categories(cap):
+            key = (cap, category, "", mask)
+            if key in by_key:
+                continue
+            row = MaskType(
+                id=uuid4(),
+                digit_capacity=cap,
+                category=category,
+                abc="",
+                mask=mask,
+            )
+            to_add.append(row)
+            by_key[key] = row
+    if to_add:
+        db.add_all(to_add)
     db.commit()
-    return len(missing)
-
-
-def _pick_absorber(rows: list[MaskType], item: MaskTypeImportRow) -> MaskType | None:
-    candidates = [row for row in rows if key_absorbs(row, item)]
-    if not candidates:
-        return None
-    candidates.sort(
-        key=lambda row: filled_key_count(row.category or "", row.abc or ""),
-        reverse=True,
-    )
-    return candidates[0]
+    return len(to_add)
 
 
 class MaskTypesService:
@@ -277,7 +301,8 @@ class MaskTypesService:
                         item.type_label or "",
                         _xlsx_price(item.premium),
                         _xlsx_price(item.purchase),
-                    ]
+                    ],
+                    fill_color=mask_row_fill_color(item.category, item.premium),
                 )
             writer.finalize()
         finally:
@@ -303,25 +328,6 @@ class MaskTypesService:
             if bucket:
                 by_mask[row.mask] = [item for item in bucket if item is not row]
 
-        def write_row(row: MaskType, item: MaskTypeImportRow) -> None:
-            nonlocal deleted
-            old = row_key(row)
-            new = (item.digit_capacity, item.category, item.abc, item.mask)
-            occupied = by_key.get(new)
-            if occupied is not None and occupied is not row:
-                forget(occupied)
-                self.db.delete(occupied)
-                deleted += 1
-                self.db.flush()
-            row.digit_capacity = item.digit_capacity
-            row.category = item.category
-            row.abc = item.abc
-            apply_payload(row, item)
-            if old != new:
-                by_key.pop(old, None)
-            by_key[new] = row
-            self.db.flush()
-
         def add_row(item: MaskTypeImportRow) -> MaskType:
             row = MaskType(
                 id=uuid4(),
@@ -344,56 +350,31 @@ class MaskTypesService:
             by_file.setdefault(item.mask, []).append(item)
 
         for mask, file_items in by_file.items():
-            db_rows = list(by_mask.get(mask, []))
-            used_ids: set[object] = set()
-            unique_pair = len(file_items) == 1 and len(db_rows) == 1
-
             for item in file_items:
                 key = (item.digit_capacity, item.category, item.abc, item.mask)
                 exact = by_key.get(key)
-                if exact is not None and exact.mask == mask:
-                    write_row(exact, item)
-                    used_ids.add(exact.id)
+                if exact is not None:
+                    apply_payload(exact, item)
                     updated += 1
                     continue
-
-                if unique_pair:
-                    write_row(db_rows[0], item)
-                    used_ids.add(db_rows[0].id)
-                    updated += 1
-                    continue
-
-                unused = [row for row in db_rows if row.id not in used_ids]
-                absorber = _pick_absorber(unused, item)
-                if absorber is not None:
-                    write_row(absorber, item)
-                    used_ids.add(absorber.id)
-                    updated += 1
-                    continue
-
                 add_row(item)
                 inserted += 1
 
             desired = {(it.category, it.abc) for it in file_items}
+            cap = mask_digit_capacity(mask)
             for row in list(by_mask.get(mask, [])):
-                if (row.category or "", row.abc or "") not in desired:
-                    forget(row)
-                    self.db.delete(row)
-                    deleted += 1
-
-            if not by_mask.get(mask):
-                add_row(
-                    MaskTypeImportRow(
-                        digit_capacity=mask_digit_capacity(mask),
-                        category="",
-                        abc="",
-                        mask=mask,
-                        type_label=None,
-                        premium=None,
-                        purchase=None,
-                    )
-                )
-                inserted += 1
+                combo = (row.category or "", row.abc or "")
+                if combo in desired:
+                    continue
+                if is_required_key(
+                    digit_capacity=row.digit_capacity or cap,
+                    category=row.category or "",
+                    abc=row.abc or "",
+                ):
+                    continue
+                forget(row)
+                self.db.delete(row)
+                deleted += 1
 
         self.db.commit()
         return MaskTypesLoadResult(

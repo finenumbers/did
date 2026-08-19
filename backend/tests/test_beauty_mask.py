@@ -115,6 +115,53 @@ def test_lookup_prefers_exact_abc_then_empty():
     )
 
 
+def test_lookup_isolates_three_categories():
+    class Row:
+        def __init__(self, cap, cat, abc, mask, type_label, premium, purchase):
+            self.digit_capacity = cap
+            self.category = cat
+            self.abc = abc
+            self.mask = mask
+            self.type_label = type_label
+            self.premium = premium
+            self.purchase = purchase
+
+    index = build_mask_type_index(
+        [
+            Row("7", "Городской", "", "XXXXXXX", "гор", Decimal("1"), Decimal("2")),
+            Row("7", "Мобильный", "", "XXXXXXX", "моб", Decimal("3"), Decimal("4")),
+            Row(
+                "7",
+                "Бесплатный вызов",
+                "",
+                "XXXXXXX",
+                "800",
+                Decimal("5"),
+                Decimal("6"),
+            ),
+            Row("5", "Городской", "", "00000", "пят", Decimal("7"), Decimal("8")),
+        ]
+    )
+    assert lookup_type_premium(
+        index, digit_capacity="7", category="Городской", abc="", mask="XXXXXXX"
+    ) == ("гор", Decimal("1"), Decimal("2"))
+    assert lookup_type_premium(
+        index, digit_capacity="7", category="Мобильный", abc="903", mask="XXXXXXX"
+    ) == ("моб", Decimal("3"), Decimal("4"))
+    assert lookup_type_premium(
+        index, digit_capacity="7", category="Бесплатный вызов", abc="800", mask="XXXXXXX"
+    ) == ("800", Decimal("5"), Decimal("6"))
+    assert (
+        lookup_type_premium(
+            index, digit_capacity="5", category="Городской", abc="", mask="XXXXXXX"
+        )
+        is None
+    )
+    assert lookup_type_premium(
+        index, digit_capacity="5", category="Городской", abc="495", mask="00000"
+    ) == ("пят", Decimal("7"), Decimal("8"))
+
+
 def test_resolve_uses_local_length_and_falls_back():
     class Row:
         def __init__(self, cap, cat, abc, mask, type_label, premium, purchase):
