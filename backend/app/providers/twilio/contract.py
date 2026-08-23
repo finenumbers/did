@@ -49,6 +49,70 @@ COUNTRIES_KEY = "countries"
 AVAILABLE_NUMBERS_KEY = "available_phone_numbers"
 SUBRESOURCE_URIS = "subresource_uris"
 
+# Official Contains: `*` = one character, `%` = a sequence (example: %979%).
+# UI «Другие номера» rotates %00%…%99%, not glob-style *00*.
+NANP_COUNTRIES = frozenset({"US", "CA"})
+GEO_NUMBER_TYPE = "local"
+NUMBER_SOURCE_GEO = "geo_sync"
+NUMBER_SOURCE_NUMBERS = "number_sync"
+
+US_STATE_CODES: tuple[str, ...] = (
+    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+    "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+    "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+    "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+    "DC",
+)
+CA_PROVINCE_CODES: tuple[str, ...] = (
+    "AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT",
+)
+
+
+def contains_rotate_pattern(index: int) -> str:
+    return f"%{index % 100:02d}%"
+
+
+def contains_region_patterns() -> tuple[str, ...]:
+    return tuple(f"%{index:02d}%" for index in range(100))
+
+
+def region_search_keys(country_iso: str) -> tuple[str | None, ...]:
+    iso = (country_iso or "").strip().upper()
+    if iso == "US":
+        return US_STATE_CODES
+    if iso == "CA":
+        return CA_PROVINCE_CODES
+    return (None,)
+
+
+def geo_contains_queue(first_batch_count: int) -> tuple[str, ...]:
+    if first_batch_count <= 0:
+        return ()
+    return contains_region_patterns()
+
+
+def available_search_params(
+    *,
+    country_iso: str,
+    in_region: str | None = None,
+    in_locality: str | None = None,
+    area_code: str | None = None,
+    contains: str | None = None,
+) -> dict[str, str]:
+    iso = (country_iso or "").strip().upper()
+    params: dict[str, str] = {}
+    if iso in NANP_COUNTRIES:
+        if in_region:
+            params["InRegion"] = in_region
+        if area_code:
+            params["AreaCode"] = area_code
+    if in_locality:
+        params["InLocality"] = in_locality
+    if contains:
+        params["Contains"] = contains
+    return params
+
 DOC_REFS = {
     "phone_numbers_api": "https://www.twilio.com/docs/phone-numbers/api",
     "available": "https://www.twilio.com/docs/phone-numbers/api/availablephonenumber-resource",

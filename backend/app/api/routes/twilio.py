@@ -1,4 +1,4 @@
-"""Twilio coverage catalog API — isolated from the RU unified sync endpoints."""
+"""Twilio coverage + persisted sample numbers API — isolated from RU unified sync."""
 
 import tempfile
 
@@ -7,14 +7,17 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
+from app.models.enums import SyncJobStatus
 from app.models.sync import SyncJob
 from app.modules.twilio import (
     create_twilio_job,
+    get_latest_success_twilio_job,
     get_latest_twilio_job,
     get_twilio_provider,
     spawn_twilio_job,
     twilio_connection_config,
 )
+from app.modules.twilio.persist import catalog_progress_rows, snapshot_totals
 from app.providers.errors import ProviderAuthError, ProviderError
 from app.providers.twilio import contract as twilio_contract
 from app.providers.twilio.client import TwilioClient
@@ -24,10 +27,11 @@ from app.schemas.twilio import (
     TwilioAvailableNumbersResponse,
     TwilioCoverageItem,
     TwilioFacetResponse,
+    TwilioNumberItem,
     TwilioSyncJobOut,
     TwilioSyncStageOut,
 )
-from app.services.twilio_service import TwilioCatalogService
+from app.services.twilio_service import TwilioCatalogService, TwilioNumbersService
 
 router = APIRouter(prefix="/twilio", tags=["Twilio"])
 
@@ -41,7 +45,7 @@ def _parse_filters_param(filters: str | None) -> dict[str, list[str]]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-def _job_out(job: SyncJob) -> TwilioSyncJobOut:
+def _job_out(job: SyncJob, *, last_success_at=None) -> TwilioSyncJobOut:
     stats = job.stats or {}
     progress = stats.get("progress") or {}
     stages = [
@@ -67,6 +71,7 @@ def _job_out(job: SyncJob) -> TwilioSyncJobOut:
         counts=stats.get("counts") or {},
         progress=progress,
         stages=stages,
+        last_success_at=last_success_at,
     )
 
 
@@ -94,6 +99,30 @@ def list_coverage(
     )
 
 
+@router.get(
+    "/numbers",
+    response_model=Page[TwilioNumberItem],
+    summary="List persisted Twilio sample numbers",
+)
+def list_numbers(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    sort_by: str | None = Query("country_name"),
+    sort_dir: str = Query("asc", pattern="^(asc|desc)$"),
+    filters: str | None = Query(None),
+    q: str | None = Query(None),
+    db: Session = Depends(get_db),
+) -> Page[TwilioNumberItem]:
+    return TwilioNumbersService(db).list_numbers(
+        page=page,
+        page_size=page_size,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+        filters=_parse_filters_param(filters),
+        q=q,
+    )
+
+
 @router.get("/facets", response_model=TwilioFacetResponse)
 def list_facets(
     column: str = Query(...),
@@ -105,7 +134,7 @@ def list_facets(
     db: Session = Depends(get_db),
 ) -> TwilioFacetResponse:
     try:
-        return TwilioCatalogService(db).list_facets(
+        return TwilioNumbersService(db).list_facets(
             column=column,
             filters=_parse_filters_param(filters),
             q=q,
@@ -127,14 +156,14 @@ def export_xlsx(
 ) -> FileResponse:
     tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
     tmp.close()
-    TwilioCatalogService(db).write_xlsx(
+    TwilioNumbersService(db).write_xlsx(
         tmp.name,
         sort_by=sort_by,
         sort_dir=sort_dir,
         filters=_parse_filters_param(filters),
         q=q,
     )
-    return FileResponse(tmp.name, media_type=_XLSX_MEDIA, filename="twilio-coverage.xlsx")
+    return FileResponse(tmp.name, media_type=_XLSX_MEDIA, filename="twilio-numbers.xlsx")
 
 
 @router.post("/sync", response_model=TwilioSyncJobOut)
@@ -144,13 +173,28 @@ def start_sync(db: Session = Depends(get_db)) -> TwilioSyncJobOut:
     except ProviderError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     spawn_twilio_job(job.id)
-    return _job_out(job)
+    success = get_latest_success_twilio_job(db)
+    return _job_out(job, last_success_at=success.finished_at if success else None)
 
 
 @router.get("/sync/latest", response_model=TwilioSyncJobOut | None)
 def latest_sync(db: Session = Depends(get_db)) -> TwilioSyncJobOut | None:
     job = get_latest_twilio_job(db)
-    return _job_out(job) if job else None
+    if job is None:
+        return None
+    success = get_latest_success_twilio_job(db)
+    out = _job_out(job, last_success_at=success.finished_at if success else None)
+    if job.status == SyncJobStatus.success:
+        provider = get_twilio_provider(db)
+        progress = dict(out.progress or {})
+        progress["rows"] = catalog_progress_rows(db, provider_id=provider.id)
+        totals = snapshot_totals(db, provider_id=provider.id)
+        summary = dict(progress.get("summary") or {})
+        summary["cities_total"] = totals["cities_total"]
+        summary["numbers_unique"] = totals["numbers_unique"]
+        progress["summary"] = summary
+        out.progress = progress
+    return out
 
 
 @router.get(
@@ -208,8 +252,8 @@ async def available_numbers(
                 address_requirements=row.get("address_requirements"),
                 beta=row.get("beta"),
                 voice=caps.get("voice"),
-                sms=caps.get("sms"),
-                mms=caps.get("mms"),
+                sms=caps.get("sms") if "sms" in caps else caps.get("SMS"),
+                mms=caps.get("mms") if "mms" in caps else caps.get("MMS"),
                 fax=caps.get("fax"),
             )
         )

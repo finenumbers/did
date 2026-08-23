@@ -122,7 +122,7 @@ class ProvidersService:
             notice = (
                 "DIDWW: api_key = API key from DIDWW panel (header Api-Key). "
                 "Read-only GET /v3 coverage (countries/regions/cities/did_group_types/did_groups). "
-                "See didww-contract.md. Раздел «Нумерация DIDWW» синхронизируется отдельно "
+                "See didww-contract.md. Раздел «Номера DIDWW» синхронизируется отдельно "
                 "и не входит в общий прогон РФ."
             )
         elif code == ProviderCode.twilio.value:

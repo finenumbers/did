@@ -154,40 +154,61 @@ export interface DidwwSyncJob {
   stages: SyncStage[];
 }
 
-/** One Twilio coverage row: country + type, not an E.164 number. */
-export interface TwilioCoverageItem {
+export interface TwilioCoverageRow {
+  country_iso: string | null;
+  country_name: string | null;
+  number_type: string | null;
+  status?: string;
+  detail?: string;
+  region_count?: number | null;
+  city_count?: number | null;
+  period_price?: string | number | null;
+  price_unit?: string | null;
+}
+
+export interface TwilioNumberItem {
   id: string;
-  provider_group_key: string;
+  phone_number: string;
   country_name: string | null;
   country_iso: string | null;
   number_type: string | null;
-  period_price: string | null;
-  price_unit: string | null;
-  country_beta: boolean | null;
-}
-
-export type TwilioSyncJob = DidwwSyncJob;
-
-export interface TwilioAvailableNumber {
-  phone_number: string | null;
-  friendly_name: string | null;
-  iso_country: string | null;
   region: string | null;
   locality: string | null;
-  postal_code: string | null;
-  lata: string | null;
-  rate_center: string | null;
-  address_requirements: string | null;
-  beta: boolean | null;
+  period_price: string | null;
+  price_unit: string | null;
   voice: boolean | null;
   sms: boolean | null;
   mms: boolean | null;
   fax: boolean | null;
+  address_requirements: string | null;
 }
 
-export interface TwilioAvailableNumbersResponse {
-  items: TwilioAvailableNumber[];
-  returned: number;
+export interface TwilioSyncJob {
+  id: string;
+  status: string;
+  started_at: string | null;
+  finished_at: string | null;
+  error_summary: string | null;
+  triggered_by: string | null;
+  created_at: string;
+  counts: Record<string, number>;
+  progress: {
+    current_stage_id?: string | null;
+    stages?: SyncStage[];
+    summary?: {
+      requests?: number;
+      cities_total?: number;
+      numbers_unique?: number;
+    };
+    current?: {
+      country_iso?: string | null;
+      in_region?: string | null;
+      contains?: string | null;
+    };
+    rows?: TwilioCoverageRow[];
+  };
+  stages: SyncStage[];
+  last_success_at?: string | null;
 }
 
 export interface RegionCityItem {

@@ -41,7 +41,13 @@ from app.models.didww import (
     DidwwDidGroupTypeRaw,
     DidwwRegionRaw,
 )
-from app.models.twilio import TwilioCatalog, TwilioCountryRaw, TwilioPricingRaw
+from app.models.twilio import (
+    TwilioAvailableNumber,
+    TwilioCatalog,
+    TwilioCountryRaw,
+    TwilioGeo,
+    TwilioPricingRaw,
+)
 from app.models.regions_directory import RegionsDirectory
 from app.models.mask_types import MaskType
 
@@ -64,8 +70,10 @@ __all__ = [
     "DidwwDidGroupRaw",
     "DidwwDidGroupTypeRaw",
     "DidwwRegionRaw",
+    "TwilioAvailableNumber",
     "TwilioCatalog",
     "TwilioCountryRaw",
+    "TwilioGeo",
     "TwilioPricingRaw",
     "Base",
     "NumberPriceHistory",

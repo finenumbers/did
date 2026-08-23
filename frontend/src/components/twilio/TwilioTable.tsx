@@ -11,25 +11,29 @@ import { encodeFilters } from "@/lib/numbers/filters";
 import type {
   ColumnFilters,
   FacetResponse,
-  TwilioAvailableNumber,
-  TwilioAvailableNumbersResponse,
-  TwilioCoverageItem,
+  TwilioCoverageRow,
+  TwilioNumberItem,
   TwilioSyncJob,
 } from "@/lib/types/api";
 
 type Col = {
   key: string;
   header: string;
-  value: (row: TwilioCoverageItem) => string | number | boolean | null | undefined;
+  value: (row: TwilioNumberItem) => string | number | boolean | null | undefined;
 };
 
 const TWILIO_COLUMNS: Col[] = [
   { key: "country_name", header: "Страна", value: (r) => r.country_name },
-  { key: "country_iso", header: "ISO", value: (r) => r.country_iso },
+  { key: "phone_number", header: "Номер", value: (r) => r.phone_number },
   { key: "number_type", header: "Тип", value: (r) => r.number_type },
+  { key: "region", header: "Регион", value: (r) => r.region },
+  { key: "locality", header: "Город", value: (r) => r.locality },
   { key: "period_price", header: "Абонплата", value: (r) => formatDecimal(r.period_price) },
-  { key: "price_unit", header: "Валюта", value: (r) => r.price_unit },
-  { key: "country_beta", header: "Beta", value: (r) => r.country_beta },
+  { key: "voice", header: "Voice", value: (r) => r.voice },
+  { key: "sms", header: "SMS", value: (r) => r.sms },
+  { key: "mms", header: "MMS", value: (r) => r.mms },
+  { key: "fax", header: "Fax", value: (r) => r.fax },
+  { key: "address_requirements", header: "Адрес", value: (r) => r.address_requirements },
 ];
 
 const HEADER_MAP = Object.fromEntries(TWILIO_COLUMNS.map((c) => [c.key, c.header]));
@@ -41,35 +45,30 @@ function cellText(value: string | number | boolean | null | undefined): string {
   return String(value);
 }
 
-function cap(value: boolean | null | undefined): string {
-  if (value === true) return "да";
-  if (value === false) return "нет";
-  return "—";
+function countText(value: number | null | undefined, type: string | null | undefined): string {
+  if (type !== "local") return "—";
+  if (value == null || value === 0) return "—";
+  return formatCount(value);
 }
 
-function containsPattern(index: number): string {
-  return `*${String(index % 100).padStart(2, "0")}*`;
+function formatWhen(value: string | null | undefined): string {
+  if (!value) return "—";
+  return new Date(value).toLocaleString("ru-RU");
 }
 
-function syncStatusText(job: TwilioSyncJob): string {
-  const stages = job.stages || [];
-  const running = stages.find((s) => s.status === "running");
-  if (ACTIVE_STATUSES.has(job.status)) {
-    return running
-      ? `Синхронизация: ${running.label}${running.detail ? ` — ${running.detail}` : ""}`
-      : "Синхронизация запущена…";
-  }
-  if (job.status === "failed") {
-    return `Ошибка синхронизации: ${job.error_summary || "неизвестная ошибка"}`;
-  }
-  if (job.status === "success") {
-    const rows = job.counts?.rows;
-    const at = job.finished_at ? new Date(job.finished_at).toLocaleString("ru-RU") : "";
-    return `Последняя синхронизация: ${
-      rows != null ? `${formatCount(rows)} строк` : "успешно"
-    }${at ? ` · ${at}` : ""}`;
-  }
-  return `Статус: ${job.status}`;
+function jobStatusLabel(job: TwilioSyncJob | null): string {
+  if (!job) return "Нет прогона";
+  if (ACTIVE_STATUSES.has(job.status)) return "Идёт";
+  if (job.status === "success") return "Успешно";
+  if (job.status === "failed") return "Ошибка";
+  return job.status;
+}
+
+function rowStatusText(row: TwilioCoverageRow): string {
+  if (row.status === "running") return row.detail ? `сейчас · ${row.detail}` : "сейчас";
+  if (row.status === "success") return row.detail || "";
+  if (row.status === "failed") return row.detail || "ошибка";
+  return "";
 }
 
 export function TwilioTable() {
@@ -84,17 +83,7 @@ export function TwilioTable() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
-  const [openRow, setOpenRow] = useState<TwilioCoverageItem | null>(null);
-  const [inRegion, setInRegion] = useState("");
-  const [inLocality, setInLocality] = useState("");
-  const [areaCode, setAreaCode] = useState("");
-  const [contains, setContains] = useState("");
-  const [sample, setSample] = useState<TwilioAvailableNumber[]>([]);
-  const [sampleLoading, setSampleLoading] = useState(false);
-  const [sampleError, setSampleError] = useState<string | null>(null);
-  const [sampleNote, setSampleNote] = useState<string | null>(null);
-  const [shownNumbers, setShownNumbers] = useState<Set<string>>(new Set());
-  const [rotateIndex, setRotateIndex] = useState(0);
+  const [regionsOpen, setRegionsOpen] = useState(false);
 
   const sortBy = "country_name";
   const sortDir: "asc" | "desc" = "asc";
@@ -116,13 +105,13 @@ export function TwilioTable() {
       });
       if (filtersKey) params.set("filters", filtersKey);
       if (searchQ) params.set("q", searchQ);
-      return `/api/v1/twilio/coverage?${params}`;
+      return `/api/v1/twilio/numbers?${params}`;
     },
     [filtersKey, searchQ],
   );
 
   const { items, total, hasMore, loading, loadingMore, error, loadMore } =
-    useInfinitePage<TwilioCoverageItem>({
+    useInfinitePage<TwilioNumberItem>({
       getPath,
       deps: [filtersKey, searchQ, sortBy, sortDir, reloadTick],
     });
@@ -193,7 +182,7 @@ export function TwilioTable() {
       const blob = await apiDownload(`/api/v1/twilio/export.xlsx?${params}`);
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = "twilio-coverage.xlsx";
+      a.download = "twilio-numbers.xlsx";
       a.click();
       URL.revokeObjectURL(a.href);
     } catch (e) {
@@ -201,76 +190,6 @@ export function TwilioTable() {
     } finally {
       setExporting(false);
     }
-  };
-
-  const fetchSample = async (
-    row: TwilioCoverageItem,
-    rotate: boolean,
-    overlay?: { inRegion: string; inLocality: string; areaCode: string; contains: string },
-  ) => {
-    if (!row.country_iso || !row.number_type) return;
-    setSampleLoading(true);
-    setSampleError(null);
-    setSampleNote(null);
-    const region = overlay ? overlay.inRegion : inRegion;
-    const locality = overlay ? overlay.inLocality : inLocality;
-    const npa = overlay ? overlay.areaCode : areaCode;
-    const pattern = overlay ? overlay.contains : contains;
-    const params = new URLSearchParams({
-      country: row.country_iso,
-      type: row.number_type,
-    });
-    if (region.trim()) params.set("in_region", region.trim());
-    if (locality.trim()) params.set("in_locality", locality.trim());
-    if (npa.trim()) params.set("area_code", npa.trim());
-    if (rotate) {
-      params.set("contains", containsPattern(rotateIndex));
-      setRotateIndex((n) => n + 1);
-    } else if (pattern.trim()) {
-      params.set("contains", pattern.trim());
-    }
-    try {
-      const data = await apiFetch<TwilioAvailableNumbersResponse>(
-        `/api/v1/twilio/available-numbers?${params}`,
-      );
-      const incoming = data.items.filter((n) => n.phone_number);
-      const keys = incoming.map((n) => n.phone_number as string);
-      const allKnown = keys.length > 0 && keys.every((n) => shownNumbers.has(n));
-      if (rotate && allKnown) {
-        setSampleNote("Twilio вернул ту же выборку");
-      } else if (incoming.length === 0) {
-        setSampleNote("В этой выборке номеров нет");
-      }
-      setSample(incoming);
-      setShownNumbers((prev) => {
-        const next = new Set(prev);
-        for (const n of keys) next.add(n);
-        return next;
-      });
-    } catch (e) {
-      setSampleError(e instanceof Error ? e.message : "Не удалось загрузить номера");
-    } finally {
-      setSampleLoading(false);
-    }
-  };
-
-  const openModal = (row: TwilioCoverageItem) => {
-    setOpenRow(row);
-    setInRegion("");
-    setInLocality("");
-    setAreaCode("");
-    setContains("");
-    setSample([]);
-    setSampleError(null);
-    setSampleNote(null);
-    setShownNumbers(new Set());
-    setRotateIndex(0);
-    void fetchSample(row, false, {
-      inRegion: "",
-      inLocality: "",
-      areaCode: "",
-      contains: "",
-    });
   };
 
   const setColumnFilter = (field: string, values: string[]) => {
@@ -300,6 +219,8 @@ export function TwilioTable() {
   };
 
   const hasActiveFilters = Object.keys(filters).length > 0 || searchInput.trim().length > 0;
+  const summary = job?.progress?.summary;
+  const coverageRows = job?.progress?.rows ?? [];
 
   return (
     <div className="panel numbers-panel">
@@ -311,12 +232,21 @@ export function TwilioTable() {
           className="filters-phone-search"
           type="search"
           value={searchInput}
-          placeholder="Страна, ISO, тип"
-          aria-label="Поиск покрытия Twilio"
+          placeholder="Страна, номер, регион, город"
+          aria-label="Поиск номеров Twilio"
           onChange={(e) => setSearchInput(e.target.value)}
         />
-        <button type="button" disabled={starting || syncActive} onClick={() => void startSync()}>
-          {syncActive ? "Синхронизация…" : "Синхронизировать Twilio"}
+        <button
+          type="button"
+          onClick={() => {
+            setRegionsOpen(true);
+            void loadJob().catch(() => undefined);
+          }}
+        >
+          Загрузка регионов
+        </button>
+        <button type="button" disabled title="Будет в следующей итерации">
+          Загрузка номеров
         </button>
         <button
           type="button"
@@ -337,11 +267,10 @@ export function TwilioTable() {
         )}
       </div>
 
-      {job && (
-        <div className={job.status === "failed" ? "state error" : "notice"} role="status">
-          {syncStatusText(job)}
-        </div>
-      )}
+      <div className="notice" role="note">
+        Выборка, не полный список. Twilio не отдаёт весь инвентарь — в таблице сохранённые номера
+        последней загрузки регионов.
+      </div>
       {syncError && <div className="state error">{syncError}</div>}
       {exportError && <div className="state error">{exportError}</div>}
 
@@ -383,11 +312,7 @@ export function TwilioTable() {
           </thead>
           <tbody>
             {items.map((row) => (
-              <tr
-                key={row.id}
-                onClick={() => openModal(row)}
-                style={{ cursor: "pointer" }}
-              >
+              <tr key={row.id}>
                 {TWILIO_COLUMNS.map((col) => (
                   <td key={col.key}>{cellText(col.value(row))}</td>
                 ))}
@@ -398,8 +323,7 @@ export function TwilioTable() {
         {loading && items.length === 0 && <div className="state">Загрузка…</div>}
         {!loading && !error && items.length === 0 && (
           <div className="state">
-            Нет данных. Укажите Account SID и Auth Token Twilio в «Настройках» и нажмите
-            «Синхронизировать Twilio», либо сбросьте фильтры.
+            Нет сохранённых номеров. Откройте «Загрузка регионов» и запустите синхронизацию.
           </div>
         )}
         <InfiniteScrollSentinel
@@ -412,11 +336,11 @@ export function TwilioTable() {
         />
       </div>
 
-      {openRow && (
+      {regionsOpen && (
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Выборка номеров Twilio"
+          aria-label="Загрузка регионов Twilio"
           style={{
             position: "fixed",
             inset: 0,
@@ -427,97 +351,66 @@ export function TwilioTable() {
             justifyContent: "center",
             padding: "1.5rem",
           }}
-          onClick={() => setOpenRow(null)}
+          onClick={() => setRegionsOpen(false)}
         >
           <div
             className="panel"
-            style={{ width: "min(960px, 100%)", maxHeight: "90vh", overflow: "auto" }}
+            style={{ width: "min(1100px, 100%)", maxHeight: "90vh", overflow: "auto" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="filters" style={{ justifyContent: "space-between" }}>
-              <strong>
-                {openRow.country_name} ({openRow.country_iso}) · {openRow.number_type}
-                {openRow.period_price != null
-                  ? ` · ${formatDecimal(openRow.period_price)} ${openRow.price_unit || ""}`
-                  : ""}
-              </strong>
-              <button type="button" className="secondary" onClick={() => setOpenRow(null)}>
+              <strong>Загрузка регионов</strong>
+              <button type="button" className="secondary" onClick={() => setRegionsOpen(false)}>
                 Закрыть
               </button>
             </div>
+            <div className="notice" role="status">
+              <div>Статус: {jobStatusLabel(job)}</div>
+              <div>Начало: {formatWhen(job?.started_at)}</div>
+              <div>Окончание: {formatWhen(job?.finished_at)}</div>
+              <div>Запросы: {formatCount(summary?.requests ?? 0)}</div>
+              <div>Города: {formatCount(summary?.cities_total ?? 0)}</div>
+              <div>Уникальные номера: {formatCount(summary?.numbers_unique ?? 0)}</div>
+              <div>Последний успешный cutover: {formatWhen(job?.last_success_at)}</div>
+              {job?.error_summary && <div>Ошибка: {job.error_summary}</div>}
+            </div>
             <div className="filters">
-              <input
-                placeholder="Регион (US/CA, InRegion)"
-                value={inRegion}
-                onChange={(e) => setInRegion(e.target.value)}
-              />
-              <input
-                placeholder="Город (InLocality)"
-                value={inLocality}
-                onChange={(e) => setInLocality(e.target.value)}
-              />
-              <input
-                placeholder="Area code (US/CA)"
-                value={areaCode}
-                onChange={(e) => setAreaCode(e.target.value)}
-              />
-              <input
-                placeholder="Contains"
-                value={contains}
-                onChange={(e) => setContains(e.target.value)}
-              />
-              <button
-                type="button"
-                disabled={sampleLoading}
-                onClick={() => {
-                  setShownNumbers(new Set());
-                  setRotateIndex(0);
-                  void fetchSample(openRow, false);
-                }}
-              >
-                Найти
-              </button>
-              <button
-                type="button"
-                className="secondary"
-                disabled={sampleLoading}
-                onClick={() => void fetchSample(openRow, true)}
-              >
-                Другие номера
+              <button type="button" disabled={starting || syncActive} onClick={() => void startSync()}>
+                {syncActive ? "Синхронизация…" : "Синхронизация"}
               </button>
             </div>
-            {sampleLoading && <div className="state">Загрузка выборки…</div>}
-            {sampleError && <div className="state error">{sampleError}</div>}
-            {sampleNote && <div className="notice">{sampleNote}</div>}
             <div className="table-scroll">
               <table>
                 <thead>
                   <tr>
-                    <th>Номер</th>
-                    <th>Voice</th>
-                    <th>SMS</th>
-                    <th>MMS</th>
-                    <th>Fax</th>
-                    <th>Адрес</th>
-                    <th>Регион</th>
-                    <th>Город</th>
+                    <th>Страна</th>
+                    <th>Тип</th>
+                    <th>Регионы</th>
+                    <th>Города</th>
+                    <th>Абонплата</th>
+                    <th>Статус</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sample.map((n) => (
-                    <tr key={n.phone_number || n.friendly_name || Math.random()}>
-                      <td>{n.phone_number || n.friendly_name || "—"}</td>
-                      <td>{cap(n.voice)}</td>
-                      <td>{cap(n.sms)}</td>
-                      <td>{cap(n.mms)}</td>
-                      <td>{cap(n.fax)}</td>
-                      <td>{n.address_requirements || "—"}</td>
-                      <td>{n.region || "—"}</td>
-                      <td>{n.locality || "—"}</td>
+                  {coverageRows.map((row) => (
+                    <tr key={`${row.country_iso}-${row.number_type}`}>
+                      <td>{row.country_name || row.country_iso || "—"}</td>
+                      <td>{row.number_type || "—"}</td>
+                      <td>{countText(row.region_count, row.number_type)}</td>
+                      <td>{countText(row.city_count, row.number_type)}</td>
+                      <td>
+                        {row.period_price != null && row.period_price !== ""
+                          ? `${formatDecimal(String(row.period_price))} ${row.price_unit || ""}`.trim()
+                          : "—"}
+                      </td>
+                      <td>{rowStatusText(row) || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {coverageRows.length === 0 && (
+                <div className="state">Нет строк. Нажмите «Синхронизация», чтобы загрузить страны и типы.</div>
+              )}
             </div>
           </div>
         </div>

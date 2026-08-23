@@ -18,16 +18,18 @@ Allowed (GET only):
 |---|---|
 | `GET /Accounts/{Sid}/AvailablePhoneNumbers.json` | Paginated countries list. Connection probe. |
 | `GET /Accounts/{Sid}/AvailablePhoneNumbers/{CC}.json` | One country + `subresource_uris`. |
-| `GET /Accounts/{Sid}/AvailablePhoneNumbers/{CC}/{Local\|Mobile\|TollFree\|Voip\|National\|SharedCost\|MachineToMachine}.json` | Live search only, never persisted. |
+| `GET /Accounts/{Sid}/AvailablePhoneNumbers/{CC}/{Local\|Mobile\|TollFree\|Voip\|National\|SharedCost\|MachineToMachine}.json` | Search sample. Persist only `Local` during geo-sync. |
 | `GET https://pricing.twilio.com/v1/PhoneNumbers/Countries/{ISO}` | Monthly price by type. |
 
 Never call: `POST/PATCH/DELETE IncomingPhoneNumbers`, ActiveNumbers, Global Catalog preview, Voice Pricing (outbound prefixes are call rates, not inventory).
 
 ## Grain
 
-One catalog row = **country + type** from live `subresource_uris` keys. Not E.164, not city, not area code.
+Coverage row (`twilio_catalog`) = **country + type** from live `subresource_uris` keys.
 
-Types come only from keys that actually appear on the country. Official HTML documents Local / TollFree / Mobile; OpenAPI also has National / Voip / SharedCost / MachineToMachine.
+Main UI row (`twilio_available_numbers`) = **E.164** from AvailablePhoneNumbers search. This is a **sample**, not a full inventory dump.
+
+Types come only from keys that actually appear on the country. Official HTML documents Local / TollFree / Mobile; OpenAPI also has National / Voip / SharedCost / MachineToMachine. Geo search runs only for `local`.
 
 ## Missing dictionaries (verified)
 
@@ -39,8 +41,13 @@ Types come only from keys that actually appear on the country. Official HTML doc
 ## Available numbers search
 
 - Typical ceiling ~30 numbers; not a dump; `Page`/`PageToken` do not walk inventory.
-- Live endpoint only. Empty result means this sample is empty, not «no coverage».
+- Empty first GET (no `Contains`) means this cell is empty: **do not** run the `%00%`…`%99%` grid.
+- If the first GET returns any numbers, run **all** 100 patterns `%00%`…`%99%`. No streak stop.
+- US/CA: fan-out `InRegion` over all US states+DC and 13 CA provinces. PR is not in the list. Empty state still stays in the queue; only the grid is skipped.
+- Other ISO: one country-level GET, then the grid if non-empty. No `InRegion`.
+- `InRegion` / `AreaCode` apply only to US/CA (NANP) in `available_search_params`. Do not send them for other ISO codes.
 - Do not pass `Beta` (vendor default `true` includes beta numbers).
+- Official `Contains` wildcards: `*` = one character, `%` = a sequence (docs example `%979%`). Grid uses `contains_region_patterns()`.
 
 ## Pricing
 

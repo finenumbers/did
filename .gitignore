@@ -19,3 +19,4 @@ frontend/tsconfig.tsbuildinfo
 *.log
 .idea/
 .vscode/
+backend/.probe/

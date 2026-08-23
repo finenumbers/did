@@ -27,6 +27,7 @@ online documentation above **plus** `backend/app/providers/twilio/contract.py`.
 ## Scope rule
 
 Twilio is **not** part of the RU free-numbers catalog. It feeds its own section
-(«Номера Twilio», `/twilio`) backed by `twilio_catalog`, and never writes to
+(«Номера Twilio», `/twilio`) backed by `twilio_catalog` (country × type) and
+`twilio_available_numbers` (sample E.164). It never writes to
 `numbers_catalog_normalized`. Integration is **read-only**: GET only. Never call
 `POST IncomingPhoneNumbers` or Global Catalog preview purchase.

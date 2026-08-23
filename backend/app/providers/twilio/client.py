@@ -191,15 +191,13 @@ class TwilioClient:
             country_code=country_iso,
             type_path=type_path,
         )
-        params: dict[str, Any] = {}
-        if in_region:
-            params["InRegion"] = in_region
-        if in_locality:
-            params["InLocality"] = in_locality
-        if area_code:
-            params["AreaCode"] = area_code
-        if contains:
-            params["Contains"] = contains
+        params = contract.available_search_params(
+            country_iso=country_iso,
+            in_region=in_region,
+            in_locality=in_locality,
+            area_code=area_code,
+            contains=contains,
+        )
         payload = await self._get(self._abs(self.base_url, path), params or None)
         rows = payload.get(contract.AVAILABLE_NUMBERS_KEY) or []
         if not isinstance(rows, list):

@@ -21,16 +21,30 @@ Nav: [`twilio/SOURCE.md`](twilio/SOURCE.md) · [`twilio-contract.md`](twilio-con
 ## Isolation
 
 - `ProviderCode.twilio` is in `PROVIDER_REGISTRY`, **not** in `PROVIDER_ORDER`.
-- Own stages: `countries` → `pricing` → `cutover`.
+- Own stages: `countries` → `pricing` → `geo` → `cutover`.
 - Own lock `TWILIO_LOCK_KEY = 88221004`.
 - RU catalog sync methods return `SyncLimitation`.
 
-## Sync flow
+## Sync flow (Загрузка регионов)
 
-1. Paginate countries (no search fan-out).
-2. Fetch Pricing per ISO sequentially. One country miss → row without price, job continues.
-3. Build rows from `subresource_uris` × Pricing. Empty countries or 0 rows → fail, no wipe.
+Page button only opens the viewer. `POST /api/v1/twilio/sync` starts the same `SyncJobType.twilio` job. Closing the window does not cancel it; reopen reads `GET /sync/latest`.
 
-## Live sample
+1. Paginate countries. Build one progress row per live `subresource_uris` type.
+2. Fetch Pricing per ISO sequentially. Missing price stays empty, not 0.
+3. Persist catalog upsert (no wipe yet). Geo search only for `local`:
+   - non-US/CA: one GET without `Contains`; empty → no grid; non-empty → `%00%`…`%99%`.
+   - US/CA: every state/province as `InRegion`, same 1+100 rule. 4xx on a state = empty, job continues.
+4. Upsert `twilio_geo` + `twilio_available_numbers` (`source=geo_sync`) on every response.
+5. Cutover wipe only after success: delete geo and `geo_sync` numbers whose `last_sync_job_id` is not this job. `number_sync` rows stay. Empty countries list → `EmptyTwilioFetchError`, nothing is deleted.
 
-`GET /api/v1/twilio/available-numbers?country=US&type=local` plus optional `in_region`, `in_locality`, `area_code`, `contains`. Never persisted. «Другие номера» rotates `Contains` `*00*`…`*99*` in the browser.
+`job.stats.progress.summary` (`requests`, `cities_total`, `numbers_unique`) flushes at most every 2s.
+
+## Process caveat
+
+The job runs in a `daemon=True` thread. Uvicorn `--reload` kills it on restart. Long US geo-sync must run without reload.
+
+## UI
+
+- Main table: persisted E.164 sample. Caption: not a full list.
+- «Загрузка регионов»: viewer with summary + country×type rows.
+- «Загрузка номеров»: disabled stub (InLocality fan-out is later).

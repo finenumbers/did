@@ -26,6 +26,6 @@ Any field not present in the online docs must stay `UNVERIFIED` and live only in
 ## Scope rule
 
 DIDWW is **not** part of the RU free-numbers catalog. It feeds its own section
-(«Нумерация DIDWW», `/didww`) backed by `didww_catalog`, and never writes to
+(«Номера DIDWW», `/didww`) backed by `didww_catalog`, and never writes to
 `numbers_catalog_normalized`. Integration is **read-only**: GET requests only, never
 reservations, orders or `PATCH /dids`.

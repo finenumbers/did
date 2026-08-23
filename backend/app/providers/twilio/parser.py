@@ -119,3 +119,35 @@ def build_catalog_rows(
 
 def catalog_key(country_iso: str, number_type: str) -> str:
     return f"{country_iso}:{number_type}"
+
+
+def _capability(caps: dict[str, Any], *names: str) -> bool | None:
+    for name in names:
+        if name in caps:
+            return bool(caps[name])
+        lower = name.lower()
+        for key, value in caps.items():
+            if str(key).lower() == lower:
+                return bool(value)
+    return None
+
+
+def parse_available_number(item: dict[str, Any]) -> dict[str, Any] | None:
+    phone = str(item.get("phone_number") or "").strip()
+    if not phone:
+        return None
+    caps = item.get("capabilities") if isinstance(item.get("capabilities"), dict) else {}
+    locality = str(item.get("locality") or "").strip() or None
+    region = str(item.get("region") or "").strip() or None
+    return {
+        "phone_number": phone,
+        "country_iso": str(item.get("iso_country") or "").strip().upper() or None,
+        "region": region,
+        "locality": locality,
+        "locality_norm": (locality or "").strip().lower(),
+        "address_requirements": str(item.get("address_requirements") or "").strip() or None,
+        "voice": _capability(caps, "voice"),
+        "sms": _capability(caps, "sms", "SMS"),
+        "mms": _capability(caps, "mms", "MMS"),
+        "fax": _capability(caps, "fax"),
+    }

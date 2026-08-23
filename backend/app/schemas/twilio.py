@@ -17,6 +17,25 @@ class TwilioCoverageItem(BaseModel):
     period_price: Decimal | None = None
     price_unit: str | None = None
     country_beta: bool | None = None
+    region_count: int = 0
+    city_count: int = 0
+
+
+class TwilioNumberItem(BaseModel):
+    id: UUID
+    phone_number: str
+    country_name: str | None = None
+    country_iso: str | None = None
+    number_type: str | None = None
+    region: str | None = None
+    locality: str | None = None
+    period_price: Decimal | None = None
+    price_unit: str | None = None
+    voice: bool | None = None
+    sms: bool | None = None
+    mms: bool | None = None
+    fax: bool | None = None
+    address_requirements: str | None = None
 
 
 class TwilioFacetItem(BaseModel):
@@ -51,6 +70,7 @@ class TwilioSyncJobOut(BaseModel):
     counts: dict[str, Any] = Field(default_factory=dict)
     progress: dict[str, Any] = Field(default_factory=dict)
     stages: list[TwilioSyncStageOut] = Field(default_factory=list)
+    last_success_at: datetime | None = None
 
 
 class TwilioAvailableNumberOut(BaseModel):
@@ -74,3 +94,33 @@ class TwilioAvailableNumbersResponse(BaseModel):
     items: list[TwilioAvailableNumberOut] = Field(default_factory=list)
     returned: int = 0
     same_set: bool = False
+
+
+class TwilioSampleProbeStageOut(BaseModel):
+    id: str
+    label: str
+    status: str
+    detail: str = ""
+
+
+class TwilioSampleProbeRecentOut(BaseModel):
+    request_n: int | None = None
+    detail: str
+    stage: str | None = None
+
+
+class TwilioSampleProbeOut(BaseModel):
+    exists: bool
+    running: bool
+    status: str
+    started_at: str | None = None
+    updated_at: str | None = None
+    elapsed_s: float | None = None
+    requests: int = 0
+    cities_total: int = 0
+    numbers_total: int = 0
+    numbers_after_stage2: int = 0
+    by_country: dict[str, Any] = Field(default_factory=dict)
+    current_detail: str = ""
+    stages: list[TwilioSampleProbeStageOut] = Field(default_factory=list)
+    recent: list[TwilioSampleProbeRecentOut] = Field(default_factory=list)

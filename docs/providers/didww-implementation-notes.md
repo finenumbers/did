@@ -14,7 +14,7 @@ Operational behavior of the code, not vendor prose.
 
 | Piece | Location |
 |---|---|
-| Nav item «Нумерация DIDWW» | after «Регионы» in `frontend/src/components/layout/AppShell.tsx` |
+| Nav item «Номера DIDWW» | after «Регионы» in `frontend/src/components/layout/AppShell.tsx` |
 | Page | `frontend/src/app/didww/page.tsx` + `components/didww/DidwwTable.tsx` |
 | API | `backend/app/api/routes/didww.py`, prefix `/api/v1/didww` |
 | Sync job | `backend/app/modules/didww/runner.py` |

@@ -152,3 +152,72 @@ def test_search_type_paths_cover_openapi_keys():
         "machine_to_machine",
     ):
         assert key in contract.SEARCH_TYPE_PATHS
+
+
+def test_contains_rotate_pattern_uses_sequence_wildcard():
+    assert contract.contains_rotate_pattern(0) == "%00%"
+    assert contract.contains_rotate_pattern(9) == "%09%"
+    assert contract.contains_rotate_pattern(99) == "%99%"
+    assert contract.contains_rotate_pattern(100) == "%00%"
+    assert "*" not in contract.contains_rotate_pattern(12)
+
+
+def test_region_grid_is_exactly_100_patterns():
+    patterns = contract.contains_region_patterns()
+    assert len(patterns) == 100
+    assert patterns[0] == "%00%"
+    assert patterns[-1] == "%99%"
+    assert contract.geo_contains_queue(0) == ()
+    assert contract.geo_contains_queue(1) == patterns
+
+
+def test_region_search_keys_nanp_and_other():
+    assert "DC" in contract.region_search_keys("US")
+    assert "PR" not in contract.region_search_keys("US")
+    assert "ON" in contract.region_search_keys("CA")
+    assert contract.region_search_keys("GB") == (None,)
+
+
+def test_available_search_params_gate_inregion_to_nanp():
+    assert contract.available_search_params(
+        country_iso="GB",
+        in_region="ENG",
+        area_code="20",
+        contains="%00%",
+    ) == {"Contains": "%00%"}
+    assert contract.available_search_params(
+        country_iso="US",
+        in_region="AL",
+        area_code="205",
+    ) == {"InRegion": "AL", "AreaCode": "205"}
+
+
+def test_cutover_does_not_delete_number_sync_rows():
+    from sqlalchemy.dialects import postgresql
+
+    from app.modules.twilio.persist import cutover_geo_snapshot
+
+    captured: list[object] = []
+
+    class _Capture:
+        def execute(self, stmt):
+            captured.append(stmt)
+
+            class _Result:
+                rowcount = 0
+
+            return _Result()
+
+        def flush(self):
+            return None
+
+    cutover_geo_snapshot(
+        _Capture(),
+        provider_id="11111111-1111-1111-1111-111111111111",
+        job_id="22222222-2222-2222-2222-222222222222",
+    )
+    compiled = [stmt.compile(dialect=postgresql.dialect()) for stmt in captured]
+    numbers = next(item for item in compiled if "twilio_available_numbers" in str(item))
+    assert contract.NUMBER_SOURCE_GEO in numbers.params.values()
+    assert contract.NUMBER_SOURCE_NUMBERS not in numbers.params.values()
+    assert "source =" in str(numbers)
