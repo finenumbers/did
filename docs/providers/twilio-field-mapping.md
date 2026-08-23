@@ -12,7 +12,7 @@ Twilio never writes to `numbers_catalog_normalized`. Coverage lives in `twilio_c
 | `GET AvailablePhoneNumbers.json` | `twilio_countries_raw` | `country_name`, `country_iso`, `country_beta` |
 | `GET Pricing …/PhoneNumbers/Countries/{ISO}` | `twilio_pricing_raw` | `country_iso`, `price_unit` |
 
-Search results are persisted only by the geo-sync job (`source=geo_sync`). Documentation examples are never seeded.
+Search results are persisted by the geo-sync job (`source=geo_sync`) and the per-row numbers job (`source=number_sync`). Documentation examples are never seeded.
 
 ## Catalog (`twilio_catalog`)
 
@@ -26,6 +26,8 @@ Search results are persisted only by the geo-sync job (`source=geo_sync`). Docum
 | Pricing `price_unit` | `price_unit` | валюта абонплаты |
 | country `beta` | `country_beta` | — |
 | derived from `twilio_geo` | `region_count` / `city_count` | Регионы / Города (`local` only; 0 → «—») |
+| COUNT of E.164 for the pair | `number_count` (API, not a column) | Номера |
+| number-sync job | `numbers_synced_at` / `numbers_sync_job_id` / `numbers_sync_geo_job_id` | зелёная «Загрузка» только если geo-job id совпал |
 
 Price is stored on the catalog row and JOINed onto numbers. It is not copied onto each E.164.
 
@@ -52,6 +54,6 @@ Empty locality is not a city. US/CA region count = distinct `region_filter` with
 | catalog JOIN `period_price` | — | Абонплата |
 | `capabilities.voice/sms/mms/fax` | `voice` / `sms` / `mms` / `fax` | Voice / SMS / MMS / Fax |
 | `address_requirements` | `address_requirements` | Адрес |
-| job writer | `source` | `geo_sync` or later `number_sync` |
+| job writer | `source` | `geo_sync` or `number_sync` |
 
-Cutover deletes only `source=geo_sync` rows that this job did not see.
+Geo cutover deletes only `source=geo_sync` rows that this geo job did not see. Numbers-job cutover deletes any source for that country×type whose `last_sync_job_id` is not the numbers job. Conflict upsert does not change a row that already belongs to another country×type.

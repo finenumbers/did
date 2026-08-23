@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 TWILIO_LOCK_KEY = 88221004
 LOCK_KEEPALIVE_SECONDS = 30
 PROGRESS_THROTTLE_SECONDS = 2.0
+TWILIO_JOB_TYPES = (SyncJobType.twilio, SyncJobType.twilio_numbers)
 
 STAGES = (
     ("countries", "Страны"),
@@ -200,15 +201,18 @@ def get_twilio_provider(db: Session) -> Provider:
     return provider
 
 
-def create_twilio_job(db: Session, *, triggered_by: str = "api") -> SyncJob:
-    provider = get_twilio_provider(db)
-    active = db.scalar(
+def get_active_twilio_job(db: Session) -> SyncJob | None:
+    return db.scalar(
         select(SyncJob).where(
-            SyncJob.job_type == SyncJobType.twilio,
+            SyncJob.job_type.in_(TWILIO_JOB_TYPES),
             SyncJob.status.in_((SyncJobStatus.pending, SyncJobStatus.running)),
         )
     )
-    if active:
+
+
+def create_twilio_job(db: Session, *, triggered_by: str = "api") -> SyncJob:
+    provider = get_twilio_provider(db)
+    if get_active_twilio_job(db):
         raise ProviderError("Синхронизация Twilio уже выполняется")
     job = SyncJob(
         provider_id=provider.id,
@@ -315,6 +319,7 @@ async def _search_or_empty(
     country_iso: str,
     number_type: str,
     in_region: str | None = None,
+    in_locality: str | None = None,
     contains: str | None = None,
 ) -> list[dict[str, Any]]:
     try:
@@ -322,6 +327,7 @@ async def _search_or_empty(
             country_iso=country_iso,
             number_type=number_type,
             in_region=in_region,
+            in_locality=in_locality,
             contains=contains,
         )
     except ProviderAuthError:
@@ -480,7 +486,7 @@ async def _execute(job_id: uuid.UUID) -> None:
                     grid_queue.append((row, region_key))
                 if item:
                     item["status"] = "running"
-                    item["detail"] = _first_pass_detail(index, len(keys), region_key, len(first))
+                    item["detail"] = _geo_detail(index, len(keys), region_key, None, len(first))
                     _refresh_row_counts(db, tracker, item, row)
                 tracker.apply(
                     current={
@@ -498,8 +504,6 @@ async def _execute(job_id: uuid.UUID) -> None:
                 if pending == 0:
                     item["status"] = "success"
                     item["detail"] = ""
-                else:
-                    item["detail"] = f"0 / {pending * 100}"
                 _refresh_row_counts(db, tracker, item, row)
             tracker.apply(rows=progress_rows, force=True)
 
@@ -513,10 +517,8 @@ async def _execute(job_id: uuid.UUID) -> None:
         )
 
         remaining_by_iso: dict[str, int] = {}
-        planned_by_iso: dict[str, int] = {}
         for queued, _key in grid_queue:
             remaining_by_iso[queued.country_iso] = remaining_by_iso.get(queued.country_iso, 0) + 1
-            planned_by_iso[queued.country_iso] = planned_by_iso.get(queued.country_iso, 0) + 1
 
         grid_done = 0
         grid_total = len(grid_queue) * 100
@@ -547,7 +549,7 @@ async def _execute(job_id: uuid.UUID) -> None:
                 )
                 tracker.note_batch(row.country_iso, row.number_type, result)
                 if item:
-                    item["detail"] = _grid_detail(index, len(patterns), pattern, len(batch))
+                    item["detail"] = _geo_detail(index, len(patterns), region_key, pattern, len(batch))
                     _refresh_row_counts(db, tracker, item, row)
                 tracker.apply(
                     current={
@@ -566,10 +568,6 @@ async def _execute(job_id: uuid.UUID) -> None:
                 if left <= 0:
                     item["status"] = "success"
                     item["detail"] = ""
-                else:
-                    planned = planned_by_iso.get(row.country_iso, 0) * 100
-                    done_patterns = planned - left * 100
-                    item["detail"] = f"{done_patterns} / {planned}"
                 _refresh_row_counts(db, tracker, item, row)
             tracker.apply(rows=progress_rows, force=True)
 
@@ -681,11 +679,17 @@ def _refresh_row_counts(
     item["number_count"] = tracker.row_number_count(row.country_iso, row.number_type)
 
 
-def _first_pass_detail(index: int, total: int, region_key: str | None, returned: int) -> str:
+def _geo_detail(
+    index: int,
+    total: int,
+    region_key: str | None,
+    contains: str | None,
+    returned: int,
+) -> str:
+    parts = [f"{index} / {total}"]
     if region_key:
-        return f"{index} / {total}, {region_key} · {returned} номеров"
-    return f"{index} / {total} · {returned} номеров"
-
-
-def _grid_detail(index: int, total: int, contains: str, returned: int) -> str:
-    return f"{index} / {total}, {contains} · {returned} номеров"
+        parts.append(region_key)
+    if contains:
+        parts.append(contains)
+    parts.append(f"{returned} номеров")
+    return " · ".join(parts)

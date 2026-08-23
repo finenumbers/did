@@ -162,12 +162,31 @@ class TwilioCatalogService:
             .offset((page - 1) * page_size)
             .limit(page_size)
         ).all()
-        return Page.of(
-            [TwilioCoverageItem.model_validate(r) for r in rows],
-            page=page,
-            page_size=page_size,
-            total=int(total),
-        )
+        from app.modules.twilio.persist import catalog_numbers_loaded, number_counts_by_type
+
+        provider_id = rows[0].provider_id if rows else None
+        counts = number_counts_by_type(self.db, provider_id=provider_id) if provider_id else {}
+        items = []
+        for row in rows:
+            loaded = catalog_numbers_loaded(row)
+            items.append(
+                TwilioCoverageItem(
+                    id=row.id,
+                    provider_group_key=row.provider_group_key,
+                    country_name=row.country_name,
+                    country_iso=row.country_iso,
+                    number_type=row.number_type,
+                    period_price=row.period_price,
+                    price_unit=row.price_unit,
+                    country_beta=row.country_beta,
+                    region_count=row.region_count,
+                    city_count=row.city_count,
+                    number_count=counts.get((row.country_iso or "", row.number_type or ""), 0),
+                    numbers_synced_at=row.numbers_synced_at,
+                    numbers_loaded=loaded,
+                )
+            )
+        return Page.of(items, page=page, page_size=page_size, total=int(total))
 
     def iter_coverage(
         self,

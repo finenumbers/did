@@ -155,6 +155,7 @@ export interface DidwwSyncJob {
 }
 
 export interface TwilioCoverageRow {
+  id?: string;
   country_iso: string | null;
   country_name: string | null;
   number_type: string | null;
@@ -165,6 +166,8 @@ export interface TwilioCoverageRow {
   number_count?: number | null;
   period_price?: string | number | null;
   price_unit?: string | null;
+  numbers_synced_at?: string | null;
+  numbers_loaded?: boolean;
 }
 
 export interface TwilioNumberItem {
@@ -207,10 +210,15 @@ export interface TwilioSyncJob {
       in_region?: string | null;
       contains?: string | null;
     };
+    target?: {
+      country_iso?: string | null;
+      number_type?: string | null;
+    };
     rows?: TwilioCoverageRow[];
   };
   stages: SyncStage[];
   last_success_at?: string | null;
+  has_catalog?: boolean;
 }
 
 export interface RegionCityItem {

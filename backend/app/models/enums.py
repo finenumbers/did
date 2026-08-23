@@ -33,6 +33,7 @@ class SyncJobType(str, enum.Enum):
     dictionaries_only = "dictionaries_only"  # legacy DB value; unused by engine
     didww = "didww"  # isolated DIDWW coverage sync, outside the RU unified run
     twilio = "twilio"  # isolated Twilio coverage sync, outside the RU unified run
+    twilio_numbers = "twilio_numbers"  # per-row Twilio number enrichment
 
 
 class SyncJobStatus(str, enum.Enum):

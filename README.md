@@ -15,7 +15,7 @@ Internal admin console for loading and analyzing phone number inventory from ind
 - Local PSTN INN ranges cache used **only** to fill the **Оператор** column
 - Daily schedule option at 00:00 Europe/Moscow (requires ready min cache)
 - Separate «Номера DIDWW» section (`/didww`): international DIDWW coverage by DID Group, synced by its own button outside the RU run
-- Separate «Номера Twilio» section (`/twilio`): sample of available E.164 numbers (not a full inventory), synced by «Загрузка регионов»
+- Separate «Номера Twilio» section (`/twilio`): sample of available E.164 numbers (not a full inventory); «Загрузка регионов» builds coverage, «Загрузка номеров» enriches a country×type row
 
 This is **not** a CDR / RADIUS / softswitch platform.
 

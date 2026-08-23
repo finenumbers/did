@@ -19,6 +19,9 @@ class TwilioCoverageItem(BaseModel):
     country_beta: bool | None = None
     region_count: int = 0
     city_count: int = 0
+    number_count: int = 0
+    numbers_synced_at: datetime | None = None
+    numbers_loaded: bool = False
 
 
 class TwilioNumberItem(BaseModel):
@@ -71,6 +74,12 @@ class TwilioSyncJobOut(BaseModel):
     progress: dict[str, Any] = Field(default_factory=dict)
     stages: list[TwilioSyncStageOut] = Field(default_factory=list)
     last_success_at: datetime | None = None
+    has_catalog: bool = False
+
+
+class TwilioNumbersSyncIn(BaseModel):
+    country_iso: str
+    number_type: str
 
 
 class TwilioAvailableNumberOut(BaseModel):

@@ -11,13 +11,16 @@ from app.models.enums import SyncJobStatus
 from app.models.sync import SyncJob
 from app.modules.twilio import (
     create_twilio_job,
+    create_twilio_numbers_job,
     get_latest_success_twilio_job,
     get_latest_twilio_job,
+    get_latest_twilio_numbers_job,
     get_twilio_provider,
     spawn_twilio_job,
+    spawn_twilio_numbers_job,
     twilio_connection_config,
 )
-from app.modules.twilio.persist import catalog_progress_rows, snapshot_totals
+from app.modules.twilio.persist import catalog_has_rows, catalog_progress_rows, snapshot_totals
 from app.providers.errors import ProviderAuthError, ProviderError
 from app.providers.twilio import contract as twilio_contract
 from app.providers.twilio.client import TwilioClient
@@ -28,6 +31,7 @@ from app.schemas.twilio import (
     TwilioCoverageItem,
     TwilioFacetResponse,
     TwilioNumberItem,
+    TwilioNumbersSyncIn,
     TwilioSyncJobOut,
     TwilioSyncStageOut,
 )
@@ -45,7 +49,7 @@ def _parse_filters_param(filters: str | None) -> dict[str, list[str]]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-def _job_out(job: SyncJob, *, last_success_at=None) -> TwilioSyncJobOut:
+def _job_out(job: SyncJob, *, last_success_at=None, has_catalog: bool = False) -> TwilioSyncJobOut:
     stats = job.stats or {}
     progress = stats.get("progress") or {}
     stages = [
@@ -72,6 +76,7 @@ def _job_out(job: SyncJob, *, last_success_at=None) -> TwilioSyncJobOut:
         progress=progress,
         stages=stages,
         last_success_at=last_success_at,
+        has_catalog=has_catalog,
     )
 
 
@@ -82,7 +87,7 @@ def _job_out(job: SyncJob, *, last_success_at=None) -> TwilioSyncJobOut:
 )
 def list_coverage(
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=200),
+    page_size: int = Query(50, ge=1, le=500),
     sort_by: str | None = Query("country_name"),
     sort_dir: str = Query("asc", pattern="^(asc|desc)$"),
     filters: str | None = Query(None),
@@ -174,16 +179,27 @@ def start_sync(db: Session = Depends(get_db)) -> TwilioSyncJobOut:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     spawn_twilio_job(job.id)
     success = get_latest_success_twilio_job(db)
-    return _job_out(job, last_success_at=success.finished_at if success else None)
+    provider = get_twilio_provider(db)
+    return _job_out(
+        job,
+        last_success_at=success.finished_at if success else None,
+        has_catalog=catalog_has_rows(db, provider_id=provider.id),
+    )
 
 
 @router.get("/sync/latest", response_model=TwilioSyncJobOut | None)
 def latest_sync(db: Session = Depends(get_db)) -> TwilioSyncJobOut | None:
     job = get_latest_twilio_job(db)
+    provider = get_twilio_provider(db)
+    has_catalog = catalog_has_rows(db, provider_id=provider.id)
     if job is None:
         return None
     success = get_latest_success_twilio_job(db)
-    out = _job_out(job, last_success_at=success.finished_at if success else None)
+    out = _job_out(
+        job,
+        last_success_at=success.finished_at if success else None,
+        has_catalog=has_catalog,
+    )
     if job.status == SyncJobStatus.success:
         provider = get_twilio_provider(db)
         progress = dict(out.progress or {})
@@ -197,6 +213,33 @@ def latest_sync(db: Session = Depends(get_db)) -> TwilioSyncJobOut | None:
         progress["summary"] = summary
         out.progress = progress
     return out
+
+
+@router.post("/numbers/sync", response_model=TwilioSyncJobOut)
+def start_numbers_sync(body: TwilioNumbersSyncIn, db: Session = Depends(get_db)) -> TwilioSyncJobOut:
+    try:
+        job = create_twilio_numbers_job(
+            db,
+            country_iso=body.country_iso,
+            number_type=body.number_type,
+            triggered_by="twilio_page",
+        )
+    except ProviderError as exc:
+        status = 409 if "уже выполняется" in str(exc) else 400
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
+    spawn_twilio_numbers_job(job.id)
+    provider = get_twilio_provider(db)
+    return _job_out(job, has_catalog=catalog_has_rows(db, provider_id=provider.id))
+
+
+@router.get("/numbers/sync/latest", response_model=TwilioSyncJobOut | None)
+def latest_numbers_sync(db: Session = Depends(get_db)) -> TwilioSyncJobOut | None:
+    job = get_latest_twilio_numbers_job(db)
+    provider = get_twilio_provider(db)
+    has_catalog = catalog_has_rows(db, provider_id=provider.id)
+    if job is None:
+        return None
+    return _job_out(job, has_catalog=has_catalog)
 
 
 @router.get(

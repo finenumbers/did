@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import and_, delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -137,6 +137,9 @@ def persist_twilio_coverage(
                 "last_sync_job_id": stmt.excluded.last_sync_job_id,
                 "last_seen_at": stmt.excluded.last_seen_at,
                 "is_currently_present": True,
+                "numbers_synced_at": None,
+                "numbers_sync_job_id": None,
+                "numbers_sync_geo_job_id": None,
             },
         )
         db.execute(stmt)
@@ -160,6 +163,7 @@ def ingest_available_batch(
     number_type: str,
     region_filter: str,
     items: list[dict[str, Any]],
+    source: str = contract.NUMBER_SOURCE_GEO,
 ) -> dict[str, Any]:
     loaded = datetime.now(timezone.utc)
     filter_key = (region_filter or "").strip().upper()
@@ -223,7 +227,7 @@ def ingest_available_batch(
             sms=parsed["sms"],
             mms=parsed["mms"],
             fax=parsed["fax"],
-            source=contract.NUMBER_SOURCE_GEO,
+            source=source,
             last_sync_job_id=job_id,
             first_seen_at=loaded,
             last_seen_at=loaded,
@@ -241,10 +245,14 @@ def ingest_available_batch(
                 "sms": number_stmt.excluded.sms,
                 "mms": number_stmt.excluded.mms,
                 "fax": number_stmt.excluded.fax,
+                "source": number_stmt.excluded.source,
                 "last_sync_job_id": number_stmt.excluded.last_sync_job_id,
                 "last_seen_at": number_stmt.excluded.last_seen_at,
             },
-            where=TwilioAvailableNumber.source == contract.NUMBER_SOURCE_GEO,
+            where=and_(
+                TwilioAvailableNumber.country_iso == country_iso,
+                TwilioAvailableNumber.number_type == number_type,
+            ),
         )
         db.execute(number_stmt)
 
@@ -425,3 +433,103 @@ def _catalog_row_payload(row: TwilioCatalog, *, status: str, detail: str = "") -
         "period_price": str(price) if isinstance(price, Decimal) else price,
         "price_unit": row.price_unit,
     }
+
+
+def catalog_numbers_loaded(row: TwilioCatalog) -> bool:
+    return bool(
+        row.numbers_sync_geo_job_id
+        and row.last_sync_job_id
+        and row.numbers_sync_geo_job_id == row.last_sync_job_id
+    )
+
+
+def catalog_has_rows(db: Session, *, provider_id: uuid.UUID) -> bool:
+    count = (
+        db.scalar(
+            select(func.count())
+            .select_from(TwilioCatalog)
+            .where(
+                TwilioCatalog.provider_id == provider_id,
+                TwilioCatalog.is_currently_present.is_(True),
+            )
+        )
+        or 0
+    )
+    return int(count) > 0
+
+
+def load_geo_rows(
+    db: Session,
+    *,
+    provider_id: uuid.UUID,
+    country_iso: str,
+    number_type: str,
+) -> list[TwilioGeo]:
+    return list(
+        db.scalars(
+            select(TwilioGeo).where(
+                TwilioGeo.provider_id == provider_id,
+                TwilioGeo.country_iso == country_iso,
+                TwilioGeo.number_type == number_type,
+            )
+        ).all()
+    )
+
+
+def get_catalog_row(
+    db: Session,
+    *,
+    provider_id: uuid.UUID,
+    country_iso: str,
+    number_type: str,
+) -> TwilioCatalog | None:
+    return db.scalar(
+        select(TwilioCatalog).where(
+            TwilioCatalog.provider_id == provider_id,
+            TwilioCatalog.country_iso == country_iso,
+            TwilioCatalog.number_type == number_type,
+            TwilioCatalog.is_currently_present.is_(True),
+        )
+    )
+
+
+def mark_numbers_synced(
+    db: Session,
+    *,
+    provider_id: uuid.UUID,
+    country_iso: str,
+    number_type: str,
+    job_id: uuid.UUID,
+    geo_job_id: uuid.UUID | None,
+) -> None:
+    row = get_catalog_row(
+        db,
+        provider_id=provider_id,
+        country_iso=country_iso,
+        number_type=number_type,
+    )
+    if row is None:
+        return
+    row.numbers_synced_at = datetime.now(timezone.utc)
+    row.numbers_sync_job_id = job_id
+    row.numbers_sync_geo_job_id = geo_job_id or row.last_sync_job_id
+
+
+def cutover_numbers_row(
+    db: Session,
+    *,
+    provider_id: uuid.UUID,
+    job_id: uuid.UUID,
+    country_iso: str,
+    number_type: str,
+) -> int:
+    deleted = db.execute(
+        delete(TwilioAvailableNumber).where(
+            TwilioAvailableNumber.provider_id == provider_id,
+            TwilioAvailableNumber.country_iso == country_iso,
+            TwilioAvailableNumber.number_type == number_type,
+            TwilioAvailableNumber.last_sync_job_id.is_distinct_from(job_id),
+        )
+    ).rowcount
+    db.flush()
+    return int(deleted or 0)

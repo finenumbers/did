@@ -55,6 +55,7 @@ NANP_COUNTRIES = frozenset({"US", "CA"})
 GEO_NUMBER_TYPE = "local"
 NUMBER_SOURCE_GEO = "geo_sync"
 NUMBER_SOURCE_NUMBERS = "number_sync"
+AVAILABLE_PAGE_CEILING = 30
 
 US_STATE_CODES: tuple[str, ...] = (
     "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",

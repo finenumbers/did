@@ -210,6 +210,30 @@ button {
 button.secondary { background: #fff; color: var(--ink); border-color: var(--line); }
 button:disabled { opacity: 0.55; cursor: not-allowed; }
 
+.twilio-load-btn {
+  font-size: 12px;
+  line-height: 1.15;
+  padding: 0.12rem 0.4rem;
+  min-height: 0;
+  border-radius: 4px;
+}
+.twilio-load-btn.red {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.twilio-load-btn.green {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: #fff;
+}
+.twilio-load-pending {
+  color: var(--warn);
+  font-size: 12px;
+  line-height: 1.15;
+  font-weight: 600;
+}
+
 table {
   width: max-content;
   border-collapse: collapse;
