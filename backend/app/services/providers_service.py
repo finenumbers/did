@@ -31,6 +31,7 @@ _AUTH_PLAIN_KEYS = frozenset(
         "numbering_base_url",
         "account_id",
         "key_id",
+        "account_sid",
     }
 )
 _AUTH_TOKEN_KEYS = frozenset(
@@ -123,6 +124,13 @@ class ProvidersService:
                 "Read-only GET /v3 coverage (countries/regions/cities/did_group_types/did_groups). "
                 "See didww-contract.md. Раздел «Нумерация DIDWW» синхронизируется отдельно "
                 "и не входит в общий прогон РФ."
+            )
+        elif code == ProviderCode.twilio.value:
+            notice = (
+                "Twilio: account_sid + auth_token (HTTP Basic). "
+                "Read-only GET AvailablePhoneNumbers + Pricing PhoneNumbers/Countries. "
+                "See twilio-contract.md. Раздел «Номера Twilio» синхронизируется отдельно "
+                "и не входит в общий прогон РФ. Покупка IncomingPhoneNumbers запрещена."
             )
         else:
             notice = (

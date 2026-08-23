@@ -18,7 +18,8 @@ type ProviderCode =
   | "exolve"
   | "voximplant"
   | "mcn"
-  | "didww";
+  | "didww"
+  | "twilio";
 
 type AuroraCsvFile = { url: string; has_status_column: boolean };
 
@@ -34,6 +35,8 @@ type Draft = {
   numberingBaseUrl: string;
   accessToken: string;
   credentialsJson: string;
+  accountSid: string;
+  authToken: string;
   csvFiles: AuroraCsvFile[];
   settings: ProviderSettings | null;
   message: string | null;
@@ -54,6 +57,8 @@ const EMPTY_DRAFT: Draft = {
   numberingBaseUrl: "",
   accessToken: "",
   credentialsJson: "",
+  accountSid: "",
+  authToken: "",
   csvFiles: [],
   settings: null,
   message: null,
@@ -71,6 +76,7 @@ const PROVIDERS: { code: ProviderCode; title: string }[] = [
   { code: "voximplant", title: "Voximplant" },
   { code: "mcn", title: "MCN Telecom" },
   { code: "didww", title: "DIDWW" },
+  { code: "twilio", title: "Twilio" },
   { code: "finenumbers", title: "Finenumbers" },
 ];
 
@@ -102,6 +108,7 @@ function draftFromSettings(code: ProviderCode, s: ProviderSettings): Draft {
     numberingLogin: typeof auth.numbering_login === "string" ? auth.numbering_login : "",
     numberingBaseUrl: typeof auth.numbering_base_url === "string" ? auth.numbering_base_url : "",
     csvFiles: code === "aurora" ? parseAuroraCsvFiles(s.extra_settings) : [],
+    accountSid: typeof auth.account_sid === "string" ? auth.account_sid : "",
     settings: s,
   };
 }
@@ -116,6 +123,7 @@ export default function SettingsPage() {
     voximplant: { ...EMPTY_DRAFT },
     mcn: { ...EMPTY_DRAFT },
     didww: { ...EMPTY_DRAFT },
+    twilio: { ...EMPTY_DRAFT },
     finenumbers: { ...EMPTY_DRAFT },
   });
   const [pageError, setPageError] = useState<string | null>(null);
@@ -163,6 +171,7 @@ export default function SettingsPage() {
       voximplant: { ...EMPTY_DRAFT },
       mcn: { ...EMPTY_DRAFT },
       didww: { ...EMPTY_DRAFT },
+      twilio: { ...EMPTY_DRAFT },
       finenumbers: { ...EMPTY_DRAFT },
     };
     for (const { code } of PROVIDERS) {
@@ -206,6 +215,11 @@ export default function SettingsPage() {
       auth_settings = d.apiKey ? { key: d.apiKey } : undefined;
     } else if (code === "exolve" || code === "mcn" || code === "didww") {
       auth_settings = d.apiKey ? { api_key: d.apiKey } : undefined;
+    } else if (code === "twilio") {
+      const next: Record<string, string> = {};
+      if (d.accountSid) next.account_sid = d.accountSid;
+      if (d.authToken) next.auth_token = d.authToken;
+      auth_settings = Object.keys(next).length ? next : undefined;
     } else if (code === "voximplant") {
       auth_settings = d.credentialsJson
         ? { credentials_json: d.credentialsJson }
@@ -519,7 +533,9 @@ export default function SettingsPage() {
                                 ? "(Витрина)"
                                 : code === "didww"
                                   ? "(API v3)"
-                                  : ""}
+                                  : code === "twilio"
+                                    ? "(2010-04-01)"
+                                    : ""}
                     <input
                       value={d.baseUrl}
                       onChange={(e) => setDraft(code, { baseUrl: e.target.value })}
@@ -539,7 +555,9 @@ export default function SettingsPage() {
                                     ? "https://shop.mcn.ru"
                                     : code === "didww"
                                       ? "https://api.didww.com/v3"
-                                      : undefined
+                                      : code === "twilio"
+                                        ? "https://api.twilio.com/2010-04-01"
+                                        : undefined
                       }
                     />
                   </label>
@@ -671,6 +689,32 @@ export default function SettingsPage() {
                         }
                         value={d.apiKey}
                         onChange={(e) => setDraft(code, { apiKey: e.target.value })}
+                        style={{ width: "100%" }}
+                      />
+                    </label>
+                  </>
+                ) : code === "twilio" ? (
+                  <>
+                    <label>
+                      Account SID
+                      <input
+                        value={d.accountSid}
+                        onChange={(e) => setDraft(code, { accountSid: e.target.value })}
+                        style={{ width: "100%" }}
+                        placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                      />
+                    </label>
+                    <label>
+                      Auth Token
+                      <input
+                        type="password"
+                        placeholder={
+                          d.settings?.auth_settings_masked?.auth_token
+                            ? `текущее: ${String(d.settings.auth_settings_masked.auth_token)}`
+                            : "Auth Token из консоли Twilio"
+                        }
+                        value={d.authToken}
+                        onChange={(e) => setDraft(code, { authToken: e.target.value })}
                         style={{ width: "100%" }}
                       />
                     </label>

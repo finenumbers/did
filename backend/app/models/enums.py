@@ -11,6 +11,7 @@ class ProviderCode(str, enum.Enum):
     voximplant = "voximplant"
     mcn = "mcn"
     didww = "didww"
+    twilio = "twilio"
 
 
 class InventoryKind(str, enum.Enum):
@@ -31,6 +32,7 @@ class SyncJobType(str, enum.Enum):
     purchased_only = "purchased_only"  # legacy DB value; unused by engine
     dictionaries_only = "dictionaries_only"  # legacy DB value; unused by engine
     didww = "didww"  # isolated DIDWW coverage sync, outside the RU unified run
+    twilio = "twilio"  # isolated Twilio coverage sync, outside the RU unified run
 
 
 class SyncJobStatus(str, enum.Enum):

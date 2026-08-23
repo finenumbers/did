@@ -9,6 +9,7 @@ from app.api.routes import (
     pstn_inn_cache,
     regions,
     sync,
+    twilio,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -20,3 +21,4 @@ api_router.include_router(regions.router)
 api_router.include_router(mask_types.router)
 api_router.include_router(sync.router)
 api_router.include_router(didww.router)
+api_router.include_router(twilio.router)

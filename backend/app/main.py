@@ -19,6 +19,7 @@ from app.modules.pstn_inn_cache.service import ensure_required_operators
 from app.modules.sync_engine.scheduler import sync_schedule_loop
 from app.providers.aurora import contract as aurora_contract
 from app.providers.didww import contract as didww_contract
+from app.providers.twilio import contract as twilio_contract
 from app.providers.exolve import contract as exolve_contract
 from app.providers.voximplant import contract as voximplant_contract
 from app.providers.mcn import contract as mcn_contract
@@ -95,6 +96,13 @@ def seed_providers() -> None:
                 ProviderCode.didww,
                 "DIDWW",
                 didww_contract.EXAMPLE_BASE_URL,
+                {},
+                {},
+            ),
+            (
+                ProviderCode.twilio,
+                "Twilio",
+                twilio_contract.EXAMPLE_BASE_URL,
                 {},
                 {},
             ),

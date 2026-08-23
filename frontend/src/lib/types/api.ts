@@ -154,6 +154,42 @@ export interface DidwwSyncJob {
   stages: SyncStage[];
 }
 
+/** One Twilio coverage row: country + type, not an E.164 number. */
+export interface TwilioCoverageItem {
+  id: string;
+  provider_group_key: string;
+  country_name: string | null;
+  country_iso: string | null;
+  number_type: string | null;
+  period_price: string | null;
+  price_unit: string | null;
+  country_beta: boolean | null;
+}
+
+export type TwilioSyncJob = DidwwSyncJob;
+
+export interface TwilioAvailableNumber {
+  phone_number: string | null;
+  friendly_name: string | null;
+  iso_country: string | null;
+  region: string | null;
+  locality: string | null;
+  postal_code: string | null;
+  lata: string | null;
+  rate_center: string | null;
+  address_requirements: string | null;
+  beta: boolean | null;
+  voice: boolean | null;
+  sms: boolean | null;
+  mms: boolean | null;
+  fax: boolean | null;
+}
+
+export interface TwilioAvailableNumbersResponse {
+  items: TwilioAvailableNumber[];
+  returned: number;
+}
+
 export interface RegionCityItem {
   id: string;
   abc: string;
