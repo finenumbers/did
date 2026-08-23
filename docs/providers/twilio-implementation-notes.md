@@ -46,12 +46,12 @@ Page button only opens the viewer. `POST /api/v1/twilio/sync` starts the same `S
 Page button only opens the viewer (`GET /coverage`). Start is **per catalog row**: `POST /api/v1/twilio/numbers/sync` `{country_iso, number_type}`. Poll `GET /numbers/sync/latest`. Geo running or another numbers job → 409.
 
 1. `build_number_cells`: queryable geo = nonempty `locality` and/or `region_filter`. Empty list → one country cell (no `InRegion`/`InLocality`), including `local` with numbers but no cities.
-2. Every cell runs `%00%`…`%99%`. If a response returns `>= 30` and the unique set for that `(cell, Contains)` grew, repeat the same GET.
+2. Each cell of the selected row first GETs **without** `Contains`. Empty first response → skip `%00%`…`%99%` for that cell. Nonempty → run all 100 patterns. If a patterned response returns `>= 30` and the unique set for that `(cell, Contains)` grew, repeat the same GET.
 3. Upsert `source=number_sync`. Conflict updates only when existing `country_iso`+`number_type` match this row (no steal).
 4. After success: wipe numbers of this country×type whose `last_sync_job_id` is not this job. Then set `numbers_synced_at` / `numbers_sync_job_id` / `numbers_sync_geo_job_id=catalog.last_sync_job_id`.
 5. A new geo persist clears the three number-sync fields. Green button only when `numbers_sync_geo_job_id == last_sync_job_id`.
 
-Row status: `78 / 1 / 15 / 98 · %78% · 4 номеров` (pattern / repeat / cell index / cells). With a region: `· AB ·`. Country fallback is `1 / 1` cells.
+Row status: first pass `0 / 1 / 15 / 98 · AB · 4 номеров` (no Contains); grid `78 / 1 / 15 / 98 · AB · %78% · 4 номеров` (pattern / repeat / cell index / cells). Country fallback is `1 / 1` cells.
 
 Do not start a full US `local` run from the agent: thousands of cities × 100+ repeats.
 

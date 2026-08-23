@@ -383,7 +383,9 @@ def test_numbers_status_detail_uses_pattern_repeat_cell_and_region():
 
     country = NumberCell(region_filter="", locality=None, label="")
     assert _numbers_detail(78, 1, 1, 1, country, "%78%", 4) == "78 / 1 / 1 / 1 · %78% · 4 номеров"
+    assert _numbers_detail(0, 1, 1, 1, country, None, 0) == "0 / 1 / 1 / 1 · 0 номеров"
     region = NumberCell(region_filter="AB", locality="Calgary", label="Calgary")
     assert _numbers_detail(78, 1, 15, 98, region, "%78%", 4) == (
         "78 / 1 / 15 / 98 · AB · %78% · 4 номеров"
     )
+    assert _numbers_detail(0, 1, 15, 98, region, None, 4) == "0 / 1 / 15 / 98 · AB · 4 номеров"

@@ -121,7 +121,7 @@ def _numbers_detail(
     cell_index: int,
     cell_total: int,
     cell: NumberCell,
-    contains: str,
+    contains: str | None,
     returned: int,
 ) -> str:
     parts = [f"{pattern_index} / {repeat} / {cell_index} / {cell_total}"]
@@ -129,7 +129,8 @@ def _numbers_detail(
         parts.append(cell.region_filter)
     elif cell.label:
         parts.append(cell.label)
-    parts.append(contains)
+    if contains:
+        parts.append(contains)
     parts.append(f"{returned} номеров")
     return " · ".join(parts)
 
@@ -218,9 +219,7 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
             number_type=number_type,
         )
         cells = build_number_cells(geo_rows)
-        patterns = contract.contains_region_patterns()
-        planned = len(cells) * len(patterns)
-        tracker.requests_total = planned
+        tracker.requests_total = len(cells)
         row_view = _row_view(
             country_iso=country_iso,
             country_name=catalog.country_name,
@@ -235,9 +234,73 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
         )
         tracker.apply(rows=[row_view], force=True, stage_id="numbers", stage_status="running")
 
+        def _commit_batch(
+            *,
+            batch: list[dict[str, Any]],
+            cell: NumberCell,
+            cell_index: int,
+            pattern_index: int,
+            repeat: int,
+            contains: str | None,
+        ) -> None:
+            result = ingest_available_batch(
+                db,
+                provider_id=provider.id,
+                job_id=job.id,
+                country_iso=country_iso,
+                country_name=catalog.country_name,
+                number_type=number_type,
+                region_filter=cell.region_filter,
+                items=batch,
+                source=contract.NUMBER_SOURCE_NUMBERS,
+            )
+            tracker.note_batch(country_iso, number_type, result)
+            row_view["status"] = "running"
+            row_view["detail"] = _numbers_detail(
+                pattern_index,
+                repeat,
+                cell_index,
+                len(cells),
+                cell,
+                contains,
+                len(batch),
+            )
+            row_view["number_count"] = tracker.row_number_count(country_iso, number_type)
+            tracker.apply(
+                current={
+                    "country_iso": country_iso,
+                    "in_region": cell.region_filter or None,
+                    "contains": contains,
+                },
+                rows=[row_view],
+                stage_id="numbers",
+                stage_status="running",
+                stage_detail=row_view["detail"],
+            )
+
         for cell_index, cell in enumerate(cells, start=1):
             in_region = cell.region_filter or None
             in_locality = cell.locality
+            first = await _search_or_empty(
+                client,
+                country_iso=country_iso,
+                number_type=number_type,
+                in_region=in_region,
+                in_locality=in_locality,
+            )
+            tracker.bump_request()
+            _commit_batch(
+                batch=first,
+                cell=cell,
+                cell_index=cell_index,
+                pattern_index=0,
+                repeat=1,
+                contains=None,
+            )
+            patterns = contract.geo_contains_queue(len(first))
+            if not patterns:
+                continue
+            tracker.requests_total = (tracker.requests_total or 0) + len(patterns)
             for pattern_index, pattern in enumerate(patterns, start=1):
                 seen: set[str] = set()
                 repeat = 0
@@ -259,39 +322,13 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
                     }
                     new_unique = len(phones - seen)
                     seen.update(phones)
-                    result = ingest_available_batch(
-                        db,
-                        provider_id=provider.id,
-                        job_id=job.id,
-                        country_iso=country_iso,
-                        country_name=catalog.country_name,
-                        number_type=number_type,
-                        region_filter=cell.region_filter,
-                        items=batch,
-                        source=contract.NUMBER_SOURCE_NUMBERS,
-                    )
-                    tracker.note_batch(country_iso, number_type, result)
-                    row_view["status"] = "running"
-                    row_view["detail"] = _numbers_detail(
-                        pattern_index,
-                        repeat,
-                        cell_index,
-                        len(cells),
-                        cell,
-                        pattern,
-                        len(batch),
-                    )
-                    row_view["number_count"] = tracker.row_number_count(country_iso, number_type)
-                    tracker.apply(
-                        current={
-                            "country_iso": country_iso,
-                            "in_region": in_region,
-                            "contains": pattern,
-                        },
-                        rows=[row_view],
-                        stage_id="numbers",
-                        stage_status="running",
-                        stage_detail=row_view["detail"],
+                    _commit_batch(
+                        batch=batch,
+                        cell=cell,
+                        cell_index=cell_index,
+                        pattern_index=pattern_index,
+                        repeat=repeat,
+                        contains=pattern,
                     )
                     if not should_repeat_contains(len(batch), new_unique):
                         break
