@@ -266,9 +266,13 @@ async def _execute(job_id: uuid.UUID) -> None:
             client.list_cities(on_page=page_progress("cities", "городов")),
             lambda pair: f"{len(pair[0])} городов",
         )
+        country_ids = [str(row.get("id") or "").strip() for row in countries if row.get("id")]
         group_resources, idx = await stage(
             "groups",
-            client.list_did_groups(on_page=page_progress("groups", "групп")),
+            client.list_did_groups(
+                on_page=page_progress("groups", "групп"),
+                country_ids=country_ids,
+            ),
             lambda pair: f"{len(pair[0])} групп",
         )
         groups = [parse_did_group(item, idx) for item in group_resources if item.get("id")]

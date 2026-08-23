@@ -53,9 +53,10 @@ an empty or failing API response, and nothing is ever seeded from documentation 
 - `/countries` and `/regions` are requested unpaginated (vendor disables pagination there).
 - `/cities` uses page size 1000, `/did_groups` and `/did_group_types` use 100.
 - DIDWW returns only `links.first` / `links.last`, so `iter_collection` pages by the
-  latest `meta.total_records` and `links.last`; it does not stop on a short or
-  all-duplicate page while `fetched < total`. When meta is missing, stop on the first
-  partial page. `MAX_PAGE_NUMBER` is the safety cap.
+  latest `meta.total_records`. It does not stop on a short page, duplicates, or
+  `links.last` while `fetched < total`. When meta is missing, stop on the first
+  partial page. `MAX_PAGE_NUMBER` is the safety cap. A still-short `did_groups`
+  walk retries per `filter[country.id]`.
 - A short walk that still contradicts the latest `meta.total_records` raises
   `DIDWW_SLICE_INCOMPLETE`, so the job fails instead of writing a truncated catalog.
   Success replaces the whole catalog.

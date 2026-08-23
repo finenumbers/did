@@ -55,6 +55,7 @@ SORT_DID_GROUPS = "prefix"
 
 # VERIFIED filters
 FILTER_IN_STOCK = "filter[is_available]"
+FILTER_COUNTRY_ID = "filter[country.id]"
 FILTER_AVAILABLE_DID_GROUP = "filter[did_group.id]"
 FILTER_AVAILABLE_NUMBER = "filter[number_contains]"
 

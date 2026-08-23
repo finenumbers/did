@@ -239,6 +239,37 @@ def test_pagination_gate_fails_on_short_walk():
     assert len(client.calls) == 3
 
 
+def test_pagination_keeps_going_past_links_last_when_short():
+    client = ScriptedDidwwClient(
+        [
+            _page(_rows(0, 100), 180, last=2),
+            _page(_rows(100, 56), 180, last=2),
+            _page(_rows(156, 24), 180, last=3),
+        ]
+    )
+    items, _idx = asyncio.run(client.list_did_groups())
+
+    assert len(items) == 180
+    assert [call[1]["page[number]"] for call in client.calls] == [1, 2, 3]
+
+
+def test_did_groups_retries_by_country_after_incomplete_slice():
+    client = ScriptedDidwwClient(
+        [
+            _page(_rows(0, 100), 150, last=2),
+            _page(_rows(100, 20), 150, last=2),
+            {"data": []},
+            _page(_rows(0, 80), 80, last=1),
+            _page(_rows(80, 70), 70, last=1),
+        ]
+    )
+    items, _idx = asyncio.run(client.list_did_groups(country_ids=["c-a", "c-b"]))
+
+    assert len(items) == 150
+    assert client.calls[3][1][contract.FILTER_COUNTRY_ID] == "c-a"
+    assert client.calls[4][1][contract.FILTER_COUNTRY_ID] == "c-b"
+
+
 def test_pagination_continues_after_short_page_when_total_known():
     client = ScriptedDidwwClient(
         [

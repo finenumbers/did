@@ -138,7 +138,6 @@ class DidwwClient:
         name = label or path.strip("/")
         size = page_size if (paginated and page_size) else None
         total: int | None = None
-        last_page: int | None = None
         page = 1
         while True:
             page_query = dict(query)
@@ -150,9 +149,6 @@ class DidwwClient:
             page_total = parser.total_records(payload)
             if page_total is not None:
                 total = page_total
-            page_last = parser.last_page_number(payload)
-            if page_last is not None:
-                last_page = page_last
             added = 0
             for row in batch:
                 key = (str(row.get("type") or ""), str(row.get("id") or ""))
@@ -179,7 +175,6 @@ class DidwwClient:
                     seen.clear()
                     idx.clear()
                     total = None
-                    last_page = None
                     page = 1
                     continue
                 break
@@ -188,8 +183,8 @@ class DidwwClient:
                     break
                 if not batch:
                     break
-                if last_page is not None and page >= last_page:
-                    break
+                # `links.last` can be short of total (page-size mismatch / stock
+                # moving). Do not stop on it while unique rows are still missing.
             else:
                 if not batch or not added:
                     break
@@ -261,18 +256,63 @@ class DidwwClient:
         self,
         *,
         on_page: PageProgress | None = None,
+        country_ids: list[str] | None = None,
     ) -> tuple[list[dict[str, Any]], dict[tuple[str, str], dict[str, Any]]]:
-        return await self.iter_collection(
-            contract.PATH_DID_GROUPS,
-            params={
-                "include": contract.DID_GROUPS_INCLUDE,
-                contract.FILTER_IN_STOCK: "true",
-                "sort": contract.SORT_DID_GROUPS,
-            },
-            page_size=contract.DID_GROUPS_PAGE_SIZE,
-            label="did_groups",
-            on_page=on_page,
-        )
+        params = {
+            "include": contract.DID_GROUPS_INCLUDE,
+            contract.FILTER_IN_STOCK: "true",
+            "sort": contract.SORT_DID_GROUPS,
+        }
+        try:
+            return await self.iter_collection(
+                contract.PATH_DID_GROUPS,
+                params=params,
+                page_size=contract.DID_GROUPS_PAGE_SIZE,
+                label="did_groups",
+                on_page=on_page,
+            )
+        except ProviderError as exc:
+            ids = [cid.strip() for cid in (country_ids or []) if cid and cid.strip()]
+            if exc.code != "DIDWW_SLICE_INCOMPLETE" or not ids:
+                raise
+            logger.warning(
+                "DIDWW did_groups incomplete fetched=%s total=%s; retrying by country",
+                (exc.details or {}).get("fetched"),
+                (exc.details or {}).get("total_records"),
+            )
+            return await self._list_did_groups_by_countries(ids, on_page=on_page)
+
+    async def _list_did_groups_by_countries(
+        self,
+        country_ids: list[str],
+        *,
+        on_page: PageProgress | None = None,
+    ) -> tuple[list[dict[str, Any]], dict[tuple[str, str], dict[str, Any]]]:
+        items: list[dict[str, Any]] = []
+        idx: dict[tuple[str, str], dict[str, Any]] = {}
+        seen: set[tuple[str, str]] = set()
+        for country_id in country_ids:
+            batch, extra = await self.iter_collection(
+                contract.PATH_DID_GROUPS,
+                params={
+                    "include": contract.DID_GROUPS_INCLUDE,
+                    contract.FILTER_IN_STOCK: "true",
+                    "sort": contract.SORT_DID_GROUPS,
+                    contract.FILTER_COUNTRY_ID: country_id,
+                },
+                page_size=contract.DID_GROUPS_PAGE_SIZE,
+                label=f"did_groups:{country_id}",
+            )
+            for row in batch:
+                key = (str(row.get("type") or ""), str(row.get("id") or ""))
+                if not key[1] or key in seen:
+                    continue
+                seen.add(key)
+                items.append(row)
+            parser.merge_included(idx, extra)
+            if on_page is not None:
+                on_page(len(items), None)
+        return items, idx
 
     async def list_available_dids(
         self,
