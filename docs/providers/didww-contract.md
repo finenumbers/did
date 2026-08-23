@@ -41,10 +41,11 @@ Never call: reservations, orders, `POST`/`PATCH`/`DELETE` on any resource, `PATC
   Keep requesting pages while `fetched < total_records` even if a page is short,
   all-duplicate, or `links.last` says this is the last page. Stop on an empty page
   or `fetched >= total`. When meta is absent, stop on the first partial page.
-  If the flat walk is still short, retry `/did_groups` per `filter[country.id]`.
-- If the walk ends with `fetched < total_records`, the client raises
-  `DIDWW_SLICE_INCOMPLETE` and the job fails instead of persisting a partial catalog.
-  A successful walk fully replaces `didww_catalog` (not a delta).
+- `did_groups` loads per `filter[country.id]` (countries already fetched). A country
+  walk that exhausts pages is kept even if unique < that country's meta; a second
+  pass at `page[size]=50` merges extra ids. The job then fully replaces `didww_catalog`.
+- A flat `did_groups` walk (no country ids) still raises `DIDWW_SLICE_INCOMPLETE`
+  when unique < meta after an empty page.
 - Every paginated collection is requested with a documented `sort` value so pages do not
   drift between requests.
 

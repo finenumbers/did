@@ -253,12 +253,9 @@ def test_pagination_keeps_going_past_links_last_when_short():
     assert [call[1]["page[number]"] for call in client.calls] == [1, 2, 3]
 
 
-def test_did_groups_retries_by_country_after_incomplete_slice():
+def test_did_groups_walks_countries_first():
     client = ScriptedDidwwClient(
         [
-            _page(_rows(0, 100), 150, last=2),
-            _page(_rows(100, 20), 150, last=2),
-            {"data": []},
             _page(_rows(0, 80), 80, last=1),
             _page(_rows(80, 70), 70, last=1),
         ]
@@ -266,8 +263,24 @@ def test_did_groups_retries_by_country_after_incomplete_slice():
     items, _idx = asyncio.run(client.list_did_groups(country_ids=["c-a", "c-b"]))
 
     assert len(items) == 150
-    assert client.calls[3][1][contract.FILTER_COUNTRY_ID] == "c-a"
-    assert client.calls[4][1][contract.FILTER_COUNTRY_ID] == "c-b"
+    assert client.calls[0][1][contract.FILTER_COUNTRY_ID] == "c-a"
+    assert client.calls[1][1][contract.FILTER_COUNTRY_ID] == "c-b"
+
+
+def test_country_did_groups_merges_second_pass_when_meta_is_ahead():
+    client = ScriptedDidwwClient(
+        [
+            _page(_rows(0, 100), 180, last=3),
+            _page(_rows(100, 66), 180, last=3),
+            {"data": []},
+            _page(_rows(160, 20), 180, last=4),
+            {"data": []},
+        ]
+    )
+    items, _idx = asyncio.run(client.list_did_groups(country_ids=["c-1"]))
+
+    assert len(items) == 180
+    assert client.calls[3][1]["page[size]"] == 50
 
 
 def test_pagination_continues_after_short_page_when_total_known():

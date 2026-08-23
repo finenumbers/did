@@ -125,11 +125,13 @@ class DidwwClient:
         paginated: bool = True,
         label: str | None = None,
         on_page: PageProgress | None = None,
+        strict: bool = True,
     ) -> tuple[list[dict[str, Any]], dict[tuple[str, str], dict[str, Any]]]:
         """Walk a JSON:API collection.
 
         DIDWW returns only `links.first` / `links.last`, never `links.next`, so paging is
         driven by `meta.total_records` with a full-page fallback when meta is absent.
+        `strict=False` keeps a nonempty exhausted walk even if unique < meta.
         """
         query = dict(params or {})
         items: list[dict[str, Any]] = []
@@ -198,16 +200,24 @@ class DidwwClient:
                     details={"path": path, "fetched": len(items), "total_records": total},
                 )
         if total is not None and len(items) < total:
-            raise ProviderError(
-                f"DIDWW slice incomplete {name}: fetched={len(items)} total_records={total}",
-                code="DIDWW_SLICE_INCOMPLETE",
-                details={
-                    "path": path,
-                    "fetched": len(items),
-                    "total_records": total,
-                    "pages": page,
-                    "page_size": size,
-                },
+            details = {
+                "path": path,
+                "fetched": len(items),
+                "total_records": total,
+                "pages": page,
+                "page_size": size,
+            }
+            if strict:
+                raise ProviderError(
+                    f"DIDWW slice incomplete {name}: fetched={len(items)} total_records={total}",
+                    code="DIDWW_SLICE_INCOMPLETE",
+                    details=details,
+                )
+            logger.warning(
+                "DIDWW %s exhausted pages short of meta: fetched=%s total_records=%s",
+                name,
+                len(items),
+                total,
             )
         return items, idx
 
@@ -258,29 +268,30 @@ class DidwwClient:
         on_page: PageProgress | None = None,
         country_ids: list[str] | None = None,
     ) -> tuple[list[dict[str, Any]], dict[tuple[str, str], dict[str, Any]]]:
+        ids = [cid.strip() for cid in (country_ids or []) if cid and cid.strip()]
+        if ids:
+            return await self._list_did_groups_by_countries(ids, on_page=on_page)
+        return await self.iter_collection(
+            contract.PATH_DID_GROUPS,
+            params={
+                "include": contract.DID_GROUPS_INCLUDE,
+                contract.FILTER_IN_STOCK: "true",
+                "sort": contract.SORT_DID_GROUPS,
+            },
+            page_size=contract.DID_GROUPS_PAGE_SIZE,
+            label="did_groups",
+            on_page=on_page,
+        )
+
+    def _did_group_params(self, country_id: str | None = None) -> dict[str, str]:
         params = {
             "include": contract.DID_GROUPS_INCLUDE,
             contract.FILTER_IN_STOCK: "true",
             "sort": contract.SORT_DID_GROUPS,
         }
-        try:
-            return await self.iter_collection(
-                contract.PATH_DID_GROUPS,
-                params=params,
-                page_size=contract.DID_GROUPS_PAGE_SIZE,
-                label="did_groups",
-                on_page=on_page,
-            )
-        except ProviderError as exc:
-            ids = [cid.strip() for cid in (country_ids or []) if cid and cid.strip()]
-            if exc.code != "DIDWW_SLICE_INCOMPLETE" or not ids:
-                raise
-            logger.warning(
-                "DIDWW did_groups incomplete fetched=%s total=%s; retrying by country",
-                (exc.details or {}).get("fetched"),
-                (exc.details or {}).get("total_records"),
-            )
-            return await self._list_did_groups_by_countries(ids, on_page=on_page)
+        if country_id:
+            params[contract.FILTER_COUNTRY_ID] = country_id
+        return params
 
     async def _list_did_groups_by_countries(
         self,
@@ -292,26 +303,51 @@ class DidwwClient:
         idx: dict[tuple[str, str], dict[str, Any]] = {}
         seen: set[tuple[str, str]] = set()
         for country_id in country_ids:
-            batch, extra = await self.iter_collection(
-                contract.PATH_DID_GROUPS,
-                params={
-                    "include": contract.DID_GROUPS_INCLUDE,
-                    contract.FILTER_IN_STOCK: "true",
-                    "sort": contract.SORT_DID_GROUPS,
-                    contract.FILTER_COUNTRY_ID: country_id,
-                },
-                page_size=contract.DID_GROUPS_PAGE_SIZE,
-                label=f"did_groups:{country_id}",
-            )
+            batch, extra = await self._country_did_groups(country_id)
+            parser.merge_included(idx, extra)
             for row in batch:
                 key = (str(row.get("type") or ""), str(row.get("id") or ""))
                 if not key[1] or key in seen:
                     continue
                 seen.add(key)
                 items.append(row)
-            parser.merge_included(idx, extra)
             if on_page is not None:
                 on_page(len(items), None)
+        return items, idx
+
+    async def _country_did_groups(
+        self,
+        country_id: str,
+    ) -> tuple[list[dict[str, Any]], dict[tuple[str, str], dict[str, Any]]]:
+        params = self._did_group_params(country_id)
+        items, idx = await self.iter_collection(
+            contract.PATH_DID_GROUPS,
+            params=params,
+            page_size=contract.DID_GROUPS_PAGE_SIZE,
+            label=f"did_groups:{country_id}",
+            strict=False,
+        )
+        if len(items) < contract.DID_GROUPS_PAGE_SIZE:
+            return items, idx
+        more, extra = await self.iter_collection(
+            contract.PATH_DID_GROUPS,
+            params=params,
+            page_size=50,
+            label=f"did_groups:{country_id}:p50",
+            strict=False,
+        )
+        seen = {
+            (str(row.get("type") or ""), str(row.get("id") or ""))
+            for row in items
+            if row.get("id")
+        }
+        parser.merge_included(idx, extra)
+        for row in more:
+            key = (str(row.get("type") or ""), str(row.get("id") or ""))
+            if not key[1] or key in seen:
+                continue
+            seen.add(key)
+            items.append(row)
         return items, idx
 
     async def list_available_dids(

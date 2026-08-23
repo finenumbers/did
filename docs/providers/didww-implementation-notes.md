@@ -55,11 +55,11 @@ an empty or failing API response, and nothing is ever seeded from documentation 
 - DIDWW returns only `links.first` / `links.last`, so `iter_collection` pages by the
   latest `meta.total_records`. It does not stop on a short page, duplicates, or
   `links.last` while `fetched < total`. When meta is missing, stop on the first
-  partial page. `MAX_PAGE_NUMBER` is the safety cap. A still-short `did_groups`
-  walk retries per `filter[country.id]`.
-- A short walk that still contradicts the latest `meta.total_records` raises
-  `DIDWW_SLICE_INCOMPLETE`, so the job fails instead of writing a truncated catalog.
-  Success replaces the whole catalog.
+  partial page. `MAX_PAGE_NUMBER` is the safety cap.
+- `did_groups` is fetched per country. An exhausted country page walk is kept even
+  if meta is ahead (live `is_available` + `sort=prefix` drift). Multi-page countries
+  get a second `page[size]=50` pass and the unique union is persisted as the full
+  snapshot. A flat walk without country ids still raises `DIDWW_SLICE_INCOMPLETE`.
 - If an unpaginated endpoint ever answers with fewer rows than its own `meta.total_records`,
   the client restarts that collection with explicit `page[size] = 100` instead of accepting
   a truncated dictionary.
