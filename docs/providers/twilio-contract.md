@@ -41,9 +41,10 @@ Types come only from keys that actually appear on the country. Official HTML doc
 ## Available numbers search
 
 - Typical ceiling ~30 numbers; not a dump; `Page`/`PageToken` do not walk inventory.
+- First geo pass: every `local` country and every US/CA state/province **without** `Contains`. Only after that pass is `requests_total` known (`done + 100 × nonempty cells`).
 - Empty first GET (no `Contains`) means this cell is empty: **do not** run the `%00%`…`%99%` grid.
-- If the first GET returns any numbers, run **all** 100 patterns `%00%`…`%99%`. No streak stop.
-- US/CA: fan-out `InRegion` over all US states+DC and 13 CA provinces. PR is not in the list. Empty state still stays in the queue; only the grid is skipped.
+- If the first GET returns any numbers, run **all** 100 patterns `%00%`…`%99%` in a second pass. No streak stop.
+- US/CA: fan-out `InRegion` over all US states+DC and 13 CA provinces. PR is not in the list. Empty state still stays in the first-pass queue; only the grid is skipped.
 - Other ISO: one country-level GET, then the grid if non-empty. No `InRegion`.
 - `InRegion` / `AreaCode` apply only to US/CA (NANP) in `available_search_params`. Do not send them for other ISO codes.
 - Do not pass `Beta` (vendor default `true` includes beta numbers).

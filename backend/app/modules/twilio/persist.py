@@ -353,7 +353,21 @@ def cutover_geo_snapshot(
     }
 
 
+def number_counts_by_type(db: Session, *, provider_id: uuid.UUID) -> dict[tuple[str, str], int]:
+    rows = db.execute(
+        select(
+            TwilioAvailableNumber.country_iso,
+            TwilioAvailableNumber.number_type,
+            func.count(),
+        )
+        .where(TwilioAvailableNumber.provider_id == provider_id)
+        .group_by(TwilioAvailableNumber.country_iso, TwilioAvailableNumber.number_type)
+    ).all()
+    return {(str(iso or ""), str(typ or "")): int(cnt) for iso, typ, cnt in rows}
+
+
 def catalog_progress_rows(db: Session, *, provider_id: uuid.UUID) -> list[dict[str, Any]]:
+    counts = number_counts_by_type(db, provider_id=provider_id)
     rows = db.scalars(
         select(TwilioCatalog)
         .where(
@@ -362,7 +376,12 @@ def catalog_progress_rows(db: Session, *, provider_id: uuid.UUID) -> list[dict[s
         )
         .order_by(TwilioCatalog.country_name.asc(), TwilioCatalog.number_type.asc())
     ).all()
-    return [_catalog_row_payload(row, status="success") for row in rows]
+    out = []
+    for row in rows:
+        payload = _catalog_row_payload(row, status="success")
+        payload["number_count"] = counts.get((row.country_iso or "", row.number_type or ""), 0)
+        out.append(payload)
+    return out
 
 
 def snapshot_totals(db: Session, *, provider_id: uuid.UUID) -> dict[str, int]:
@@ -402,6 +421,7 @@ def _catalog_row_payload(row: TwilioCatalog, *, status: str, detail: str = "") -
         "detail": detail,
         "region_count": row.region_count,
         "city_count": row.city_count,
+        "number_count": 0,
         "period_price": str(price) if isinstance(price, Decimal) else price,
         "price_unit": row.price_unit,
     }

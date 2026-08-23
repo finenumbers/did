@@ -192,6 +192,8 @@ def latest_sync(db: Session = Depends(get_db)) -> TwilioSyncJobOut | None:
         summary = dict(progress.get("summary") or {})
         summary["cities_total"] = totals["cities_total"]
         summary["numbers_unique"] = totals["numbers_unique"]
+        if summary.get("requests_total") is None and summary.get("requests") is not None:
+            summary["requests_total"] = summary["requests"]
         progress["summary"] = summary
         out.progress = progress
     return out

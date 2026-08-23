@@ -69,7 +69,12 @@ def _progress_template() -> dict[str, Any]:
             }
             for sid, label in STAGES
         ],
-        "summary": {"requests": 0, "cities_total": 0, "numbers_unique": 0},
+        "summary": {
+            "requests": 0,
+            "requests_total": None,
+            "cities_total": 0,
+            "numbers_unique": 0,
+        },
         "current": {"country_iso": None, "in_region": None, "contains": None},
         "rows": [],
     }
@@ -78,7 +83,10 @@ def _progress_template() -> dict[str, Any]:
 def _ensure_progress(job: SyncJob) -> dict[str, Any]:
     stats = dict(job.stats or {})
     progress = stats.get("progress") or _progress_template()
-    progress.setdefault("summary", {"requests": 0, "cities_total": 0, "numbers_unique": 0})
+    progress.setdefault(
+        "summary",
+        {"requests": 0, "requests_total": None, "cities_total": 0, "numbers_unique": 0},
+    )
     progress.setdefault("current", {"country_iso": None, "in_region": None, "contains": None})
     progress.setdefault("rows", [])
     progress.setdefault("stages", [])
@@ -134,6 +142,7 @@ def _row_payload(
         "detail": detail,
         "region_count": region_count,
         "city_count": city_count,
+        "number_count": 0,
         "period_price": _price_text(row.period_price),
         "price_unit": row.price_unit,
     }
@@ -251,16 +260,23 @@ class _Progress:
         self.job = job
         self.last_flush = 0.0
         self.requests = 0
+        self.requests_total: int | None = None
         self.phones: set[str] = set()
+        self.phones_by_row: dict[tuple[str, str], set[str]] = {}
         self.cities: set[tuple[str, str, str]] = set()
 
     def bump_request(self) -> None:
         self.requests += 1
 
-    def note_batch(self, country_iso: str, result: dict[str, Any]) -> None:
-        self.phones.update(result.get("phones") or ())
+    def note_batch(self, country_iso: str, number_type: str, result: dict[str, Any]) -> None:
+        phones = result.get("phones") or ()
+        self.phones.update(phones)
+        self.phones_by_row.setdefault((country_iso, number_type), set()).update(phones)
         for region_filter, locality in result.get("cities") or ():
             self.cities.add((country_iso, region_filter, locality))
+
+    def row_number_count(self, country_iso: str, number_type: str) -> int:
+        return len(self.phones_by_row.get((country_iso, number_type), set()))
 
     def apply(
         self,
@@ -275,6 +291,7 @@ class _Progress:
         progress = _ensure_progress(self.job)
         progress["summary"] = {
             "requests": self.requests,
+            "requests_total": self.requests_total,
             "cities_total": len(self.cities),
             "numbers_unique": len(self.phones),
         }
@@ -419,17 +436,27 @@ async def _execute(job_id: uuid.UUID) -> None:
         _set_stage(job, "geo", "running")
         db.commit()
         local_rows = [row for row in priced_rows if row.number_type == contract.GEO_NUMBER_TYPE]
+        first_pass_total = sum(len(contract.region_search_keys(row.country_iso)) for row in local_rows)
         for row in local_rows:
             item = _find_row(progress_rows, row.country_iso, row.number_type)
             if item:
+                keys_n = len(contract.region_search_keys(row.country_iso))
                 item["status"] = "running"
-                item["detail"] = "очередь"
-        tracker.apply(rows=progress_rows, force=True)
+                item["detail"] = f"0 / {keys_n}"
+        tracker.apply(
+            rows=progress_rows,
+            force=True,
+            stage_id="geo",
+            stage_status="running",
+            stage_detail=f"первый прогон 0 / {first_pass_total}",
+        )
 
+        grid_queue: list[tuple[Any, str | None]] = []
+        first_done = 0
         for row in local_rows:
             item = _find_row(progress_rows, row.country_iso, row.number_type)
             keys = contract.region_search_keys(row.country_iso)
-            for region_key in keys:
+            for index, region_key in enumerate(keys, start=1):
                 first = await _search_or_empty(
                     client,
                     country_iso=row.country_iso,
@@ -437,6 +464,7 @@ async def _execute(job_id: uuid.UUID) -> None:
                     in_region=region_key,
                 )
                 tracker.bump_request()
+                first_done += 1
                 first_result = ingest_available_batch(
                     db,
                     provider_id=provider.id,
@@ -447,10 +475,13 @@ async def _execute(job_id: uuid.UUID) -> None:
                     region_filter=region_key or "",
                     items=first,
                 )
-                tracker.note_batch(row.country_iso, first_result)
+                tracker.note_batch(row.country_iso, row.number_type, first_result)
+                if first:
+                    grid_queue.append((row, region_key))
                 if item:
                     item["status"] = "running"
-                    item["detail"] = _geo_detail(region_key, None, len(first))
+                    item["detail"] = _first_pass_detail(index, len(keys), region_key, len(first))
+                    _refresh_row_counts(db, tracker, item, row)
                 tracker.apply(
                     current={
                         "country_iso": row.country_iso,
@@ -458,48 +489,88 @@ async def _execute(job_id: uuid.UUID) -> None:
                         "contains": None,
                     },
                     rows=progress_rows,
+                    stage_id="geo",
+                    stage_status="running",
+                    stage_detail=f"первый прогон {first_done} / {first_pass_total}",
                 )
-                for pattern in contract.geo_contains_queue(len(first)):
-                    batch = await _search_or_empty(
-                        client,
-                        country_iso=row.country_iso,
-                        number_type=row.number_type,
-                        in_region=region_key,
-                        contains=pattern,
-                    )
-                    tracker.bump_request()
-                    result = ingest_available_batch(
-                        db,
-                        provider_id=provider.id,
-                        job_id=job.id,
-                        country_iso=row.country_iso,
-                        country_name=row.country_name,
-                        number_type=row.number_type,
-                        region_filter=region_key or "",
-                        items=batch,
-                    )
-                    tracker.note_batch(row.country_iso, result)
-                    if item:
-                        item["detail"] = _geo_detail(region_key, pattern, len(batch))
-                    tracker.apply(
-                        current={
-                            "country_iso": row.country_iso,
-                            "in_region": region_key,
-                            "contains": pattern,
-                        },
-                        rows=progress_rows,
-                    )
-            region_count, city_count = refresh_local_counts(
-                db,
-                provider_id=provider.id,
-                country_iso=row.country_iso,
-                number_type=row.number_type,
-            )
             if item:
-                item["status"] = "success"
-                item["detail"] = ""
-                item["region_count"] = region_count
-                item["city_count"] = city_count
+                pending = sum(1 for queued, _key in grid_queue if queued.country_iso == row.country_iso)
+                if pending == 0:
+                    item["status"] = "success"
+                    item["detail"] = ""
+                else:
+                    item["detail"] = f"0 / {pending * 100}"
+                _refresh_row_counts(db, tracker, item, row)
+            tracker.apply(rows=progress_rows, force=True)
+
+        tracker.requests_total = contract.planned_request_total(tracker.requests, len(grid_queue))
+        tracker.apply(
+            rows=progress_rows,
+            force=True,
+            stage_id="geo",
+            stage_status="running",
+            stage_detail=f"сетка 0 / {len(grid_queue) * 100}",
+        )
+
+        remaining_by_iso: dict[str, int] = {}
+        planned_by_iso: dict[str, int] = {}
+        for queued, _key in grid_queue:
+            remaining_by_iso[queued.country_iso] = remaining_by_iso.get(queued.country_iso, 0) + 1
+            planned_by_iso[queued.country_iso] = planned_by_iso.get(queued.country_iso, 0) + 1
+
+        grid_done = 0
+        grid_total = len(grid_queue) * 100
+        for row, region_key in grid_queue:
+            item = _find_row(progress_rows, row.country_iso, row.number_type)
+            if item:
+                item["status"] = "running"
+            patterns = contract.contains_region_patterns()
+            for index, pattern in enumerate(patterns, start=1):
+                batch = await _search_or_empty(
+                    client,
+                    country_iso=row.country_iso,
+                    number_type=row.number_type,
+                    in_region=region_key,
+                    contains=pattern,
+                )
+                tracker.bump_request()
+                grid_done += 1
+                result = ingest_available_batch(
+                    db,
+                    provider_id=provider.id,
+                    job_id=job.id,
+                    country_iso=row.country_iso,
+                    country_name=row.country_name,
+                    number_type=row.number_type,
+                    region_filter=region_key or "",
+                    items=batch,
+                )
+                tracker.note_batch(row.country_iso, row.number_type, result)
+                if item:
+                    item["detail"] = _grid_detail(index, len(patterns), pattern, len(batch))
+                    _refresh_row_counts(db, tracker, item, row)
+                tracker.apply(
+                    current={
+                        "country_iso": row.country_iso,
+                        "in_region": region_key,
+                        "contains": pattern,
+                    },
+                    rows=progress_rows,
+                    stage_id="geo",
+                    stage_status="running",
+                    stage_detail=f"сетка {grid_done} / {grid_total}",
+                )
+            remaining_by_iso[row.country_iso] = remaining_by_iso.get(row.country_iso, 1) - 1
+            if item:
+                left = remaining_by_iso.get(row.country_iso, 0)
+                if left <= 0:
+                    item["status"] = "success"
+                    item["detail"] = ""
+                else:
+                    planned = planned_by_iso.get(row.country_iso, 0) * 100
+                    done_patterns = planned - left * 100
+                    item["detail"] = f"{done_patterns} / {planned}"
+                _refresh_row_counts(db, tracker, item, row)
             tracker.apply(rows=progress_rows, force=True)
 
         for item in progress_rows:
@@ -531,6 +602,7 @@ async def _execute(job_id: uuid.UUID) -> None:
         progress = _ensure_progress(job)
         progress["summary"] = {
             "requests": tracker.requests,
+            "requests_total": tracker.requests_total or tracker.requests,
             "cities_total": totals["cities_total"],
             "numbers_unique": totals["numbers_unique"],
         }
@@ -592,11 +664,28 @@ async def _execute(job_id: uuid.UUID) -> None:
             logger.exception("Failed to close Twilio db session")
 
 
-def _geo_detail(region_key: str | None, contains: str | None, returned: int) -> str:
-    parts: list[str] = []
+def _refresh_row_counts(
+    db: Session,
+    tracker: _Progress,
+    item: dict[str, Any],
+    row: CatalogRow,
+) -> None:
+    region_count, city_count = refresh_local_counts(
+        db,
+        provider_id=tracker.job.provider_id,
+        country_iso=row.country_iso,
+        number_type=row.number_type,
+    )
+    item["region_count"] = region_count
+    item["city_count"] = city_count
+    item["number_count"] = tracker.row_number_count(row.country_iso, row.number_type)
+
+
+def _first_pass_detail(index: int, total: int, region_key: str | None, returned: int) -> str:
     if region_key:
-        parts.append(region_key)
-    if contains:
-        parts.append(contains)
-    parts.append(f"{returned} номеров")
-    return " · ".join(parts)
+        return f"{index} / {total}, {region_key} · {returned} номеров"
+    return f"{index} / {total} · {returned} номеров"
+
+
+def _grid_detail(index: int, total: int, contains: str, returned: int) -> str:
+    return f"{index} / {total}, {contains} · {returned} номеров"

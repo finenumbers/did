@@ -162,6 +162,7 @@ export interface TwilioCoverageRow {
   detail?: string;
   region_count?: number | null;
   city_count?: number | null;
+  number_count?: number | null;
   period_price?: string | number | null;
   price_unit?: string | null;
 }
@@ -197,6 +198,7 @@ export interface TwilioSyncJob {
     stages?: SyncStage[];
     summary?: {
       requests?: number;
+      requests_total?: number | null;
       cities_total?: number;
       numbers_unique?: number;
     };

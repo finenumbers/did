@@ -169,6 +169,7 @@ def test_region_grid_is_exactly_100_patterns():
     assert patterns[-1] == "%99%"
     assert contract.geo_contains_queue(0) == ()
     assert contract.geo_contains_queue(1) == patterns
+    assert contract.planned_request_total(896, 100) == 896 + 100 * 100
 
 
 def test_region_search_keys_nanp_and_other():
@@ -221,3 +222,11 @@ def test_cutover_does_not_delete_number_sync_rows():
     assert contract.NUMBER_SOURCE_GEO in numbers.params.values()
     assert contract.NUMBER_SOURCE_NUMBERS not in numbers.params.values()
     assert "source =" in str(numbers)
+
+
+def test_geo_status_detail_shows_planned_steps():
+    from app.modules.twilio.runner import _first_pass_detail, _grid_detail
+
+    assert _first_pass_detail(12, 51, "AL", 4) == "12 / 51, AL · 4 номеров"
+    assert _first_pass_detail(1, 1, None, 0) == "1 / 1 · 0 номеров"
+    assert _grid_detail(78, 100, "%78%", 4) == "78 / 100, %78% · 4 номеров"

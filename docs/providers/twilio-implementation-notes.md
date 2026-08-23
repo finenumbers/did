@@ -31,13 +31,14 @@ Page button only opens the viewer. `POST /api/v1/twilio/sync` starts the same `S
 
 1. Paginate countries. Build one progress row per live `subresource_uris` type.
 2. Fetch Pricing per ISO sequentially. Missing price stays empty, not 0.
-3. Persist catalog upsert (no wipe yet). Geo search only for `local`:
-   - non-US/CA: one GET without `Contains`; empty → no grid; non-empty → `%00%`…`%99%`.
-   - US/CA: every state/province as `InRegion`, same 1+100 rule. 4xx on a state = empty, job continues.
-4. Upsert `twilio_geo` + `twilio_available_numbers` (`source=geo_sync`) on every response.
+3. Persist catalog upsert (no wipe yet). Geo search only for `local`, in two passes:
+   - First pass: every `local` country and every US/CA state/province **without** `Contains`. Empty cell → no grid later.
+   - After the first pass the job knows the remaining volume (`100` per nonempty cell) and writes `requests / requests_total`.
+   - Second pass: `%00%`…`%99%` only for nonempty cells. Row status uses `78 / 100, %78% · 4 номеров`.
+4. Upsert `twilio_geo` + `twilio_available_numbers` (`source=geo_sync`) on every response. Modal column «Номера» is unique E.164 for that country×type.
 5. Cutover wipe only after success: delete geo and `geo_sync` numbers whose `last_sync_job_id` is not this job. `number_sync` rows stay. Empty countries list → `EmptyTwilioFetchError`, nothing is deleted.
 
-`job.stats.progress.summary` (`requests`, `cities_total`, `numbers_unique`) flushes at most every 2s.
+`job.stats.progress.summary` (`requests`, `requests_total`, `cities_total`, `numbers_unique`) flushes at most every 2s. `requests_total` is set only after the first geo pass.
 
 ## Process caveat
 

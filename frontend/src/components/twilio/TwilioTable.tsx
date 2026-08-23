@@ -71,6 +71,13 @@ function rowStatusText(row: TwilioCoverageRow): string {
   return "";
 }
 
+function requestsText(summary: TwilioSyncJob["progress"]["summary"] | undefined): string {
+  const done = summary?.requests ?? 0;
+  const total = summary?.requests_total;
+  if (total == null) return formatCount(done);
+  return `${formatCount(done)} / ${formatCount(total)}`;
+}
+
 export function TwilioTable() {
   const [filters, setFilters] = useState<ColumnFilters>({});
   const [searchInput, setSearchInput] = useState("");
@@ -368,7 +375,7 @@ export function TwilioTable() {
               <div>Статус: {jobStatusLabel(job)}</div>
               <div>Начало: {formatWhen(job?.started_at)}</div>
               <div>Окончание: {formatWhen(job?.finished_at)}</div>
-              <div>Запросы: {formatCount(summary?.requests ?? 0)}</div>
+              <div>Запросы: {requestsText(summary)}</div>
               <div>Города: {formatCount(summary?.cities_total ?? 0)}</div>
               <div>Уникальные номера: {formatCount(summary?.numbers_unique ?? 0)}</div>
               <div>Последний успешный cutover: {formatWhen(job?.last_success_at)}</div>
@@ -387,6 +394,7 @@ export function TwilioTable() {
                     <th>Тип</th>
                     <th>Регионы</th>
                     <th>Города</th>
+                    <th>Номера</th>
                     <th>Абонплата</th>
                     <th>Статус</th>
                   </tr>
@@ -398,6 +406,7 @@ export function TwilioTable() {
                       <td>{row.number_type || "—"}</td>
                       <td>{countText(row.region_count, row.number_type)}</td>
                       <td>{countText(row.city_count, row.number_type)}</td>
+                      <td>{countText(row.number_count, row.number_type)}</td>
                       <td>
                         {row.period_price != null && row.period_price !== ""
                           ? `${formatDecimal(String(row.period_price))} ${row.price_unit || ""}`.trim()

@@ -92,6 +92,10 @@ def geo_contains_queue(first_batch_count: int) -> tuple[str, ...]:
     return contains_region_patterns()
 
 
+def planned_request_total(done: int, nonempty_cells: int) -> int:
+    return int(done) + len(contains_region_patterns()) * int(nonempty_cells)
+
+
 def available_search_params(
     *,
     country_iso: str,
