@@ -15,12 +15,14 @@ from app.modules.didww import (
     get_latest_didww_job,
     spawn_didww_job,
 )
+from app.providers.didww import contract as didww_contract
 from app.providers.didww.client import DidwwClient
-from app.providers.didww.parser import collection_items
-from app.providers.errors import ProviderError
+from app.providers.didww.parser import collection_items, top_level_meta
+from app.providers.errors import ProviderAuthError, ProviderError
 from app.schemas.common import Page
 from app.schemas.didww import (
     DidwwAvailableDidOut,
+    DidwwAvailableDidsResponse,
     DidwwFacetResponse,
     DidwwGroupItem,
     DidwwSyncJobOut,
@@ -174,18 +176,25 @@ def latest_sync(db: Session = Depends(get_db)) -> DidwwSyncJobOut | None:
 
 @router.get(
     "/available-dids",
-    response_model=list[DidwwAvailableDidOut],
+    response_model=DidwwAvailableDidsResponse,
     summary="On-demand DIDWW available DIDs (never persisted)",
     description=(
         "Live read-only passthrough to GET /v3/available_dids. Results are not stored: "
-        "the endpoint is optional per account, unpaginated and returns numbers in random order."
+        "the endpoint is optional per account, unpaginated and returns numbers in random "
+        "order, so at least one filter is required and the response is capped by `limit`."
     ),
 )
 async def available_dids(
     did_group_id: str | None = Query(None),
-    number_contains: str | None = Query(None),
+    number_contains: str | None = Query(None, min_length=2),
+    limit: int = Query(200, ge=1, le=1000),
     db: Session = Depends(get_db),
-) -> list[DidwwAvailableDidOut]:
+) -> DidwwAvailableDidsResponse:
+    if not did_group_id and not number_contains:
+        raise HTTPException(
+            status_code=400,
+            detail="Укажите did_group_id или number_contains: эндпоинт не поддерживает пагинацию",
+        )
     provider = get_didww_provider(db)
     try:
         client = DidwwClient(didww_connection_config(provider))
@@ -196,19 +205,37 @@ async def available_dids(
             did_group_id=did_group_id,
             number_contains=number_contains,
         )
+    except ProviderAuthError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                f"{exc}. Эндпоинт /v3/available_dids по умолчанию отключён — "
+                "его включает поддержка DIDWW."
+            ),
+        ) from exc
     except ProviderError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     finally:
         await client.aclose()
-    out: list[DidwwAvailableDidOut] = []
-    for item in collection_items(payload):
+    rows = collection_items(payload)
+    items: list[DidwwAvailableDidOut] = []
+    for item in rows[:limit]:
         attrs = item.get("attributes") or {}
-        group = ((item.get("relationships") or {}).get("did_group") or {}).get("data") or {}
-        out.append(
+        group = ((item.get("relationships") or {}).get(didww_contract.REL_DID_GROUP) or {}).get(
+            "data"
+        ) or {}
+        items.append(
             DidwwAvailableDidOut(
                 id=str(item.get("id") or ""),
-                number=attrs.get("number"),
+                number=attrs.get(didww_contract.ATTR_NUMBER),
                 did_group_id=str(group.get("id")) if group.get("id") else None,
             )
         )
-    return out
+    meta = top_level_meta(payload)
+    return DidwwAvailableDidsResponse(
+        items=items,
+        returned=len(items),
+        total_count=meta.get(didww_contract.META_TOTAL_COUNT),
+        available_count=meta.get(didww_contract.META_AVAILABLE_COUNT),
+        truncated=len(rows) > limit,
+    )

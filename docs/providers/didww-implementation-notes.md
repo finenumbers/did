@@ -50,15 +50,38 @@ an empty or failing API response, and nothing is ever seeded from documentation 
 
 ## Pagination
 
-- `/countries` is requested unpaginated (vendor disables pagination there).
-- `/cities` uses page size 1000, other collections 100, following `links.next` with a
-  safety cap on page count.
+- `/countries` and `/regions` are requested unpaginated (vendor disables pagination there).
+- `/cities` uses page size 1000, `/did_groups` and `/did_group_types` use 100.
+- DIDWW returns only `links.first` / `links.last`, so `iter_collection` pages by
+  `meta.total_records` and falls back to «stop on the first partial page» when meta is
+  missing; `MAX_PAGE_NUMBER` is the safety cap.
+- A short walk that contradicts `meta.total_records` raises `DIDWW_SLICE_INCOMPLETE`, so the
+  job fails instead of writing a truncated catalog.
+- If an unpaginated endpoint ever answers with fewer rows than its own `meta.total_records`,
+  the client restarts that collection with explicit `page[size] = 100` instead of accepting
+  a truncated dictionary.
+- Each paginated collection sends a documented `sort` (`prefix` for `did_groups`, `name`
+  elsewhere) to keep page contents stable; rows are also de-duplicated by `(type, id)`.
+- The `cities` and `groups` stages report paging progress into the stage `detail` (throttled
+  to one update per two seconds), and an asyncio keepalive pings the advisory-lock
+  connection every 30 s so a multi-minute fetch cannot lose the lock.
+
+## Price formatting
+
+`setup_price` / `monthly_price` are fractions of a unit (`"0.3"`), stored as
+`numeric(18,4)`. `format_didww_price` (backend) and `formatDecimal` (frontend) keep the
+decimals and only drop trailing zeros; facets group by the exact amount and price filters
+compare exact decimals. The RU integer `formatPrice` / `_format_price_value` must not be
+used for DIDWW columns — it renders every price as 0 or 1.
 
 ## available_dids
 
-Exposed only as `GET /api/v1/didww/available-dids` (live passthrough, optional filters
-`did_group_id`, `number_contains`). Never stored, never called from the batch sync.
-A number-picker UI on top of it is a later phase.
+Exposed only as `GET /api/v1/didww/available-dids` (live passthrough). The endpoint has no
+pagination, is disabled by default on the account and can match hundreds of thousands of
+numbers, so the route requires `did_group_id` or `number_contains`, caps the response with
+`limit` (default 200) and returns `meta.total_count` / `meta.available_count` alongside the
+items. Never stored, never called from the batch sync. A number-picker UI on top of it is a
+later phase.
 
 ## Live TODOs
 

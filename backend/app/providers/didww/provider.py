@@ -50,6 +50,7 @@ class DidwwProvider(AbstractProvider):
                 "supported": True,
                 "source": "documentation_verified",
                 "action": "GET /v3/countries",
+                "doc_refs": [contract.DOC_REFS["countries"]],
             },
         }
 
@@ -66,7 +67,15 @@ class DidwwProvider(AbstractProvider):
         )
 
     async def test_connection(self, connection: ConnectionConfig) -> DiagnosticsResult:
-        client = DidwwClient(connection)
+        try:
+            client = DidwwClient(connection)
+        except ProviderError as exc:
+            return DiagnosticsResult(
+                ok=False,
+                message=str(exc),
+                checked_at=datetime.now(timezone.utc),
+                details=exc.details,
+            )
         try:
             items = await client.list_countries()
         except ProviderError as exc:

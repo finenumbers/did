@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -12,11 +13,15 @@ from sqlalchemy.types import String
 from app.models.didww import DidwwCatalog
 from app.schemas.common import Page
 from app.schemas.didww import DidwwFacetItem, DidwwFacetResponse, DidwwGroupItem
-from app.services.numbers_service import EMPTY_TOKEN, _format_price_value, _parse_price_token
+from app.services.numbers_service import EMPTY_TOKEN, _parse_price_token
 from app.services.xlsx_style import StyledSheetWriter, open_styled_workbook
 
 BOOL_TRUE = "да"
 BOOL_FALSE = "нет"
+
+# DIDWW SKU prices are fractions of a dollar ("0.0", "0.3", "0.8"), so the integer
+# ruble formatting used by the RU catalog would collapse them all to 0 or 1.
+PRICE_SCALE = 4
 
 DIDWW_XLSX_SHEET = "didww"
 DIDWW_XLSX_HEADERS = [
@@ -42,6 +47,24 @@ def _as_bool_label(value: bool | None) -> str:
     if value is None:
         return ""
     return BOOL_TRUE if value else BOOL_FALSE
+
+
+def format_didww_price(value: Any) -> str:
+    """Keep the stored precision, drop trailing zeros: 0.3000 -> "0.3", 12.0000 -> "12"."""
+    if value is None or value == "":
+        return ""
+    try:
+        amount = Decimal(str(value)).quantize(Decimal(1).scaleb(-PRICE_SCALE))
+    except (InvalidOperation, ValueError, TypeError):
+        return str(value)
+    sign = "-" if amount < 0 else ""
+    whole, _, fraction = format(abs(amount).normalize(), "f").partition(".")
+    groups: list[str] = []
+    while whole:
+        groups.append(whole[-3:])
+        whole = whole[:-3]
+    grouped = " ".join(reversed(groups)) or "0"
+    return sign + (f"{grouped}.{fraction}" if fraction else grouped)
 
 
 class DidwwCatalogService:
@@ -153,7 +176,7 @@ class DidwwCatalogService:
                 col = self.PRICE_COLUMNS[field]
                 nums = [n for n in (_parse_price_token(v) for v in concrete) if n is not None]
                 if nums:
-                    preds.append(func.round(col).in_([int(n) for n in nums]))
+                    preds.append(col.in_(nums))
                 if include_empty:
                     preds.append(col.is_(None))
             elif field in self.BOOL_COLUMNS:
@@ -231,7 +254,8 @@ class DidwwCatalogService:
 
     def _facet_value_expr(self, column: str) -> ColumnElement[Any]:
         if column in self.PRICE_COLUMNS:
-            return func.round(self.PRICE_COLUMNS[column])
+            # Exact stored amount: rounding would merge 0.3 and 0.8 into one bucket.
+            return self.PRICE_COLUMNS[column]
         if column in self.BOOL_COLUMNS:
             col = self.BOOL_COLUMNS[column]
             return case((col.is_(True), BOOL_TRUE), (col.is_(False), BOOL_FALSE), else_=None)
@@ -265,16 +289,17 @@ class DidwwCatalogService:
         )
         if value_q:
             grouped = grouped.where(cast(base.c.facet_value, String).ilike(f"%{value_q}%"))
-        grouped = grouped.order_by(
-            func.count().desc(),
-            cast(base.c.facet_value, String).asc().nulls_last(),
+        numeric_facet = column in self.PRICE_COLUMNS or column in self.INT_COLUMNS
+        tie_break = (
+            base.c.facet_value if numeric_facet else cast(base.c.facet_value, String)
         )
+        grouped = grouped.order_by(func.count().desc(), tie_break.asc().nulls_last())
         rows = self.db.execute(grouped.offset(offset).limit(limit + 1)).all()
         truncated = len(rows) > limit
         items = []
         for value, cnt in rows[:limit]:
             if column in self.PRICE_COLUMNS:
-                label = _format_price_value(value)
+                label = format_didww_price(value)
             else:
                 label = "" if value is None else str(value)
             items.append(DidwwFacetItem(value=label, count=int(cnt)))
@@ -309,8 +334,8 @@ class DidwwCatalogService:
                         row.city_name or "",
                         row.area_prefix or "",
                         row.did_type or "",
-                        _format_price_value(row.buy_price),
-                        _format_price_value(row.period_price),
+                        format_didww_price(row.buy_price),
+                        format_didww_price(row.period_price),
                         row.channels_included if row.channels_included is not None else "",
                         row.stock_count if row.stock_count is not None else "",
                         _as_bool_label(row.number_select),

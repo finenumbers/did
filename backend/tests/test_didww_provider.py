@@ -1,8 +1,10 @@
-"""DIDWW parser / isolation unit tests (no live API)."""
+"""DIDWW parser / pagination / isolation unit tests (no live API)."""
 
 from __future__ import annotations
 
+import asyncio
 from decimal import Decimal
+from typing import Any
 
 import pytest
 
@@ -11,14 +13,18 @@ from app.modules.didww.persist import EmptyDidwwFetchError, persist_didww_covera
 from app.modules.sync_engine.progress import STAGE_DEFS
 from app.modules.sync_engine.unified import PROVIDER_ORDER
 from app.providers.didww import contract
+from app.providers.didww.client import DidwwClient
 from app.providers.didww.parser import (
     SkuRow,
     collection_items,
     included_index,
     parse_did_group,
     pick_display_sku,
+    total_records,
 )
 from app.providers.didww.provider import DidwwProvider
+from app.providers.dto.common import ConnectionConfig
+from app.providers.errors import ProviderError
 from app.providers.registry import get_provider
 
 
@@ -151,6 +157,146 @@ def test_parse_did_group_tolerates_missing_includes_and_meta():
     assert group.skus == []
 
 
+class ScriptedDidwwClient(DidwwClient):
+    """Serves canned JSON:API pages; records the query params of every request."""
+
+    def __init__(self, pages: list[dict[str, Any]]):
+        super().__init__(
+            ConnectionConfig(
+                base_url=contract.EXAMPLE_BASE_URL,
+                auth_settings={contract.AUTH_API_KEY: "test-key"},
+            )
+        )
+        self._pages = list(pages)
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+
+    async def _throttle(self) -> None:  # type: ignore[override]
+        return None
+
+    async def _get(  # type: ignore[override]
+        self,
+        path: str,
+        params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        self.calls.append((path, dict(params or {})))
+        index = len(self.calls) - 1
+        return self._pages[index] if index < len(self._pages) else {"data": []}
+
+
+def _rows(start: int, count: int) -> list[dict[str, Any]]:
+    return [
+        {"id": f"grp-{i}", "type": contract.TYPE_DID_GROUPS, "attributes": {}}
+        for i in range(start, start + count)
+    ]
+
+
+def _page(rows: list[dict[str, Any]], total: int | None) -> dict[str, Any]:
+    """DIDWW never sends links.next — only first/last."""
+    payload: dict[str, Any] = {
+        "data": rows,
+        "links": {
+            "first": "https://api.didww.com/v3/did_groups?page%5Bnumber%5D=1",
+            "last": "https://api.didww.com/v3/did_groups?page%5Bnumber%5D=3",
+        },
+    }
+    if total is not None:
+        payload["meta"] = {"total_records": total, "api_version": contract.API_VERSION}
+    return payload
+
+
+def test_pagination_follows_total_records_without_links_next():
+    client = ScriptedDidwwClient(
+        [_page(_rows(0, 100), 250), _page(_rows(100, 100), 250), _page(_rows(200, 50), 250)]
+    )
+    items, _idx = asyncio.run(client.list_did_groups())
+
+    assert len(items) == 250
+    assert len(client.calls) == 3
+    assert [call[1]["page[number]"] for call in client.calls] == [1, 2, 3]
+    assert client.calls[0][1]["page[size]"] == contract.DID_GROUPS_PAGE_SIZE
+    # Stable server-side order plus the in-stock filter and includes.
+    assert client.calls[0][1]["sort"] == contract.SORT_DID_GROUPS
+    assert client.calls[0][1][contract.FILTER_IN_STOCK] == "true"
+    assert client.calls[0][1]["include"] == contract.DID_GROUPS_INCLUDE
+
+
+def test_pagination_gate_fails_on_short_walk():
+    client = ScriptedDidwwClient([_page(_rows(0, 100), 250), _page(_rows(100, 30), 250)])
+
+    with pytest.raises(ProviderError) as exc:
+        asyncio.run(client.list_did_groups())
+
+    assert exc.value.code == "DIDWW_SLICE_INCOMPLETE"
+    assert exc.value.details["fetched"] == 130
+    assert exc.value.details["total_records"] == 250
+
+
+def test_pagination_stops_on_partial_page_without_meta():
+    client = ScriptedDidwwClient([_page(_rows(0, 1000), None), _page(_rows(1000, 400), None)])
+    items, _idx = asyncio.run(client.list_cities())
+
+    assert len(items) == 1400
+    assert len(client.calls) == 2
+    assert client.calls[0][1]["page[size]"] == contract.CITIES_PAGE_SIZE
+
+
+def test_pagination_deduplicates_repeated_resources():
+    client = ScriptedDidwwClient(
+        [_page(_rows(0, 100), 150), _page(_rows(50, 100), 150), _page(_rows(150, 0), 150)]
+    )
+    items, _idx = asyncio.run(client.list_did_groups())
+
+    assert len(items) == 150
+    assert len({row["id"] for row in items}) == 150
+
+
+def test_unpaginated_collections_skip_page_params():
+    client = ScriptedDidwwClient([{"data": [{"id": "c-1", "type": contract.TYPE_COUNTRIES}]}])
+    asyncio.run(client.list_countries())
+
+    path, params = client.calls[0]
+    assert path == contract.PATH_COUNTRIES
+    assert "page[size]" not in params and "page[number]" not in params
+    assert contract.PATH_COUNTRIES in contract.UNPAGINATED_PATHS
+    assert contract.PATH_REGIONS in contract.UNPAGINATED_PATHS
+
+
+def test_unpaginated_collection_switches_to_paging_when_meta_reports_more():
+    """If a "pagination disabled" endpoint ever truncates, page it instead of truncating."""
+    client = ScriptedDidwwClient(
+        [
+            _page(_rows(0, 50), 120),
+            _page(_rows(0, 100), 120),
+            _page(_rows(100, 20), 120),
+        ]
+    )
+    items, _idx = asyncio.run(client.list_regions())
+
+    assert len(items) == 120
+    assert "page[number]" not in client.calls[0][1]
+    assert client.calls[1][1]["page[size]"] == contract.MAX_PAGE_SIZE
+    assert [call[1].get("page[number]") for call in client.calls] == [None, 1, 2]
+
+
+def test_total_records_reads_both_meta_keys():
+    assert total_records({"meta": {"total_records": 7}}) == 7
+    assert total_records({"meta": {"total_count": 361188}}) == 361188
+    assert total_records({"data": []}) is None
+
+
+def test_available_dids_requires_a_filter():
+    client = ScriptedDidwwClient([{"data": []}])
+
+    with pytest.raises(ProviderError) as exc:
+        asyncio.run(client.list_available_dids())
+    assert exc.value.code == "DIDWW_AVAILABLE_DIDS_FILTER_REQUIRED"
+    assert not client.calls
+
+    asyncio.run(client.list_available_dids(did_group_id="grp-1"))
+    _path, params = client.calls[0]
+    assert params[contract.FILTER_AVAILABLE_DID_GROUP] == "grp-1"
+
+
 def test_empty_fetch_never_wipes_catalog():
     with pytest.raises(EmptyDidwwFetchError):
         persist_didww_coverage(
@@ -168,13 +314,7 @@ def test_empty_fetch_never_wipes_catalog():
 class _RefusingSession:
     """Any write attempt during an empty fetch is a test failure."""
 
-    def query(self, *_args, **_kwargs):
-        return self
-
-    def filter(self, *_args, **_kwargs):
-        return self
-
-    def count(self) -> int:
+    def scalar(self, *_args, **_kwargs) -> int:
         return 7
 
     def execute(self, *_args, **_kwargs):  # pragma: no cover - must not run
@@ -224,7 +364,7 @@ def test_catalog_queries_compile_and_facets_exclude_their_own_column():
     service = DidwwCatalogService(db)
     filters = {
         "country_iso": ["GB", "__empty__"],
-        "buy_price": ["4"],
+        "buy_price": ["0.3"],
         "number_select": ["да"],
         "channels_included": ["0"],
     }
@@ -242,14 +382,27 @@ def test_catalog_queries_compile_and_facets_exclude_their_own_column():
 
     country_facet_sql = db.sql[2]
     assert "didww_catalog.country_iso IN ('GB')" in country_facet_sql
-    assert "round(didww_catalog.buy_price) IN (4)" in country_facet_sql
+    # Exact amount, not round(): DIDWW prices are fractions of a unit.
+    assert "didww_catalog.buy_price IN (0.3)" in country_facet_sql
+    assert "round(" not in country_facet_sql
 
     price_facet_sql = db.sql[3]
-    assert "round(didww_catalog.buy_price) IN (4)" not in price_facet_sql
+    assert "didww_catalog.buy_price IN (0.3)" not in price_facet_sql
     assert "didww_catalog.country_iso IN ('GB')" in price_facet_sql
 
     with pytest.raises(ValueError):
         service.list_facets(column="skus_json", filters={}, q=None)
+
+
+def test_didww_prices_keep_their_decimals():
+    from app.services.didww_service import format_didww_price
+
+    assert format_didww_price(Decimal("0.3000")) == "0.3"
+    assert format_didww_price(Decimal("1.5000")) == "1.5"
+    assert format_didww_price(Decimal("0.0000")) == "0"
+    assert format_didww_price(Decimal("12.0000")) == "12"
+    assert format_didww_price(Decimal("1500.0000")) == "1 500"
+    assert format_didww_price(None) == ""
 
 
 def test_parse_filters_accepts_json_and_rejects_garbage():
@@ -260,6 +413,20 @@ def test_parse_filters_accepts_json_and_rejects_garbage():
     assert DidwwCatalogService.parse_filters('{"country_iso":"GB"}') == {"country_iso": ["GB"]}
     with pytest.raises(ValueError):
         DidwwCatalogService.parse_filters("not-json")
+
+
+def test_failed_sync_marks_the_running_stage():
+    from app.models.sync import SyncJob
+    from app.modules.didww.runner import _fail_current_stage, _progress_template, _set_stage
+
+    job = SyncJob(stats={"progress": _progress_template()})
+    _set_stage(job, "groups", "running", "100 из 250 групп")
+    _fail_current_stage(job, "DIDWW slice incomplete did_groups")
+
+    stages = {s["id"]: s for s in job.stats["progress"]["stages"]}
+    assert stages["groups"]["status"] == "failed"
+    assert stages["groups"]["detail"] == "DIDWW slice incomplete did_groups"
+    assert stages["cutover"]["status"] == "pending"
 
 
 def test_didww_is_registered_but_outside_the_ru_pipeline():

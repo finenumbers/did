@@ -1,4 +1,4 @@
-"""JSON:API helpers + DID Group / SKU mapping. Alias-tolerant (object page vs example JSON)."""
+"""JSON:API helpers + DID Group / SKU mapping for DIDWW API v3."""
 
 from __future__ import annotations
 
@@ -7,15 +7,6 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from app.providers.didww import contract
-
-
-def first_present(mapping: dict[str, Any] | None, keys: tuple[str, ...]) -> Any:
-    if not mapping:
-        return None
-    for key in keys:
-        if key in mapping and mapping[key] is not None:
-            return mapping[key]
-    return None
 
 
 def to_decimal(value: Any) -> Decimal | None:
@@ -79,15 +70,11 @@ def related_one(
 
 def related_many(
     resource: dict[str, Any],
-    rel_names: tuple[str, ...],
+    rel_name: str,
     idx: dict[tuple[str, str], dict[str, Any]],
 ) -> list[dict[str, Any]]:
     rels = resource.get("relationships") or {}
-    data = None
-    for name in rel_names:
-        if name in rels:
-            data = (rels.get(name) or {}).get("data")
-            break
+    data = (rels.get(rel_name) or {}).get("data")
     if data is None:
         return []
     if isinstance(data, dict):
@@ -113,12 +100,28 @@ def collection_items(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return []
 
 
+def top_level_meta(payload: dict[str, Any]) -> dict[str, Any]:
+    meta = payload.get("meta")
+    return meta if isinstance(meta, dict) else {}
+
+
+def total_records(payload: dict[str, Any]) -> int | None:
+    """Collection size reported by DIDWW: `total_records`, or `total_count` on available_dids."""
+    meta = top_level_meta(payload)
+    for key in (contract.META_TOTAL_RECORDS, contract.META_TOTAL_COUNT):
+        if key in meta:
+            value = to_int(meta[key])
+            if value is not None:
+                return value
+    return None
+
+
 @dataclass
 class SkuRow:
     sku_id: str
     setup_price: Decimal | None
     monthly_price: Decimal | None
-    channels_included: int
+    channels_included: int | None
     raw: dict[str, Any] = field(default_factory=dict)
 
 
@@ -150,12 +153,11 @@ class DidGroupRow:
 
 def parse_sku(resource: dict[str, Any]) -> SkuRow:
     attrs = resource.get("attributes") or {}
-    channels = to_int(first_present(attrs, contract.SKU_CHANNELS_KEYS)) or 0
     return SkuRow(
         sku_id=str(resource.get("id") or ""),
-        setup_price=to_decimal(first_present(attrs, contract.SKU_SETUP_KEYS)),
-        monthly_price=to_decimal(first_present(attrs, contract.SKU_MONTHLY_KEYS)),
-        channels_included=channels,
+        setup_price=to_decimal(attrs.get(contract.SKU_SETUP_PRICE)),
+        monthly_price=to_decimal(attrs.get(contract.SKU_MONTHLY_PRICE)),
+        channels_included=to_int(attrs.get(contract.SKU_CHANNELS_INCLUDED)),
         raw=resource,
     )
 
@@ -171,16 +173,16 @@ def pick_display_sku(skus: list[SkuRow]) -> SkuRow | None:
         setup = s.setup_price if s.setup_price is not None else Decimal("Infinity")
         return (monthly, setup)
 
-    return sorted(pool, key=sort_key)[0]
+    return min(pool, key=sort_key)
 
 
 def parse_country(resource: dict[str, Any] | None) -> tuple[str | None, str | None, str | None]:
     if not resource:
         return None, None, None
     attrs = resource.get("attributes") or {}
-    name = attrs.get("name")
-    iso = first_present(attrs, contract.COUNTRY_ISO_KEYS)
-    prefix = attrs.get("prefix")
+    name = attrs.get(contract.ATTR_NAME)
+    iso = attrs.get(contract.ATTR_ISO)
+    prefix = attrs.get(contract.ATTR_PREFIX)
     return (
         str(name) if name is not None else None,
         str(iso) if iso is not None else None,
@@ -193,38 +195,22 @@ def parse_named(resource: dict[str, Any] | None) -> tuple[str | None, str | None
         return None, None
     attrs = resource.get("attributes") or {}
     ident = str(resource.get("id") or "") or None
-    name = attrs.get("name")
+    name = attrs.get(contract.ATTR_NAME)
     return ident, (str(name) if name is not None else None)
 
 
 def parse_did_group(resource: dict[str, Any], idx: dict[tuple[str, str], dict[str, Any]]) -> DidGroupRow:
     attrs = resource.get("attributes") or {}
+    # Meta attributes live on the primary resource only, they never arrive via includes.
     meta = resource.get("meta") or {}
-    features_raw = attrs.get("features") or []
+    features_raw = attrs.get(contract.ATTR_FEATURES) or []
     features = [str(x) for x in features_raw] if isinstance(features_raw, list) else []
 
-    country = related_one(resource, "country", idx)
-    region = related_one(resource, "region", idx)
-    city = related_one(resource, "city", idx)
-    gtype = related_one(resource, "did_group_type", idx)
-    sku_resources = related_many(resource, contract.SKU_REL_KEYS, idx)
-    if not sku_resources:
-        sku_resources = [
-            item
-            for (typ, _iid), item in idx.items()
-            if typ in contract.SKU_INCLUDED_TYPES
-            and str(item.get("id"))
-            in {
-                str(d.get("id"))
-                for d in (
-                    ((resource.get("relationships") or {}).get(rel) or {}).get("data") or []
-                    if isinstance(((resource.get("relationships") or {}).get(rel) or {}).get("data"), list)
-                    else [((resource.get("relationships") or {}).get(rel) or {}).get("data")]
-                    for rel in contract.SKU_REL_KEYS
-                )
-                if isinstance(d, dict)
-            }
-        ]
+    country = related_one(resource, contract.REL_COUNTRY, idx)
+    region = related_one(resource, contract.REL_REGION, idx)
+    city = related_one(resource, contract.REL_CITY, idx)
+    gtype = related_one(resource, contract.REL_DID_GROUP_TYPE, idx)
+    sku_resources = related_many(resource, contract.REL_SKUS, idx)
 
     country_name, country_iso, country_prefix = parse_country(country)
     region_id, region_name = parse_named(region)
@@ -232,24 +218,21 @@ def parse_did_group(resource: dict[str, Any], idx: dict[tuple[str, str], dict[st
     _type_id, did_type = parse_named(gtype)
     skus = [parse_sku(s) for s in sku_resources]
 
-    area_name = first_present(attrs, contract.ATTR_AREA_KEYS)
-    prefix = attrs.get("prefix")
+    area_name = attrs.get(contract.ATTR_AREA_NAME)
+    prefix = attrs.get(contract.ATTR_PREFIX)
+    restrictions = attrs.get(contract.ATTR_SERVICE_RESTRICTIONS)
     return DidGroupRow(
         group_id=str(resource.get("id") or ""),
         area_name=str(area_name) if area_name is not None else None,
         prefix=str(prefix) if prefix is not None else None,
         features=features,
-        is_metered=to_bool(first_present(attrs, contract.ATTR_METERED_KEYS)),
-        allow_additional_channels=to_bool(first_present(attrs, contract.ATTR_CHANNELS_KEYS)),
-        service_restrictions=(
-            str(first_present(attrs, contract.ATTR_RESTRICTIONS_KEYS))
-            if first_present(attrs, contract.ATTR_RESTRICTIONS_KEYS) is not None
-            else None
-        ),
-        is_available=to_bool(first_present(meta, contract.META_AVAILABLE_KEYS)),
-        stock_count=to_int(first_present(meta, contract.META_STOCK_KEYS)),
-        number_select=to_bool(first_present(meta, contract.META_PICKER_KEYS)),
-        needs_registration=to_bool(first_present(meta, contract.META_KYC_KEYS)),
+        is_metered=to_bool(attrs.get(contract.ATTR_IS_METERED)),
+        allow_additional_channels=to_bool(attrs.get(contract.ATTR_ALLOW_ADDITIONAL_CHANNELS)),
+        service_restrictions=str(restrictions) if restrictions is not None else None,
+        is_available=to_bool(meta.get(contract.META_IS_AVAILABLE)),
+        stock_count=to_int(meta.get(contract.META_STOCK_COUNT)),
+        number_select=to_bool(meta.get(contract.META_AVAILABLE_DIDS_ENABLED)),
+        needs_registration=to_bool(meta.get(contract.META_NEEDS_REGISTRATION)),
         country_id=str(country.get("id")) if country else None,
         country_name=country_name,
         country_iso=country_iso,

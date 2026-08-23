@@ -5,7 +5,7 @@ import { ActiveFiltersBar } from "@/components/numbers/ActiveFiltersBar";
 import { ColumnFilterDropdown } from "@/components/numbers/ColumnFilterDropdown";
 import { InfiniteScrollSentinel } from "@/components/table/InfiniteScrollSentinel";
 import { apiDownload, apiFetch } from "@/lib/api/client";
-import { formatCount, formatPrice } from "@/lib/format";
+import { formatCount, formatDecimal } from "@/lib/format";
 import { useInfinitePage } from "@/lib/hooks/useInfinitePage";
 import { encodeFilters } from "@/lib/numbers/filters";
 import type {
@@ -30,8 +30,8 @@ const DIDWW_COLUMNS: Col[] = [
   { key: "city_name", header: "Город", value: (r) => r.city_name },
   { key: "area_prefix", header: "Префикс", value: (r) => r.area_prefix },
   { key: "did_type", header: "Тип", value: (r) => r.did_type },
-  { key: "buy_price", header: "Покупка", value: (r) => formatPrice(r.buy_price) },
-  { key: "period_price", header: "Абонплата", value: (r) => formatPrice(r.period_price) },
+  { key: "buy_price", header: "Покупка", value: (r) => formatDecimal(r.buy_price) },
+  { key: "period_price", header: "Абонплата", value: (r) => formatDecimal(r.period_price) },
   { key: "channels_included", header: "Каналы", value: (r) => r.channels_included },
   { key: "stock_count", header: "В наличии", value: (r) => r.stock_count },
   { key: "number_select", header: "Выбор номера", value: (r) => r.number_select },

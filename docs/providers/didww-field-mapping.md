@@ -40,8 +40,15 @@ All raw tables carry `sync_job_id`, `source_loaded_at`, `payload_hash`, `externa
 | `did_groups.attributes.is_metered` | `is_metered` | Поминутно |
 | all SKUs of the group | `skus_json` | — (detail source) |
 
+`buy_price` / `period_price` are `numeric(18,4)`: DIDWW prices are fractions of a unit
+(`"0.3"`), so they are stored and rendered with decimals, never rounded to whole units.
+
+Display SKU rule: prefer `channels_included_count == 0` (a SKU with the field absent is not
+treated as zero-channel), then the lowest `monthly_price`, then the lowest `setup_price`.
+
 Bookkeeping columns: `raw_source_id` → `didww_did_groups_raw.id`, `last_sync_job_id`,
-`first_seen_at`, `last_seen_at`, `is_currently_present`.
+`first_seen_at` (carried over across syncs for groups already known), `last_seen_at`,
+`is_currently_present`.
 
 ## Not mapped (deliberately)
 

@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import delete
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.models.didww import (
@@ -53,13 +53,26 @@ def persist_didww_coverage(
 ) -> dict[str, int]:
     if not groups:
         previous = (
-            db.query(DidwwCatalog).filter(DidwwCatalog.provider_id == provider_id).count()
+            db.scalar(
+                select(func.count())
+                .select_from(DidwwCatalog)
+                .where(DidwwCatalog.provider_id == provider_id)
+            )
+            or 0
         )
         raise EmptyDidwwFetchError(
             f"DIDWW returned 0 DID Groups; refusing wipe (catalog has {previous} rows)"
         )
 
     loaded = datetime.now(timezone.utc)
+    # Rows are replaced wholesale, so carry first_seen_at over for groups we already knew.
+    first_seen_by_key: dict[str, datetime] = dict(
+        db.execute(
+            select(DidwwCatalog.provider_group_key, DidwwCatalog.first_seen_at).where(
+                DidwwCatalog.provider_id == provider_id
+            )
+        ).all()
+    )
     db.execute(delete(DidwwCatalog).where(DidwwCatalog.provider_id == provider_id))
     db.execute(delete(DidwwDidGroupRaw))
     db.execute(delete(DidwwDidGroupTypeRaw))
@@ -77,7 +90,7 @@ def persist_didww_coverage(
                 payload_hash=payload_hash(item),
                 external_key=str(item.get("id") or "") or None,
                 name=attrs.get("name"),
-                iso=attrs.get("iso") or attrs.get("iso"),
+                iso=attrs.get("iso"),
                 prefix=attrs.get("prefix"),
             )
         )
@@ -179,7 +192,7 @@ def persist_didww_coverage(
                 field_verification=FIELD_VERIFICATION,
                 raw_source_id=raw_id,
                 last_sync_job_id=job_id,
-                first_seen_at=loaded,
+                first_seen_at=first_seen_by_key.get(group.group_id, loaded),
                 last_seen_at=loaded,
                 is_currently_present=True,
             )

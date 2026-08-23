@@ -18,20 +18,37 @@ Allowed (GET only):
 
 | Method | Notes |
 |---|---|
-| `GET /countries` | pagination disabled; no `is_available` filter — full dictionary |
-| `GET /regions?include=country` | paginated |
-| `GET /cities?include=country,region` | page size default and max **1000** VERIFIED |
-| `GET /did_group_types` | paginated |
-| `GET /did_groups?include=country,region,city,did_group_type,stock_keeping_units&filter[is_available]=true` | page size max **100**; follow `links.next` |
-| `GET /balance` | connection probe only (no currency field) |
-| `GET /available_dids` | **on-demand only**, never persisted (see below) |
+| `GET /countries?sort=name` | "Pagination is disabled" VERIFIED — one response holds the whole dictionary. Also the connection probe. |
+| `GET /regions?include=country&sort=name` | "Pagination is disabled" VERIFIED |
+| `GET /cities?include=country,region&sort=name` | page size default and max **1000** VERIFIED |
+| `GET /did_group_types?sort=name` | paginated (default 50, max 100) |
+| `GET /did_groups?include=country,region,city,did_group_type,stock_keeping_units&filter[is_available]=true&sort=prefix` | page size max **100**; page by `meta.total_records` (see Pagination) |
+| `GET /available_dids?filter[did_group.id]=…` | **on-demand only**, never persisted (see below) |
+
+`filter[is_available]` also exists on `/countries` and `/cities`; the sync does not use it
+there because the dictionaries are stored in full.
 
 Never call: reservations, orders, `POST`/`PATCH`/`DELETE` on any resource, `PATCH /dids`.
 
+## Pagination
+
+- Query parameters `page[number]` / `page[size]`; default page size 50, max 100 unless the
+  endpoint overrides it VERIFIED.
+- Real responses expose **only `links.first` and `links.last`** — `links.next` is never
+  returned (verified in the Get DID Groups, Get DID Group Types and Get Areas examples), so
+  paging must not depend on it.
+- Completeness comes from top-level `meta.total_records`: keep requesting pages while
+  `fetched < total_records`; when meta is absent, stop on the first partial page.
+- If the walk ends with `fetched < total_records`, the client raises
+  `DIDWW_SLICE_INCOMPLETE` and the job fails instead of persisting a partial catalog.
+- Every paginated collection is requested with a documented `sort` value so pages do not
+  drift between requests.
+
 ## Rate limits
 
-- 20 rps → HTTP 429 VERIFIED. Client targets ~10 rps (`REQUEST_GAP_SECONDS = 0.12`).
-- Retry on 429/502/503/504 with backoff.
+- 20 rps per API key → HTTP 429 VERIFIED. Client spaces requests by
+  `REQUEST_GAP_SECONDS = 0.12` (~8 rps).
+- Retry on 429/502/503/504 with backoff; on 429 the `Retry-After` header is honoured.
 
 ## Grain
 
@@ -59,14 +76,19 @@ Display SKU rule (OPERATIONAL): prefer `channels_included_count == 0`, otherwise
 lowest `monthly_price`, then the lowest `setup_price`. All SKUs are stored in
 `didww_catalog.skus_json`.
 
-Currency is **not** returned by SKU or `/balance` — the UI shows the raw amount and
-treats it as the DIDWW account currency.
+Currency is **not** returned by the SKU object — the UI shows the raw amount and treats it
+as the DIDWW account currency. Prices are fractions of a unit (`"0.0"`, `"0.3"`, `"0.8"`),
+so they are stored as `numeric(18,4)` and rendered with decimals, never rounded to whole
+units like the RU catalog.
 
 ## available_dids
 
-`GET /available_dids` is optional per account, **has no pagination** and returns numbers in
-random order. Vendor forbids mirroring it into another database, so it is exposed only as a
-live passthrough (`GET /api/v1/didww/available-dids`) and never written to the DB.
+`GET /available_dids` is optional per account (disabled by default), **has no pagination or
+sorting** and returns numbers in random order; the docs report the match size in top-level
+`meta.total_count` / `meta.available_count` (hundreds of thousands account-wide). The vendor
+forbids mirroring it into another database, so it is exposed only as a live passthrough
+(`GET /api/v1/didww/available-dids`) that requires `filter[did_group.id]` and/or
+`filter[number_contains]`, caps the returned list and never writes to the DB.
 
 ## Isolation (OPERATIONAL)
 

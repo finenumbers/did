@@ -66,3 +66,13 @@ class DidwwAvailableDidOut(BaseModel):
     id: str
     number: str | None = None
     did_group_id: str | None = None
+
+
+class DidwwAvailableDidsResponse(BaseModel):
+    """`/available_dids` is unpaginated, so the API caps what it returns and reports meta counts."""
+
+    items: list[DidwwAvailableDidOut] = Field(default_factory=list)
+    returned: int = 0
+    total_count: int | None = None
+    available_count: int | None = None
+    truncated: bool = False

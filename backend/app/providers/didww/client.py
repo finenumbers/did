@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from typing import Any
 from urllib.parse import urljoin
 
@@ -15,6 +16,17 @@ from app.providers.errors import ProviderAuthError, ProviderError, ProviderTrans
 from app.providers.retry import RetryPolicy, TimeoutConfig, request_with_retries
 
 logger = logging.getLogger(__name__)
+
+PageProgress = Callable[[int, int | None], None]
+
+
+def _retry_after_seconds(response: httpx.Response) -> float:
+    raw = (response.headers.get("Retry-After") or "").strip()
+    try:
+        seconds = float(raw)
+    except ValueError:
+        return contract.RATE_LIMIT_FALLBACK_SECONDS
+    return min(max(seconds, 0.0), contract.RATE_LIMIT_MAX_WAIT_SECONDS)
 
 
 class DidwwClient:
@@ -73,11 +85,16 @@ class DidwwClient:
         async def _do() -> httpx.Response:
             return await self._http.get(url, headers=self._headers(), params=params)
 
-        response = await request_with_retries(
-            retry=self.retry,
-            label=f"DIDWW GET {path}",
-            do_request=_do,
-        )
+        label = f"DIDWW GET {path}"
+        response = await request_with_retries(retry=self.retry, label=label, do_request=_do)
+        # 20 rps per API key: respect Retry-After before giving up on a throttled call.
+        for _ in range(contract.RATE_LIMIT_RETRY_ROUNDS):
+            if response.status_code != 429:
+                break
+            delay = _retry_after_seconds(response)
+            logger.warning("%s throttled (429); waiting %.1fs", label, delay)
+            await asyncio.sleep(delay)
+            response = await request_with_retries(retry=self.retry, label=label, do_request=_do)
         if response.status_code in (401, 403):
             raise ProviderAuthError(
                 f"DIDWW auth failed HTTP {response.status_code}",
@@ -106,66 +123,144 @@ class DidwwClient:
         params: dict[str, Any] | None = None,
         page_size: int | None = None,
         paginated: bool = True,
+        label: str | None = None,
+        on_page: PageProgress | None = None,
     ) -> tuple[list[dict[str, Any]], dict[tuple[str, str], dict[str, Any]]]:
+        """Walk a JSON:API collection.
+
+        DIDWW returns only `links.first` / `links.last`, never `links.next`, so paging is
+        driven by `meta.total_records` with a full-page fallback when meta is absent.
+        """
         query = dict(params or {})
         items: list[dict[str, Any]] = []
         idx: dict[tuple[str, str], dict[str, Any]] = {}
+        seen: set[tuple[str, str]] = set()
+        name = label or path.strip("/")
+        size = page_size if (paginated and page_size) else None
+        total: int | None = None
         page = 1
         while True:
             page_query = dict(query)
-            if paginated and page_size:
-                page_query["page[size]"] = page_size
+            if size:
+                page_query["page[size]"] = size
                 page_query["page[number]"] = page
             payload = await self._get(path, page_query)
             batch = parser.collection_items(payload)
-            items.extend(batch)
+            if total is None:
+                total = parser.total_records(payload)
+            added = 0
+            for row in batch:
+                key = (str(row.get("type") or ""), str(row.get("id") or ""))
+                if key in seen:
+                    continue
+                seen.add(key)
+                items.append(row)
+                added += 1
             parser.merge_included(idx, parser.included_index(payload))
-            links = payload.get("links") if isinstance(payload.get("links"), dict) else {}
-            next_link = links.get("next") if paginated else None
-            if not next_link or not batch:
+            if on_page is not None:
+                on_page(len(items), total)
+            if size is None:
+                if total is not None and len(items) < total:
+                    # Vendor documents pagination as disabled here, yet meta reports more
+                    # rows: page explicitly instead of keeping a truncated dictionary.
+                    logger.warning(
+                        "DIDWW %s returned %s of %s rows unpaginated; switching to paging",
+                        name,
+                        len(items),
+                        total,
+                    )
+                    size = contract.MAX_PAGE_SIZE
+                    items.clear()
+                    seen.clear()
+                    idx.clear()
+                    total = None
+                    page = 1
+                    continue
+                break
+            if not batch or not added:
+                break
+            if total is not None and len(items) >= total:
+                break
+            if len(batch) < size:
                 break
             page += 1
-            if page > 20000:
-                raise ProviderError("DIDWW pagination exceeded safety cap")
+            if page > contract.MAX_PAGE_NUMBER:
+                raise ProviderError(
+                    f"DIDWW pagination exceeded safety cap for {name}",
+                    code="DIDWW_PAGINATION_CAP",
+                    details={"path": path, "fetched": len(items), "total_records": total},
+                )
+        if total is not None and len(items) < total:
+            raise ProviderError(
+                f"DIDWW slice incomplete {name}: fetched={len(items)} total_records={total}",
+                code="DIDWW_SLICE_INCOMPLETE",
+                details={
+                    "path": path,
+                    "fetched": len(items),
+                    "total_records": total,
+                    "pages": page,
+                    "page_size": size,
+                },
+            )
         return items, idx
 
     async def list_countries(self) -> list[dict[str, Any]]:
-        items, _idx = await self.iter_collection(contract.PATH_COUNTRIES, paginated=False)
+        # Get Countries: pagination is disabled, the whole list comes in one response.
+        items, _idx = await self.iter_collection(
+            contract.PATH_COUNTRIES,
+            params={"sort": contract.SORT_BY_NAME},
+            paginated=False,
+            label="countries",
+        )
         return items
 
     async def list_regions(self) -> tuple[list[dict[str, Any]], dict[tuple[str, str], dict[str, Any]]]:
+        # Get Regions: pagination is disabled.
         return await self.iter_collection(
             contract.PATH_REGIONS,
-            params={"include": contract.REGIONS_INCLUDE},
-            page_size=contract.REGIONS_PAGE_SIZE,
+            params={"include": contract.REGIONS_INCLUDE, "sort": contract.SORT_BY_NAME},
+            paginated=False,
+            label="regions",
         )
 
-    async def list_cities(self) -> tuple[list[dict[str, Any]], dict[tuple[str, str], dict[str, Any]]]:
+    async def list_cities(
+        self,
+        *,
+        on_page: PageProgress | None = None,
+    ) -> tuple[list[dict[str, Any]], dict[tuple[str, str], dict[str, Any]]]:
         return await self.iter_collection(
             contract.PATH_CITIES,
-            params={"include": contract.CITIES_INCLUDE},
+            params={"include": contract.CITIES_INCLUDE, "sort": contract.SORT_BY_NAME},
             page_size=contract.CITIES_PAGE_SIZE,
+            label="cities",
+            on_page=on_page,
         )
 
     async def list_did_group_types(self) -> list[dict[str, Any]]:
         items, _idx = await self.iter_collection(
             contract.PATH_DID_GROUP_TYPES,
+            params={"sort": contract.SORT_BY_NAME},
             page_size=contract.TYPES_PAGE_SIZE,
+            label="did_group_types",
         )
         return items
 
-    async def list_did_groups(self) -> tuple[list[dict[str, Any]], dict[tuple[str, str], dict[str, Any]]]:
+    async def list_did_groups(
+        self,
+        *,
+        on_page: PageProgress | None = None,
+    ) -> tuple[list[dict[str, Any]], dict[tuple[str, str], dict[str, Any]]]:
         return await self.iter_collection(
             contract.PATH_DID_GROUPS,
             params={
                 "include": contract.DID_GROUPS_INCLUDE,
                 contract.FILTER_IN_STOCK: "true",
+                "sort": contract.SORT_DID_GROUPS,
             },
             page_size=contract.DID_GROUPS_PAGE_SIZE,
+            label="did_groups",
+            on_page=on_page,
         )
-
-    async def get_balance(self) -> dict[str, Any]:
-        return await self._get(contract.PATH_BALANCE)
 
     async def list_available_dids(
         self,
@@ -173,9 +268,15 @@ class DidwwClient:
         did_group_id: str | None = None,
         number_contains: str | None = None,
     ) -> dict[str, Any]:
+        """Live read-only lookup. Pagination and sorting are disabled for this endpoint."""
+        if not did_group_id and not number_contains:
+            raise ProviderError(
+                "DIDWW available_dids requires did_group_id or number_contains",
+                code="DIDWW_AVAILABLE_DIDS_FILTER_REQUIRED",
+            )
         params: dict[str, Any] = {"include": contract.AVAILABLE_DIDS_INCLUDE}
         if did_group_id:
-            params["filter[did_group.id]"] = did_group_id
+            params[contract.FILTER_AVAILABLE_DID_GROUP] = did_group_id
         if number_contains:
-            params["filter[number_contains]"] = number_contains
+            params[contract.FILTER_AVAILABLE_NUMBER] = number_contains
         return await self._get(contract.PATH_AVAILABLE_DIDS, params)

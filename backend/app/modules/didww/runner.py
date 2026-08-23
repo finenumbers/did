@@ -5,11 +5,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import threading
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -27,6 +29,8 @@ from app.providers.errors import ProviderError
 logger = logging.getLogger(__name__)
 
 DIDWW_LOCK_KEY = 88221003
+LOCK_KEEPALIVE_SECONDS = 30
+PROGRESS_THROTTLE_SECONDS = 2.0
 
 STAGES = (
     ("countries", "Страны"),
@@ -79,6 +83,38 @@ def _set_stage(job: SyncJob, stage_id: str, status: str, detail: str = "") -> No
     flag_modified(job, "stats")
 
 
+def _fail_current_stage(job: SyncJob, message: str) -> None:
+    """Mark whichever stage was running as failed so the UI does not show it stuck."""
+    progress = (job.stats or {}).get("progress") or {}
+    stage_id = progress.get("current_stage_id")
+    if stage_id:
+        _set_stage(job, str(stage_id), "failed", message[:500])
+
+
+def _ping_lock_gated(lock_conn: Connection, gate: threading.Lock) -> None:
+    with gate:
+        ping_lock_conn(lock_conn)
+
+
+async def _lock_keepalive(
+    lock_conn: Connection,
+    gate: threading.Lock,
+    stop: asyncio.Event,
+) -> None:
+    """The did_groups stage runs for minutes; keep the lock session from idling out."""
+    while not stop.is_set():
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=LOCK_KEEPALIVE_SECONDS)
+            return
+        except asyncio.TimeoutError:
+            pass
+        try:
+            await asyncio.to_thread(_ping_lock_gated, lock_conn, gate)
+        except Exception:
+            logger.exception("DIDWW lock keepalive failed; lock session may be dead")
+            return
+
+
 def didww_connection_config(provider: Provider) -> ConnectionConfig:
     conn = provider.connection
     if conn is None:
@@ -129,6 +165,7 @@ def get_latest_didww_job(db: Session) -> SyncJob | None:
         select(SyncJob)
         .where(SyncJob.job_type == SyncJobType.didww)
         .order_by(SyncJob.created_at.desc())
+        .limit(1)
     )
 
 
@@ -146,6 +183,9 @@ async def _execute(job_id: uuid.UUID) -> None:
     db = SessionLocal()
     lock_conn = None
     client: DidwwClient | None = None
+    lock_gate = threading.Lock()
+    stop_keepalive = asyncio.Event()
+    keepalive_task: asyncio.Task[None] | None = None
     try:
         lock_conn = lock_engine.connect()
         if not try_advisory_lock_conn(lock_conn, DIDWW_LOCK_KEY):
@@ -176,17 +216,35 @@ async def _execute(job_id: uuid.UUID) -> None:
         job.started_at = _now()
         db.commit()
 
-        ping_lock_conn(lock_conn)
+        _ping_lock_gated(lock_conn, lock_gate)
+        keepalive_task = asyncio.create_task(
+            _lock_keepalive(lock_conn, lock_gate, stop_keepalive),
+            name=f"didww-lock-keepalive-{job_id}",
+        )
         client = DidwwClient(didww_connection_config(provider))
 
         async def stage(stage_id: str, coro, fmt):
             _set_stage(job, stage_id, "running")
             db.commit()
-            ping_lock_conn(lock_conn)
             result = await coro
             _set_stage(job, stage_id, "success", fmt(result))
             db.commit()
             return result
+
+        def page_progress(stage_id: str, unit: str):
+            """Report paging progress into the stage detail, throttled to keep commits sane."""
+            last = [0.0]
+
+            def report(fetched: int, total: int | None) -> None:
+                now = time.monotonic()
+                if now - last[0] < PROGRESS_THROTTLE_SECONDS:
+                    return
+                last[0] = now
+                detail = f"{fetched} из {total} {unit}" if total else f"{fetched} {unit}"
+                _set_stage(job, stage_id, "running", detail)
+                db.commit()
+
+            return report
 
         countries = await stage(
             "countries",
@@ -205,19 +263,19 @@ async def _execute(job_id: uuid.UUID) -> None:
         )
         cities, _cidx = await stage(
             "cities",
-            client.list_cities(),
+            client.list_cities(on_page=page_progress("cities", "городов")),
             lambda pair: f"{len(pair[0])} городов",
         )
         group_resources, idx = await stage(
             "groups",
-            client.list_did_groups(),
+            client.list_did_groups(on_page=page_progress("groups", "групп")),
             lambda pair: f"{len(pair[0])} групп",
         )
         groups = [parse_did_group(item, idx) for item in group_resources if item.get("id")]
 
         _set_stage(job, "cutover", "running")
         db.commit()
-        ping_lock_conn(lock_conn)
+        _ping_lock_gated(lock_conn, lock_gate)
         counts = persist_didww_coverage(
             db,
             provider_id=provider.id,
@@ -250,11 +308,18 @@ async def _execute(job_id: uuid.UUID) -> None:
         db.rollback()
         job = db.get(SyncJob, job_id)
         if job:
+            _fail_current_stage(job, str(exc))
             job.status = SyncJobStatus.failed
             job.error_summary = str(exc)
             job.finished_at = _now()
             db.commit()
     finally:
+        stop_keepalive.set()
+        if keepalive_task is not None:
+            try:
+                await keepalive_task
+            except Exception:
+                logger.exception("DIDWW lock keepalive task failed on shutdown")
         if client is not None:
             try:
                 await client.aclose()
