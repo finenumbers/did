@@ -37,10 +37,13 @@ Never call: reservations, orders, `POST`/`PATCH`/`DELETE` on any resource, `PATC
 - Real responses expose **only `links.first` and `links.last`** — `links.next` is never
   returned (verified in the Get DID Groups, Get DID Group Types and Get Areas examples), so
   paging must not depend on it.
-- Completeness comes from top-level `meta.total_records`: keep requesting pages while
-  `fetched < total_records`; when meta is absent, stop on the first partial page.
+- Completeness comes from top-level `meta.total_records` (re-read on every page) and
+  `links.last` `page[number]`. Keep requesting pages while `fetched < total_records`
+  even if a page is short or all-duplicate. Stop on an empty page, `fetched >= total`,
+  or `page >= last`. When meta is absent, stop on the first partial page.
 - If the walk ends with `fetched < total_records`, the client raises
   `DIDWW_SLICE_INCOMPLETE` and the job fails instead of persisting a partial catalog.
+  A successful walk fully replaces `didww_catalog` (not a delta).
 - Every paginated collection is requested with a documented `sort` value so pages do not
   drift between requests.
 

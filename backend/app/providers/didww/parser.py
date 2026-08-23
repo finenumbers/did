@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 from app.providers.didww import contract
 
@@ -114,6 +115,18 @@ def total_records(payload: dict[str, Any]) -> int | None:
             if value is not None:
                 return value
     return None
+
+
+def last_page_number(payload: dict[str, Any]) -> int | None:
+    """`page[number]` from `links.last` (DIDWW sends first/last, never next)."""
+    links = payload.get("links")
+    if not isinstance(links, dict):
+        return None
+    last = links.get("last")
+    if not isinstance(last, str) or not last.strip():
+        return None
+    raw = (parse_qs(urlparse(last).query).get("page[number]") or [None])[0]
+    return to_int(raw)
 
 
 @dataclass

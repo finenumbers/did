@@ -138,6 +138,7 @@ class DidwwClient:
         name = label or path.strip("/")
         size = page_size if (paginated and page_size) else None
         total: int | None = None
+        last_page: int | None = None
         page = 1
         while True:
             page_query = dict(query)
@@ -146,8 +147,12 @@ class DidwwClient:
                 page_query["page[number]"] = page
             payload = await self._get(path, page_query)
             batch = parser.collection_items(payload)
-            if total is None:
-                total = parser.total_records(payload)
+            page_total = parser.total_records(payload)
+            if page_total is not None:
+                total = page_total
+            page_last = parser.last_page_number(payload)
+            if page_last is not None:
+                last_page = page_last
             added = 0
             for row in batch:
                 key = (str(row.get("type") or ""), str(row.get("id") or ""))
@@ -174,15 +179,22 @@ class DidwwClient:
                     seen.clear()
                     idx.clear()
                     total = None
+                    last_page = None
                     page = 1
                     continue
                 break
-            if not batch or not added:
-                break
-            if total is not None and len(items) >= total:
-                break
-            if len(batch) < size:
-                break
+            if total is not None:
+                if len(items) >= total:
+                    break
+                if not batch:
+                    break
+                if last_page is not None and page >= last_page:
+                    break
+            else:
+                if not batch or not added:
+                    break
+                if len(batch) < size:
+                    break
             page += 1
             if page > contract.MAX_PAGE_NUMBER:
                 raise ProviderError(

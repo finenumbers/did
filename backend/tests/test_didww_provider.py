@@ -18,6 +18,7 @@ from app.providers.didww.parser import (
     SkuRow,
     collection_items,
     included_index,
+    last_page_number,
     parse_did_group,
     pick_display_sku,
     total_records,
@@ -190,13 +191,13 @@ def _rows(start: int, count: int) -> list[dict[str, Any]]:
     ]
 
 
-def _page(rows: list[dict[str, Any]], total: int | None) -> dict[str, Any]:
+def _page(rows: list[dict[str, Any]], total: int | None, *, last: int = 3) -> dict[str, Any]:
     """DIDWW never sends links.next — only first/last."""
     payload: dict[str, Any] = {
         "data": rows,
         "links": {
             "first": "https://api.didww.com/v3/did_groups?page%5Bnumber%5D=1",
-            "last": "https://api.didww.com/v3/did_groups?page%5Bnumber%5D=3",
+            "last": f"https://api.didww.com/v3/did_groups?page%5Bnumber%5D={last}",
         },
     }
     if total is not None:
@@ -221,7 +222,13 @@ def test_pagination_follows_total_records_without_links_next():
 
 
 def test_pagination_gate_fails_on_short_walk():
-    client = ScriptedDidwwClient([_page(_rows(0, 100), 250), _page(_rows(100, 30), 250)])
+    client = ScriptedDidwwClient(
+        [
+            _page(_rows(0, 100), 250, last=3),
+            _page(_rows(100, 30), 250, last=3),
+            {"data": []},
+        ]
+    )
 
     with pytest.raises(ProviderError) as exc:
         asyncio.run(client.list_did_groups())
@@ -229,6 +236,40 @@ def test_pagination_gate_fails_on_short_walk():
     assert exc.value.code == "DIDWW_SLICE_INCOMPLETE"
     assert exc.value.details["fetched"] == 130
     assert exc.value.details["total_records"] == 250
+    assert len(client.calls) == 3
+
+
+def test_pagination_continues_after_short_page_when_total_known():
+    client = ScriptedDidwwClient(
+        [
+            _page(_rows(0, 100), 180, last=3),
+            _page(_rows(100, 30), 180, last=3),
+            _page(_rows(130, 50), 180, last=3),
+        ]
+    )
+    items, _idx = asyncio.run(client.list_did_groups())
+
+    assert len(items) == 180
+    assert [call[1]["page[number]"] for call in client.calls] == [1, 2, 3]
+
+
+def test_pagination_uses_latest_total_records():
+    client = ScriptedDidwwClient(
+        [
+            _page(_rows(0, 100), 180, last=3),
+            _page(_rows(100, 60), 160, last=2),
+        ]
+    )
+    items, _idx = asyncio.run(client.list_did_groups())
+
+    assert len(items) == 160
+    assert len(client.calls) == 2
+
+
+def test_last_page_number_reads_links_last():
+    assert last_page_number({"links": {"last": "https://api.didww.com/v3/did_groups?page%5Bnumber%5D=57&page%5Bsize%5D=100"}}) == 57
+    assert last_page_number({"links": {}}) is None
+    assert last_page_number({}) is None
 
 
 def test_pagination_stops_on_partial_page_without_meta():

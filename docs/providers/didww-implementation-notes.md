@@ -52,11 +52,13 @@ an empty or failing API response, and nothing is ever seeded from documentation 
 
 - `/countries` and `/regions` are requested unpaginated (vendor disables pagination there).
 - `/cities` uses page size 1000, `/did_groups` and `/did_group_types` use 100.
-- DIDWW returns only `links.first` / `links.last`, so `iter_collection` pages by
-  `meta.total_records` and falls back to «stop on the first partial page» when meta is
-  missing; `MAX_PAGE_NUMBER` is the safety cap.
-- A short walk that contradicts `meta.total_records` raises `DIDWW_SLICE_INCOMPLETE`, so the
-  job fails instead of writing a truncated catalog.
+- DIDWW returns only `links.first` / `links.last`, so `iter_collection` pages by the
+  latest `meta.total_records` and `links.last`; it does not stop on a short or
+  all-duplicate page while `fetched < total`. When meta is missing, stop on the first
+  partial page. `MAX_PAGE_NUMBER` is the safety cap.
+- A short walk that still contradicts the latest `meta.total_records` raises
+  `DIDWW_SLICE_INCOMPLETE`, so the job fails instead of writing a truncated catalog.
+  Success replaces the whole catalog.
 - If an unpaginated endpoint ever answers with fewer rows than its own `meta.total_records`,
   the client restarts that collection with explicit `page[size] = 100` instead of accepting
   a truncated dictionary.
