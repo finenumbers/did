@@ -377,6 +377,23 @@ def test_numbers_loaded_requires_matching_geo_job():
     )
 
 
+def test_fill_number_counts_uses_db_totals_not_stage():
+    from app.modules.twilio.persist import fill_number_counts
+
+    rows = [
+        {"country_iso": "gb", "number_type": "mobile", "number_count": 0},
+        {"country_iso": "US", "number_type": "local", "number_count": 3},
+        {"country_iso": "DE", "number_type": "toll_free"},
+    ]
+    fill_number_counts(
+        rows,
+        {("GB", "mobile"): 12, ("US", "local"): 40},
+    )
+    assert rows[0]["number_count"] == 12
+    assert rows[1]["number_count"] == 40
+    assert rows[2]["number_count"] == 0
+
+
 def test_numbers_status_detail_uses_pattern_repeat_cell_and_region():
     from app.modules.twilio.cells import NumberCell
     from app.modules.twilio.numbers_runner import _numbers_detail

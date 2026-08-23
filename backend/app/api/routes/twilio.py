@@ -20,7 +20,13 @@ from app.modules.twilio import (
     spawn_twilio_numbers_job,
     twilio_connection_config,
 )
-from app.modules.twilio.persist import catalog_has_rows, catalog_progress_rows, snapshot_totals
+from app.modules.twilio.persist import (
+    catalog_has_rows,
+    catalog_progress_rows,
+    fill_number_counts,
+    number_counts_by_type,
+    snapshot_totals,
+)
 from app.providers.errors import ProviderAuthError, ProviderError
 from app.providers.twilio import contract as twilio_contract
 from app.providers.twilio.client import TwilioClient
@@ -78,6 +84,16 @@ def _job_out(job: SyncJob, *, last_success_at=None, has_catalog: bool = False) -
         last_success_at=last_success_at,
         has_catalog=has_catalog,
     )
+
+
+def _progress_with_db_counts(progress: dict, db: Session, provider_id) -> dict:
+    rows = [dict(row) for row in (progress.get("rows") or [])]
+    if not rows:
+        return progress
+    out = dict(progress)
+    fill_number_counts(rows, number_counts_by_type(db, provider_id=provider_id))
+    out["rows"] = rows
+    return out
 
 
 @router.get(
@@ -201,7 +217,6 @@ def latest_sync(db: Session = Depends(get_db)) -> TwilioSyncJobOut | None:
         has_catalog=has_catalog,
     )
     if job.status == SyncJobStatus.success:
-        provider = get_twilio_provider(db)
         progress = dict(out.progress or {})
         progress["rows"] = catalog_progress_rows(db, provider_id=provider.id)
         totals = snapshot_totals(db, provider_id=provider.id)
@@ -212,6 +227,8 @@ def latest_sync(db: Session = Depends(get_db)) -> TwilioSyncJobOut | None:
             summary["requests_total"] = summary["requests"]
         progress["summary"] = summary
         out.progress = progress
+    else:
+        out.progress = _progress_with_db_counts(out.progress or {}, db, provider.id)
     return out
 
 
@@ -239,7 +256,9 @@ def latest_numbers_sync(db: Session = Depends(get_db)) -> TwilioSyncJobOut | Non
     has_catalog = catalog_has_rows(db, provider_id=provider.id)
     if job is None:
         return None
-    return _job_out(job, has_catalog=has_catalog)
+    out = _job_out(job, has_catalog=has_catalog)
+    out.progress = _progress_with_db_counts(out.progress or {}, db, provider.id)
+    return out
 
 
 @router.get(

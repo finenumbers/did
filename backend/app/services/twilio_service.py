@@ -181,7 +181,10 @@ class TwilioCatalogService:
                     country_beta=row.country_beta,
                     region_count=row.region_count,
                     city_count=row.city_count,
-                    number_count=counts.get((row.country_iso or "", row.number_type or ""), 0),
+                    number_count=counts.get(
+                        ((row.country_iso or "").strip().upper(), (row.number_type or "").strip()),
+                        0,
+                    ),
                     numbers_synced_at=row.numbers_synced_at,
                     numbers_loaded=loaded,
                 )

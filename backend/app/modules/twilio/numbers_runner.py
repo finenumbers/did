@@ -24,6 +24,7 @@ from app.modules.twilio.persist import (
     ingest_available_batch,
     load_geo_rows,
     mark_numbers_synced,
+    number_count_for_row,
 )
 from app.modules.twilio.runner import (
     TWILIO_LOCK_KEY,
@@ -232,6 +233,12 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
             period_price=catalog.period_price,
             price_unit=catalog.price_unit,
         )
+        row_view["number_count"] = number_count_for_row(
+            db,
+            provider_id=provider.id,
+            country_iso=country_iso,
+            number_type=number_type,
+        )
         tracker.apply(rows=[row_view], force=True, stage_id="numbers", stage_status="running")
 
         def _commit_batch(
@@ -265,7 +272,12 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
                 contains,
                 len(batch),
             )
-            row_view["number_count"] = tracker.row_number_count(country_iso, number_type)
+            row_view["number_count"] = number_count_for_row(
+                db,
+                provider_id=provider.id,
+                country_iso=country_iso,
+                number_type=number_type,
+            )
             tracker.apply(
                 current={
                     "country_iso": country_iso,
@@ -350,7 +362,12 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
         )
         row_view["status"] = "success"
         row_view["detail"] = ""
-        row_view["number_count"] = tracker.row_number_count(country_iso, number_type)
+        row_view["number_count"] = number_count_for_row(
+            db,
+            provider_id=provider.id,
+            country_iso=country_iso,
+            number_type=number_type,
+        )
         tracker.requests_total = tracker.requests
         tracker.apply(
             rows=[row_view],

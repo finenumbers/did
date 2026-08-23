@@ -202,10 +202,10 @@ export function TwilioTable() {
         .then((latest) => {
           if (latest && !ACTIVE_STATUSES.has(latest.status)) {
             setReloadTick((n) => n + 1);
-            void loadCoverage().catch(() => undefined);
           }
         })
         .catch(() => undefined);
+      void loadCoverage().catch(() => undefined);
     }, 2000);
     return () => clearInterval(timer);
   }, [syncActive, loadJob, loadCoverage]);
@@ -217,10 +217,10 @@ export function TwilioTable() {
         .then((latest) => {
           if (latest && !ACTIVE_STATUSES.has(latest.status)) {
             setReloadTick((n) => n + 1);
-            void loadCoverage().catch(() => undefined);
           }
         })
         .catch(() => undefined);
+      void loadCoverage().catch(() => undefined);
     }, 2000);
     return () => clearInterval(timer);
   }, [numbersActive, loadNumbersJob, loadCoverage]);
@@ -326,7 +326,7 @@ export function TwilioTable() {
       ...row,
       status: "running",
       detail: live?.detail || row.detail,
-      number_count: live?.number_count ?? row.number_count,
+      number_count: Math.max(live?.number_count ?? 0, row.number_count ?? 0),
     };
   });
 
@@ -516,7 +516,7 @@ export function TwilioTable() {
                       <td>{row.number_type || "—"}</td>
                       <td>{countText(row.region_count, row.number_type)}</td>
                       <td>{countText(row.city_count, row.number_type)}</td>
-                      <td>{countText(row.number_count, row.number_type)}</td>
+                      <td>{optionalCount(row.number_count)}</td>
                       <td>
                         {row.period_price != null && row.period_price !== ""
                           ? `${formatDecimal(String(row.period_price))} ${row.price_unit || ""}`.trim()

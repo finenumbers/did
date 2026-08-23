@@ -25,7 +25,10 @@ from app.modules.twilio.persist import (
     EmptyTwilioFetchError,
     catalog_progress_rows,
     cutover_geo_snapshot,
+    fill_number_counts,
     ingest_available_batch,
+    number_count_for_row,
+    number_counts_by_type,
     persist_twilio_coverage,
     refresh_local_counts,
     snapshot_totals,
@@ -398,6 +401,7 @@ async def _execute(job_id: uuid.UUID) -> None:
         countries = await client.list_countries(on_page=lambda *_args: tracker.bump_request())
         rows = build_catalog_rows(countries, {})
         progress_rows = [_row_payload(row) for row in rows]
+        fill_number_counts(progress_rows, number_counts_by_type(db, provider_id=provider.id))
         tracker.apply(
             rows=progress_rows,
             force=True,
@@ -423,6 +427,7 @@ async def _execute(job_id: uuid.UUID) -> None:
                 )
         priced_rows = build_catalog_rows(countries, pricing_by_iso)
         progress_rows = [_row_payload(row) for row in priced_rows]
+        fill_number_counts(progress_rows, number_counts_by_type(db, provider_id=provider.id))
         counts = persist_twilio_coverage(
             db,
             provider_id=provider.id,
@@ -676,7 +681,12 @@ def _refresh_row_counts(
     )
     item["region_count"] = region_count
     item["city_count"] = city_count
-    item["number_count"] = tracker.row_number_count(row.country_iso, row.number_type)
+    item["number_count"] = number_count_for_row(
+        db,
+        provider_id=tracker.job.provider_id,
+        country_iso=row.country_iso,
+        number_type=row.number_type,
+    )
 
 
 def _geo_detail(

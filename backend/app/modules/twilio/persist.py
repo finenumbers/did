@@ -371,7 +371,40 @@ def number_counts_by_type(db: Session, *, provider_id: uuid.UUID) -> dict[tuple[
         .where(TwilioAvailableNumber.provider_id == provider_id)
         .group_by(TwilioAvailableNumber.country_iso, TwilioAvailableNumber.number_type)
     ).all()
-    return {(str(iso or ""), str(typ or "")): int(cnt) for iso, typ, cnt in rows}
+    return {
+        (str(iso or "").strip().upper(), str(typ or "").strip()): int(cnt)
+        for iso, typ, cnt in rows
+    }
+
+
+def number_count_for_row(
+    db: Session,
+    *,
+    provider_id: uuid.UUID,
+    country_iso: str,
+    number_type: str,
+) -> int:
+    iso = (country_iso or "").strip().upper()
+    ntype = (number_type or "").strip()
+    return int(
+        db.scalar(
+            select(func.count())
+            .select_from(TwilioAvailableNumber)
+            .where(
+                TwilioAvailableNumber.provider_id == provider_id,
+                TwilioAvailableNumber.country_iso == iso,
+                TwilioAvailableNumber.number_type == ntype,
+            )
+        )
+        or 0
+    )
+
+
+def fill_number_counts(rows: list[dict[str, Any]], counts: dict[tuple[str, str], int]) -> None:
+    for row in rows:
+        iso = str(row.get("country_iso") or "").strip().upper()
+        ntype = str(row.get("number_type") or "").strip()
+        row["number_count"] = counts.get((iso, ntype), 0)
 
 
 def catalog_progress_rows(db: Session, *, provider_id: uuid.UUID) -> list[dict[str, Any]]:
@@ -387,7 +420,10 @@ def catalog_progress_rows(db: Session, *, provider_id: uuid.UUID) -> list[dict[s
     out = []
     for row in rows:
         payload = _catalog_row_payload(row, status="success")
-        payload["number_count"] = counts.get((row.country_iso or "", row.number_type or ""), 0)
+        payload["number_count"] = counts.get(
+            ((row.country_iso or "").strip().upper(), (row.number_type or "").strip()),
+            0,
+        )
         out.append(payload)
     return out
 
