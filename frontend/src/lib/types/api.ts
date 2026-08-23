@@ -117,6 +117,43 @@ export interface SyncRun {
   created_at: string;
 }
 
+/** One DIDWW DID Group (coverage row), not an individual E.164 number. */
+export interface DidwwGroupItem {
+  id: string;
+  provider_group_key: string;
+  country_name: string | null;
+  country_iso: string | null;
+  country_prefix: string | null;
+  region_name: string | null;
+  city_name: string | null;
+  area_prefix: string | null;
+  did_type: string | null;
+  buy_price: string | null;
+  period_price: string | null;
+  channels_included: number | null;
+  stock_count: number | null;
+  number_select: boolean | null;
+  features: string | null;
+  needs_registration: boolean | null;
+  is_metered: boolean | null;
+}
+
+export interface DidwwSyncJob {
+  id: string;
+  status: string;
+  started_at: string | null;
+  finished_at: string | null;
+  error_summary: string | null;
+  triggered_by: string | null;
+  created_at: string;
+  counts: Record<string, number>;
+  progress: {
+    current_stage_id?: string | null;
+    stages?: SyncStage[];
+  };
+  stages: SyncStage[];
+}
+
 export interface RegionCityItem {
   id: string;
   abc: string;

@@ -14,6 +14,7 @@ const links = [
   { href: "/booking", label: "Бронирование" },
   { href: "/masks", label: "Маски и типы" },
   { href: "/regions", label: "Регионы" },
+  { href: "/didww", label: "Нумерация DIDWW" },
   { href: "/settings", label: "Настройки" },
   { href: "/sync-logs", label: "Синхронизация" },
 ];

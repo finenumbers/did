@@ -14,6 +14,7 @@ Internal admin console for loading and analyzing phone number inventory from ind
 - Normalized catalog UI (filters, infinite scroll, XLSX export)
 - Local PSTN INN ranges cache used **only** to fill the **Оператор** column
 - Daily schedule option at 00:00 Europe/Moscow (requires ready min cache)
+- Separate «Нумерация DIDWW» section (`/didww`): international DIDWW coverage by DID Group, synced by its own button outside the RU run
 
 This is **not** a CDR / RADIUS / softswitch platform.
 
@@ -28,6 +29,7 @@ Index: [`docs/providers/README.md`](docs/providers/README.md)
 - Exolve: [`docs/providers/exolve/SOURCE.md`](docs/providers/exolve/SOURCE.md)
 - Voximplant: [`docs/providers/voximplant/SOURCE.md`](docs/providers/voximplant/SOURCE.md)
 - MCN Telecom: [`docs/providers/mcn/SOURCE.md`](docs/providers/mcn/SOURCE.md)
+- DIDWW: [`docs/providers/didww/SOURCE.md`](docs/providers/didww/SOURCE.md)
 - Finenumbers/PSTN: [`docs/providers/finenumbers-contract.md`](docs/providers/finenumbers-contract.md)
 
 **Locked product decisions:** provider APIs are read-only; wipe is per inventory slice (not full catalog purge); sync requires manually loaded min PSTN INN cache (СИПАУТНЭТ, ИНТЕРНОД, Фронтир Нетворк).

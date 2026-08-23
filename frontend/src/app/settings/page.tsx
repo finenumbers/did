@@ -17,7 +17,8 @@ type ProviderCode =
   | "finenumbers"
   | "exolve"
   | "voximplant"
-  | "mcn";
+  | "mcn"
+  | "didww";
 
 type AuroraCsvFile = { url: string; has_status_column: boolean };
 
@@ -69,6 +70,7 @@ const PROVIDERS: { code: ProviderCode; title: string }[] = [
   { code: "exolve", title: "Exolve" },
   { code: "voximplant", title: "Voximplant" },
   { code: "mcn", title: "MCN Telecom" },
+  { code: "didww", title: "DIDWW" },
   { code: "finenumbers", title: "Finenumbers" },
 ];
 
@@ -113,6 +115,7 @@ export default function SettingsPage() {
     exolve: { ...EMPTY_DRAFT },
     voximplant: { ...EMPTY_DRAFT },
     mcn: { ...EMPTY_DRAFT },
+    didww: { ...EMPTY_DRAFT },
     finenumbers: { ...EMPTY_DRAFT },
   });
   const [pageError, setPageError] = useState<string | null>(null);
@@ -159,6 +162,7 @@ export default function SettingsPage() {
       exolve: { ...EMPTY_DRAFT },
       voximplant: { ...EMPTY_DRAFT },
       mcn: { ...EMPTY_DRAFT },
+      didww: { ...EMPTY_DRAFT },
       finenumbers: { ...EMPTY_DRAFT },
     };
     for (const { code } of PROVIDERS) {
@@ -200,7 +204,7 @@ export default function SettingsPage() {
       }
     } else if (code === "sipout") {
       auth_settings = d.apiKey ? { key: d.apiKey } : undefined;
-    } else if (code === "exolve" || code === "mcn") {
+    } else if (code === "exolve" || code === "mcn" || code === "didww") {
       auth_settings = d.apiKey ? { api_key: d.apiKey } : undefined;
     } else if (code === "voximplant") {
       auth_settings = d.credentialsJson
@@ -513,7 +517,9 @@ export default function SettingsPage() {
                               ? "(Management API)"
                               : code === "mcn"
                                 ? "(Витрина)"
-                                : ""}
+                                : code === "didww"
+                                  ? "(API v3)"
+                                  : ""}
                     <input
                       value={d.baseUrl}
                       onChange={(e) => setDraft(code, { baseUrl: e.target.value })}
@@ -531,7 +537,9 @@ export default function SettingsPage() {
                                   ? "https://api.voximplant.com"
                                   : code === "mcn"
                                     ? "https://shop.mcn.ru"
-                                    : undefined
+                                    : code === "didww"
+                                      ? "https://api.didww.com/v3"
+                                      : undefined
                       }
                     />
                   </label>
@@ -647,6 +655,23 @@ export default function SettingsPage() {
                         value={d.credentialsJson}
                         onChange={(e) => setDraft(code, { credentialsJson: e.target.value })}
                         style={{ width: "100%", fontFamily: "monospace", fontSize: "0.85rem" }}
+                      />
+                    </label>
+                  </>
+                ) : code === "didww" ? (
+                  <>
+                    <label>
+                      API-ключ (Api-Key)
+                      <input
+                        type="password"
+                        placeholder={
+                          d.settings?.auth_settings_masked?.api_key
+                            ? `текущее: ${String(d.settings.auth_settings_masked.api_key)}`
+                            : "API-ключ из панели DIDWW"
+                        }
+                        value={d.apiKey}
+                        onChange={(e) => setDraft(code, { apiKey: e.target.value })}
+                        style={{ width: "100%" }}
                       />
                     </label>
                   </>

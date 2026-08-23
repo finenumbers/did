@@ -33,6 +33,14 @@ from app.models.voximplant_raw import (
     VoximplantRegionRaw,
 )
 from app.models.mcn_raw import McnCityRaw, McnFreeNumberRaw, McnRegionRaw
+from app.models.didww import (
+    DidwwCatalog,
+    DidwwCityRaw,
+    DidwwCountryRaw,
+    DidwwDidGroupRaw,
+    DidwwDidGroupTypeRaw,
+    DidwwRegionRaw,
+)
 from app.models.regions_directory import RegionsDirectory
 from app.models.mask_types import MaskType
 
@@ -49,6 +57,12 @@ __all__ = [
     "McnCityRaw",
     "McnFreeNumberRaw",
     "McnRegionRaw",
+    "DidwwCatalog",
+    "DidwwCityRaw",
+    "DidwwCountryRaw",
+    "DidwwDidGroupRaw",
+    "DidwwDidGroupTypeRaw",
+    "DidwwRegionRaw",
     "Base",
     "NumberPriceHistory",
     "NumbersCatalogNormalized",

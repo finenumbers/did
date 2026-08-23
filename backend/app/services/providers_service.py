@@ -117,6 +117,13 @@ class ProvidersService:
                 "(shop.mcn.ru) countries/regions/cities/numbers for RU=643. "
                 "See mcn-contract.md. Checkout/NNP/purchased out of scope."
             )
+        elif code == ProviderCode.didww.value:
+            notice = (
+                "DIDWW: api_key = API key from DIDWW panel (header Api-Key). "
+                "Read-only GET /v3 coverage (countries/regions/cities/did_group_types/did_groups). "
+                "See didww-contract.md. Раздел «Нумерация DIDWW» синхронизируется отдельно "
+                "и не входит в общий прогон РФ."
+            )
         else:
             notice = (
                 "Provider integration is based on uploaded documentation contracts "

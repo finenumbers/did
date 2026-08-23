@@ -1,6 +1,7 @@
 from app.models.enums import ProviderCode
 from app.providers.aurora import AuroraProvider
 from app.providers.base import AbstractProvider
+from app.providers.didww import DidwwProvider
 from app.providers.errors import ProviderError
 from app.providers.exolve import ExolveProvider
 from app.providers.finenumbers import FinenumbersProvider
@@ -19,6 +20,7 @@ PROVIDER_REGISTRY: dict[ProviderCode, type[AbstractProvider]] = {
     ProviderCode.exolve: ExolveProvider,
     ProviderCode.voximplant: VoximplantProvider,
     ProviderCode.mcn: McnProvider,
+    ProviderCode.didww: DidwwProvider,
 }
 
 
