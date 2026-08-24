@@ -1,11 +1,12 @@
-"""Queryable cells for the Twilio number-enrichment stage."""
+"""Queryable cells and stop rules for the Twilio number-enrichment stage."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
-from app.models.twilio import TwilioGeo
 from app.providers.twilio import contract
+from app.providers.twilio.parser import parse_available_number
 
 
 @dataclass(frozen=True)
@@ -19,42 +20,51 @@ class NumberCell:
         return (self.region_filter, (self.locality or "").strip().lower())
 
 
-def is_queryable_geo(row: TwilioGeo) -> bool:
-    locality = (row.locality or "").strip()
-    region_filter = (row.region_filter or "").strip()
-    return bool(locality or region_filter)
-
-
-def cell_from_geo(row: TwilioGeo) -> NumberCell | None:
-    if not is_queryable_geo(row):
-        return None
-    locality = (row.locality or "").strip() or None
-    region_filter = (row.region_filter or "").strip().upper()
-    label = locality or region_filter
-    return NumberCell(region_filter=region_filter, locality=locality, label=label)
-
-
 def country_cell() -> NumberCell:
     return NumberCell(region_filter="", locality=None, label="")
 
 
-def build_number_cells(geo_rows: list[TwilioGeo]) -> list[NumberCell]:
-    cells: list[NumberCell] = []
-    seen: set[tuple[str, str]] = set()
-    for row in geo_rows:
-        cell = cell_from_geo(row)
-        if cell is None or cell.key in seen:
-            continue
-        seen.add(cell.key)
-        cells.append(cell)
-    if not cells:
-        return [country_cell()]
-    return cells
+def enrich_cells(country_iso: str, number_type: str) -> list[NumberCell]:
+    iso = (country_iso or "").strip().upper()
+    ntype = (number_type or "").strip()
+    if iso in contract.NANP_COUNTRIES and ntype == contract.GEO_NUMBER_TYPE:
+        return [
+            NumberCell(region_filter=code, locality=None, label=code)
+            for code in contract.region_search_keys(iso)
+            if code
+        ]
+    return [country_cell()]
 
 
-def should_repeat_contains(
+def should_repeat_pattern(
     returned: int,
-    new_unique: int,
+    no_new_streak: int,
     cap: int = contract.AVAILABLE_PAGE_CEILING,
 ) -> bool:
-    return returned >= cap and new_unique > 0
+    return returned >= cap and no_new_streak < 2
+
+
+def apply_batch_novelty(
+    items: list[dict[str, Any]],
+    known_phones: set[str],
+    known_regions: set[str],
+    known_cities: set[str],
+) -> int:
+    new_facts = 0
+    for item in items:
+        parsed = parse_available_number(item)
+        if parsed is None:
+            continue
+        phone = parsed["phone_number"]
+        if phone and phone not in known_phones:
+            known_phones.add(phone)
+            new_facts += 1
+        region = (parsed["region"] or "").strip()
+        if region and region not in known_regions:
+            known_regions.add(region)
+            new_facts += 1
+        locality = (parsed["locality"] or "").strip()
+        if locality and locality not in known_cities:
+            known_cities.add(locality)
+            new_facts += 1
+    return new_facts

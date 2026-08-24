@@ -15,52 +15,63 @@ Nav: [`twilio/SOURCE.md`](twilio/SOURCE.md) · [`twilio-contract.md`](twilio-con
 | Nav «Номера Twilio» | after DIDWW in `frontend/src/components/layout/AppShell.tsx` |
 | Page | `frontend/src/app/twilio/page.tsx` + `components/twilio/TwilioTable.tsx` |
 | API | `backend/app/api/routes/twilio.py`, prefix `/api/v1/twilio` |
-| Sync | `backend/app/modules/twilio/runner.py` (geo) + `numbers_runner.py` (per-row numbers) |
+| Sync | `backend/app/modules/twilio/runner.py` (countries) + `numbers_runner.py` (enrich) |
 | Persist | `backend/app/modules/twilio/persist.py` |
 
 ## Isolation
 
 - `ProviderCode.twilio` is in `PROVIDER_REGISTRY`, **not** in `PROVIDER_ORDER`.
-- Own stages: `countries` → `pricing` → `geo` → `cutover`.
-- Own lock `TWILIO_LOCK_KEY = 88221004` shared by geo and numbers jobs.
+- Own stages: `countries` → `pricing` → `sample` → `cutover`.
+- Own lock `TWILIO_LOCK_KEY = 88221004` shared by countries and numbers jobs.
 - `get_active_twilio_job` treats `SyncJobType.twilio` and `twilio_numbers` as one busy flag.
+- If a job is `pending`/`running` but the lock is free (process restart), it is marked failed (`прервано, процесс перезапущен`) before a new start.
 - RU catalog sync methods return `SyncLimitation`.
-
-## Sync flow (Загрузка регионов)
-
-Page button only opens the viewer. `POST /api/v1/twilio/sync` starts the same `SyncJobType.twilio` job. Closing the window does not cancel it; reopen reads `GET /sync/latest`.
-
-1. Paginate countries. Build one progress row per live `subresource_uris` type.
-2. Fetch Pricing per ISO sequentially. Missing price stays empty, not 0.
-3. Persist catalog upsert (no wipe yet). Geo search only for `local`, in two passes:
-   - First pass: every `local` country and every US/CA state/province **without** `Contains`. Empty cell → no grid later.
-   - After the first pass the job knows the remaining volume (`100` per nonempty cell) and writes `requests / requests_total`.
-   - Second pass: `%00%`…`%99%` only for nonempty cells. Row status: `сейчас · 78 / 100 · %78% · 4 номеров` or `сейчас · 78 / 100 · AB · %17% · 30 номеров`.
-4. Upsert `twilio_geo` + `twilio_available_numbers` (`source=geo_sync`) on every response. Modal column «Номера» is unique E.164 already stored for that country×type (geo + numbers), not this-job-only.
-5. Cutover wipe only after success: delete geo and `geo_sync` numbers whose `last_sync_job_id` is not this job. `number_sync` rows stay. Empty countries list → `EmptyTwilioFetchError`, nothing is deleted.
-
-`job.stats.progress.summary` (`requests`, `requests_total`, `cities_total`, `numbers_unique`) flushes at most every 2s. `requests_total` is set only after the first geo pass.
-
-## Numbers flow (Загрузка номеров)
-
-Page button only opens the viewer (`GET /coverage`). Start is **per catalog row**: `POST /api/v1/twilio/numbers/sync` `{country_iso, number_type}`. Poll `GET /numbers/sync/latest`. Geo running or another numbers job → 409.
-
-1. `build_number_cells`: queryable geo = nonempty `locality` and/or `region_filter`. Empty list → one country cell (no `InRegion`/`InLocality`), including `local` with numbers but no cities.
-2. Each cell of the selected row first GETs **without** `Contains`. Empty first response → skip `%00%`…`%99%` for that cell. Nonempty → run all 100 patterns. If a patterned response returns `>= 30` and the unique set for that `(cell, Contains)` grew, repeat the same GET.
-3. Write `source=number_sync` into UNLOGGED `twilio_available_numbers_stg` only (no live numbers, no `twilio_geo`). Staging upsert is last-wins on `(provider_id, phone_number)`. Modal column «Номера» during the job is this-run unique, not the live union.
-4. After success: one transaction upserts staging → live (`ON CONFLICT` updates only the same country×type, keeps `first_seen_at`), deletes this country×type whose `last_sync_job_id` is not this job, then sets `numbers_synced_at` / `numbers_sync_job_id` / `numbers_sync_geo_job_id=catalog.last_sync_job_id`. Empty incoming with existing live rows → `EmptyTwilioFetchError`, live unchanged.
-5. A new geo persist clears the three number-sync fields. Green button only when `numbers_sync_geo_job_id == last_sync_job_id`.
-
-Row status: first pass `0 / 1 / 15 / 98 · AB · 4 номеров` (no Contains); grid `78 / 1 / 15 / 98 · AB · %78% · 4 номеров` (pattern / repeat / cell index / cells). Country fallback is `1 / 1` cells.
-
-Do not start a full US `local` run from the agent: thousands of cities × 100+ repeats.
-
-## Process caveat
-
-Jobs run in a `daemon=True` thread. Uvicorn `--reload` kills them on restart. Long US geo- or numbers-sync must run without reload.
 
 ## UI
 
-- Main table: persisted E.164 sample. Caption: not a full list.
-- «Загрузка регионов»: viewer with summary + country×type rows (no «Загрузка» column).
-- «Загрузка номеров»: same table from DB + «Загрузка» column (red / yellow «в процессе» / green + date). Disabled until `twilio_catalog` has rows.
+Page button **«Синхронизация»** only opens the viewer. Closing the window does not cancel a job.
+
+Inside the window: summary, then **«Загрузка стран»**, **«Загрузка номеров»**, **«Стереть данные»**, then the coverage table (Страна | Тип | Регионы | Города | Номера | Абонплата | Загрузка | Статус).
+
+- While a countries job is running, the table is `job.progress.rows`.
+- Otherwise rows come from `GET /coverage` (page_size up to 2000) with a live overlay on the current numbers-job target.
+- «Загрузка» is red until that row is enriched for the current countries snapshot (`numbers_sync_geo_job_id == last_sync_job_id`); green shows the last load date.
+- «Стереть данные» asks for confirm, then `POST /wipe`.
+
+## Загрузка стран (`POST /api/v1/twilio/sync`)
+
+Background `SyncJobType.twilio`. Poll `GET /sync/latest`.
+
+1. Paginate countries. One progress row per live `subresource_uris` type.
+2. Fetch Pricing v1 per ISO. Missing price stays empty, not 0.
+3. One `search_available` per country×type **without** `Contains` / `InRegion` / `InLocality`. Empty → «—». Non-empty → `twilio_geo` + `twilio_available_numbers` (`source=geo_sync`). No `%x%` grid.
+4. Persist catalog + cutover **only after success**: upsert catalog (resets `numbers_sync_*` so all load buttons go red), then delete catalog/geo/**all** numbers whose `last_sync_job_id` is not this job.
+5. Empty countries list → `EmptyTwilioFetchError`, live data unchanged. A failed run does not replace the previous catalog.
+
+NANP region counts: if any `region_filter` is set, count those; otherwise `distinct(region)` so the countries-sample (no `InRegion`) still shows regions.
+
+## Загрузка (row or chain)
+
+`POST /api/v1/twilio/numbers/sync` with `{country_iso, number_type}` or `{}` for every catalog row (including already-green). Same enricher. Poll `GET /numbers/sync/latest`. Busy lock → 409.
+
+Cells:
+
+- US/CA `local`: each state / province (`InRegion`).
+- Everything else: one country cell.
+
+Per cell:
+
+1. First GET **without** `Contains`. Empty → skip the cell (no `%x%`).
+2. If numbers exist → write geo+numbers, then **all** `%00%`…`%99%` without skipping indexes.
+3. Repeat the same `%xx%` while the page has ≥ 30 **and** fewer than two consecutive responses with no new region / city / E.164 (novelty is vs already stored facts for the row).
+4. `< 30` or two empty-of-new loads → next `%x%`, not the end of the grid.
+
+Writes go live via `ingest_available_batch` (`source=number_sync`). The row is marked loaded even if every cell was empty. A row error in the chain marks that row failed and continues; auth / missing catalog fail the job.
+
+## Wipe
+
+`POST /api/v1/twilio/wipe` deletes catalog, geo, numbers, raw countries/pricing. 409 if a job actually holds the lock.
+
+## Process caveat
+
+Jobs run in a `daemon=True` thread. Uvicorn `--reload` or a backend restart kills them; stale recovery unblocks the next start. A full US `local` chain is long (51 probes + up to 100 patterns each). Do not start it from the agent.

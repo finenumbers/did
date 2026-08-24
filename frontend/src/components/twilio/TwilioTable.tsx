@@ -46,13 +46,7 @@ function cellText(value: string | number | boolean | null | undefined): string {
   return String(value);
 }
 
-function countText(value: number | null | undefined, type: string | null | undefined): string {
-  if (type !== "local") return "—";
-  if (value == null || value === 0) return "—";
-  return formatCount(value);
-}
-
-function optionalCount(value: number | null | undefined): string {
+function countText(value: number | null | undefined): string {
   if (value == null || value === 0) return "—";
   return formatCount(value);
 }
@@ -95,6 +89,14 @@ function requestsText(summary: TwilioSyncJob["progress"]["summary"] | undefined)
   return `${formatCount(done)} / ${formatCount(total)}`;
 }
 
+function laterJob(a: TwilioSyncJob | null, b: TwilioSyncJob | null): TwilioSyncJob | null {
+  if (!a) return b;
+  if (!b) return a;
+  const aAt = a.started_at || a.created_at || "";
+  const bAt = b.started_at || b.created_at || "";
+  return aAt >= bAt ? a : b;
+}
+
 export function TwilioTable() {
   const [filters, setFilters] = useState<ColumnFilters>({});
   const [searchInput, setSearchInput] = useState("");
@@ -107,13 +109,14 @@ export function TwilioTable() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
-  const [regionsOpen, setRegionsOpen] = useState(false);
-  const [numbersOpen, setNumbersOpen] = useState(false);
+  const [syncOpen, setSyncOpen] = useState(false);
   const [coverageRowsDb, setCoverageRowsDb] = useState<TwilioCoverageRow[]>([]);
   const [hasCatalog, setHasCatalog] = useState(false);
   const [numbersJob, setNumbersJob] = useState<TwilioSyncJob | null>(null);
   const [numbersError, setNumbersError] = useState<string | null>(null);
   const [startingNumbers, setStartingNumbers] = useState(false);
+  const [wipeConfirm, setWipeConfirm] = useState(false);
+  const [wiping, setWiping] = useState(false);
 
   const sortBy = "country_name";
   const sortDir: "asc" | "desc" = "asc";
@@ -172,7 +175,7 @@ export function TwilioTable() {
 
   const loadCoverage = useCallback(async () => {
     const page = await apiFetch<Page<TwilioCoverageRow>>(
-      "/api/v1/twilio/coverage?page=1&page_size=500&sort_by=country_name&sort_dir=asc",
+      "/api/v1/twilio/coverage?page=1&page_size=2000&sort_by=country_name&sort_dir=asc",
     );
     setCoverageRowsDb(page.items);
     setHasCatalog(page.total > 0);
@@ -194,9 +197,10 @@ export function TwilioTable() {
   const syncActive = Boolean(job && ACTIVE_STATUSES.has(job.status));
   const numbersActive = Boolean(numbersJob && ACTIVE_STATUSES.has(numbersJob.status));
   const twilioBusy = syncActive || numbersActive;
+  const displayJob = syncActive ? job : numbersActive ? numbersJob : laterJob(job, numbersJob);
 
   useEffect(() => {
-    if (!syncActive) return;
+    if (!twilioBusy) return;
     const timer = setInterval(() => {
       void loadJob()
         .then((latest) => {
@@ -205,14 +209,6 @@ export function TwilioTable() {
           }
         })
         .catch(() => undefined);
-      void loadCoverage().catch(() => undefined);
-    }, 2000);
-    return () => clearInterval(timer);
-  }, [syncActive, loadJob, loadCoverage]);
-
-  useEffect(() => {
-    if (!numbersActive) return;
-    const timer = setInterval(() => {
       void loadNumbersJob()
         .then((latest) => {
           if (latest && !ACTIVE_STATUSES.has(latest.status)) {
@@ -223,36 +219,59 @@ export function TwilioTable() {
       void loadCoverage().catch(() => undefined);
     }, 2000);
     return () => clearInterval(timer);
-  }, [numbersActive, loadNumbersJob, loadCoverage]);
+  }, [twilioBusy, loadJob, loadNumbersJob, loadCoverage]);
 
-  const startSync = async () => {
+  const startCountries = async () => {
     setStarting(true);
     setSyncError(null);
+    setWipeConfirm(false);
     try {
       const started = await apiFetch<TwilioSyncJob>("/api/v1/twilio/sync", { method: "POST" });
       setJob(started);
     } catch (e) {
-      setSyncError(e instanceof Error ? e.message : "Не удалось запустить синхронизацию");
+      setSyncError(e instanceof Error ? e.message : "Не удалось запустить загрузку стран");
     } finally {
       setStarting(false);
     }
   };
 
-  const startNumbers = async (row: TwilioCoverageRow) => {
-    if (!row.country_iso || !row.number_type) return;
+  const startNumbers = async (row?: TwilioCoverageRow) => {
     setStartingNumbers(true);
     setNumbersError(null);
+    setWipeConfirm(false);
     try {
       const started = await apiFetch<TwilioSyncJob>("/api/v1/twilio/numbers/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ country_iso: row.country_iso, number_type: row.number_type }),
+        body: JSON.stringify(
+          row?.country_iso && row.number_type
+            ? { country_iso: row.country_iso, number_type: row.number_type }
+            : {},
+        ),
       });
       setNumbersJob(started);
     } catch (e) {
       setNumbersError(e instanceof Error ? e.message : "Не удалось запустить загрузку номеров");
     } finally {
       setStartingNumbers(false);
+    }
+  };
+
+  const wipeData = async () => {
+    setWiping(true);
+    setSyncError(null);
+    try {
+      await apiFetch("/api/v1/twilio/wipe", { method: "POST" });
+      setCoverageRowsDb([]);
+      setHasCatalog(false);
+      setJob(null);
+      setNumbersJob(null);
+      setWipeConfirm(false);
+      setReloadTick((n) => n + 1);
+    } catch (e) {
+      setSyncError(e instanceof Error ? e.message : "Не удалось стереть данные");
+    } finally {
+      setWiping(false);
     }
   };
 
@@ -303,19 +322,11 @@ export function TwilioTable() {
   };
 
   const hasActiveFilters = Object.keys(filters).length > 0 || searchInput.trim().length > 0;
-  const summary = job?.progress?.summary;
-  const coverageRows = job?.progress?.rows ?? [];
-  const numbersSummary = numbersJob?.progress?.summary;
-  const numbersUniqueDb = coverageRowsDb.reduce((sum, row) => sum + (row.number_count ?? 0), 0);
-  const numbersSummaryView = numbersActive
-    ? numbersSummary
-    : {
-        requests: numbersSummary?.requests ?? 0,
-        requests_total: numbersSummary?.requests_total ?? numbersSummary?.requests ?? 0,
-        numbers_unique: numbersUniqueDb,
-      };
+  const summary = displayJob?.progress?.summary;
   const numbersTarget = numbersJob?.progress?.target;
-  const numbersRows = coverageRowsDb.map((row) => {
+  const tableRows = (
+    syncActive ? (job?.progress?.rows ?? []) : coverageRowsDb
+  ).map((row) => {
     const isRunning =
       numbersActive &&
       row.country_iso === numbersTarget?.country_iso &&
@@ -326,7 +337,9 @@ export function TwilioTable() {
       ...row,
       status: "running",
       detail: live?.detail || row.detail,
-      number_count: live?.number_count ?? 0,
+      number_count: live?.number_count ?? row.number_count,
+      region_count: live?.region_count ?? row.region_count,
+      city_count: live?.city_count ?? row.city_count,
     };
   });
 
@@ -347,23 +360,14 @@ export function TwilioTable() {
         <button
           type="button"
           onClick={() => {
-            setRegionsOpen(true);
+            setSyncOpen(true);
+            setWipeConfirm(false);
             void loadJob().catch(() => undefined);
-          }}
-        >
-          Загрузка регионов
-        </button>
-        <button
-          type="button"
-          disabled={!hasCatalog}
-          title={hasCatalog ? undefined : "Сначала выполните «Загрузка регионов»"}
-          onClick={() => {
-            setNumbersOpen(true);
             void loadCoverage().catch(() => undefined);
             void loadNumbersJob().catch(() => undefined);
           }}
         >
-          Загрузка номеров
+          Синхронизация
         </button>
         <button
           type="button"
@@ -386,9 +390,9 @@ export function TwilioTable() {
 
       <div className="notice" role="note">
         Выборка, не полный список. Twilio не отдаёт весь инвентарь — в таблице сохранённые номера
-        последней загрузки регионов и номеров.
+        последней загрузки стран и номеров.
       </div>
-      {syncError && <div className="state error">{syncError}</div>}
+      {syncError && !syncOpen && <div className="state error">{syncError}</div>}
       {exportError && <div className="state error">{exportError}</div>}
 
       <ActiveFiltersBar
@@ -440,7 +444,7 @@ export function TwilioTable() {
         {loading && items.length === 0 && <div className="state">Загрузка…</div>}
         {!loading && !error && items.length === 0 && (
           <div className="state">
-            Нет сохранённых номеров. Откройте «Загрузка регионов» и запустите синхронизацию.
+            Нет сохранённых номеров. Откройте «Синхронизация» и нажмите «Загрузка стран».
           </div>
         )}
         <InfiniteScrollSentinel
@@ -453,11 +457,11 @@ export function TwilioTable() {
         />
       </div>
 
-      {regionsOpen && (
+      {syncOpen && (
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Загрузка регионов Twilio"
+          aria-label="Синхронизация Twilio"
           style={{
             position: "fixed",
             inset: 0,
@@ -468,89 +472,7 @@ export function TwilioTable() {
             justifyContent: "center",
             padding: "1.5rem",
           }}
-          onClick={() => setRegionsOpen(false)}
-        >
-          <div
-            className="panel"
-            style={{ width: "min(1100px, 100%)", maxHeight: "90vh", overflow: "auto" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="filters" style={{ justifyContent: "space-between" }}>
-              <strong>Загрузка регионов</strong>
-              <button type="button" className="secondary" onClick={() => setRegionsOpen(false)}>
-                Закрыть
-              </button>
-            </div>
-            <div className="notice" role="status">
-              <div>Статус: {jobStatusLabel(job)}</div>
-              <div>Начало: {formatWhen(job?.started_at)}</div>
-              <div>Окончание: {formatWhen(job?.finished_at)}</div>
-              <div>Запросы: {requestsText(summary)}</div>
-              <div>Города: {formatCount(summary?.cities_total ?? 0)}</div>
-              <div>Уникальные номера: {formatCount(summary?.numbers_unique ?? 0)}</div>
-              <div>Последний успешный cutover: {formatWhen(job?.last_success_at)}</div>
-              {job?.error_summary && <div>Ошибка: {job.error_summary}</div>}
-            </div>
-            <div className="filters">
-              <button type="button" disabled={starting || twilioBusy} onClick={() => void startSync()}>
-                {syncActive ? "Синхронизация…" : "Синхронизация"}
-              </button>
-            </div>
-            <div className="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Страна</th>
-                    <th>Тип</th>
-                    <th>Регионы</th>
-                    <th>Города</th>
-                    <th>Номера</th>
-                    <th>Абонплата</th>
-                    <th>Статус</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {coverageRows.map((row) => (
-                    <tr key={`${row.country_iso}-${row.number_type}`}>
-                      <td>{row.country_name || row.country_iso || "—"}</td>
-                      <td>{formatTwilioNumberType(row.number_type)}</td>
-                      <td>{countText(row.region_count, row.number_type)}</td>
-                      <td>{countText(row.city_count, row.number_type)}</td>
-                      <td>{optionalCount(row.number_count)}</td>
-                      <td>
-                        {row.period_price != null && row.period_price !== ""
-                          ? `${formatDecimal(String(row.period_price))} ${row.price_unit || ""}`.trim()
-                          : "—"}
-                      </td>
-                      <td>{rowStatusText(row) || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {coverageRows.length === 0 && (
-                <div className="state">Нет строк. Нажмите «Синхронизация», чтобы загрузить страны и типы.</div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {numbersOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Загрузка номеров Twilio"
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.4)",
-            zIndex: 40,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1.5rem",
-          }}
-          onClick={() => setNumbersOpen(false)}
+          onClick={() => setSyncOpen(false)}
         >
           <div
             className="panel"
@@ -558,20 +480,54 @@ export function TwilioTable() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="filters" style={{ justifyContent: "space-between" }}>
-              <strong>Загрузка номеров</strong>
-              <button type="button" className="secondary" onClick={() => setNumbersOpen(false)}>
+              <strong>Синхронизация</strong>
+              <button type="button" className="secondary" onClick={() => setSyncOpen(false)}>
                 Закрыть
               </button>
             </div>
             <div className="notice" role="status">
-              <div>Статус: {jobStatusLabel(numbersJob)}</div>
-              <div>Начало: {formatWhen(numbersJob?.started_at)}</div>
-              <div>Окончание: {formatWhen(numbersJob?.finished_at)}</div>
-              <div>Запросы: {requestsText(numbersSummaryView)}</div>
-              <div>Уникальные номера: {formatCount(numbersSummaryView?.numbers_unique ?? 0)}</div>
-              {numbersJob?.error_summary && <div>Ошибка: {numbersJob.error_summary}</div>}
+              <div>Статус: {jobStatusLabel(displayJob)}</div>
+              <div>Начало: {formatWhen(displayJob?.started_at)}</div>
+              <div>Окончание: {formatWhen(displayJob?.finished_at)}</div>
+              <div>Запросы: {requestsText(summary)}</div>
+              <div>Города: {formatCount(summary?.cities_total ?? 0)}</div>
+              <div>Уникальные номера: {formatCount(summary?.numbers_unique ?? 0)}</div>
+              {displayJob?.error_summary && <div>Ошибка: {displayJob.error_summary}</div>}
             </div>
+            {syncError && <div className="state error">{syncError}</div>}
             {numbersError && <div className="state error">{numbersError}</div>}
+            <div className="filters">
+              <button type="button" disabled={starting || twilioBusy} onClick={() => void startCountries()}>
+                {syncActive ? "Загрузка стран…" : "Загрузка стран"}
+              </button>
+              <button
+                type="button"
+                disabled={startingNumbers || twilioBusy || !hasCatalog}
+                title={hasCatalog ? undefined : "Сначала выполните «Загрузка стран»"}
+                onClick={() => void startNumbers()}
+              >
+                {numbersActive ? "Загрузка номеров…" : "Загрузка номеров"}
+              </button>
+              {wipeConfirm ? (
+                <>
+                  <button type="button" className="secondary" disabled={wiping} onClick={() => setWipeConfirm(false)}>
+                    Отмена
+                  </button>
+                  <button type="button" disabled={wiping || twilioBusy} onClick={() => void wipeData()}>
+                    {wiping ? "Удаление…" : "Подтвердить удаление"}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={wiping || twilioBusy}
+                  onClick={() => setWipeConfirm(true)}
+                >
+                  Стереть данные
+                </button>
+              )}
+            </div>
             <div className="table-scroll">
               <table>
                 <thead>
@@ -587,7 +543,7 @@ export function TwilioTable() {
                   </tr>
                 </thead>
                 <tbody>
-                  {numbersRows.map((row) => {
+                  {tableRows.map((row) => {
                     const isRunning =
                       numbersActive &&
                       row.country_iso === numbersTarget?.country_iso &&
@@ -596,9 +552,9 @@ export function TwilioTable() {
                       <tr key={`${row.country_iso}-${row.number_type}`}>
                         <td>{row.country_name || row.country_iso || "—"}</td>
                         <td>{formatTwilioNumberType(row.number_type)}</td>
-                        <td>{countText(row.region_count, row.number_type)}</td>
-                        <td>{countText(row.city_count, row.number_type)}</td>
-                        <td>{optionalCount(row.number_count)}</td>
+                        <td>{countText(row.region_count)}</td>
+                        <td>{countText(row.city_count)}</td>
+                        <td>{countText(row.number_count)}</td>
                         <td>
                           {row.period_price != null && row.period_price !== ""
                             ? `${formatDecimal(String(row.period_price))} ${row.price_unit || ""}`.trim()
@@ -620,7 +576,7 @@ export function TwilioTable() {
                             <button
                               type="button"
                               className="twilio-load-btn red"
-                              disabled={startingNumbers || twilioBusy}
+                              disabled={startingNumbers || twilioBusy || !hasCatalog}
                               onClick={() => void startNumbers(row)}
                             >
                               Загрузка
@@ -633,8 +589,8 @@ export function TwilioTable() {
                   })}
                 </tbody>
               </table>
-              {numbersRows.length === 0 && (
-                <div className="state">Нет справочника. Сначала выполните «Загрузка регионов».</div>
+              {tableRows.length === 0 && (
+                <div className="state">Нет строк. Нажмите «Загрузка стран», чтобы загрузить справочник.</div>
               )}
             </div>
           </div>

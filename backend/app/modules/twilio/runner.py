@@ -23,7 +23,6 @@ from app.models.sync import SyncJob
 from app.modules.sync_engine.locks import advisory_unlock_conn, ping_lock_conn, try_advisory_lock_conn
 from app.modules.twilio.persist import (
     EmptyTwilioFetchError,
-    catalog_progress_rows,
     cutover_geo_snapshot,
     fill_number_counts,
     ingest_available_batch,
@@ -35,7 +34,6 @@ from app.modules.twilio.persist import (
 )
 from app.providers.dto.common import ConnectionConfig
 from app.providers.errors import ProviderAuthError, ProviderError
-from app.providers.twilio import contract
 from app.providers.twilio.client import TwilioClient
 from app.providers.twilio.parser import CatalogRow, build_catalog_rows
 
@@ -49,9 +47,11 @@ TWILIO_JOB_TYPES = (SyncJobType.twilio, SyncJobType.twilio_numbers)
 STAGES = (
     ("countries", "Страны"),
     ("pricing", "Цены"),
-    ("geo", "Регионы"),
+    ("sample", "Выборка"),
     ("cutover", "Запись каталога"),
 )
+
+STALE_JOB_MESSAGE = "прервано, процесс перезапущен"
 
 
 def _now() -> datetime:
@@ -213,8 +213,48 @@ def get_active_twilio_job(db: Session) -> SyncJob | None:
     )
 
 
+def list_active_twilio_jobs(db: Session) -> list[SyncJob]:
+    return list(
+        db.scalars(
+            select(SyncJob).where(
+                SyncJob.job_type.in_(TWILIO_JOB_TYPES),
+                SyncJob.status.in_((SyncJobStatus.pending, SyncJobStatus.running)),
+            )
+        ).all()
+    )
+
+
+def twilio_lock_is_free() -> bool:
+    lock_conn = lock_engine.connect()
+    try:
+        if not try_advisory_lock_conn(lock_conn, TWILIO_LOCK_KEY):
+            return False
+        advisory_unlock_conn(lock_conn, TWILIO_LOCK_KEY)
+        return True
+    finally:
+        lock_conn.close()
+
+
+def reclaim_stale_twilio_jobs(db: Session, *, lock_free: bool | None = None) -> int:
+    jobs = list_active_twilio_jobs(db)
+    if not jobs:
+        return 0
+    if lock_free is None:
+        lock_free = twilio_lock_is_free()
+    if not lock_free:
+        return 0
+    now = _now()
+    for job in jobs:
+        job.status = SyncJobStatus.failed
+        job.error_summary = STALE_JOB_MESSAGE
+        job.finished_at = now
+    db.commit()
+    return len(jobs)
+
+
 def create_twilio_job(db: Session, *, triggered_by: str = "api") -> SyncJob:
     provider = get_twilio_provider(db)
+    reclaim_stale_twilio_jobs(db)
     if get_active_twilio_job(db):
         raise ProviderError("Синхронизация Twilio уже выполняется")
     job = SyncJob(
@@ -428,14 +468,6 @@ async def _execute(job_id: uuid.UUID) -> None:
         priced_rows = build_catalog_rows(countries, pricing_by_iso)
         progress_rows = [_row_payload(row) for row in priced_rows]
         fill_number_counts(progress_rows, number_counts_by_type(db, provider_id=provider.id))
-        counts = persist_twilio_coverage(
-            db,
-            provider_id=provider.id,
-            job_id=job.id,
-            countries=[c.raw for c in countries],
-            pricing_by_iso=pricing_by_iso,
-            rows=priced_rows,
-        )
         tracker.apply(
             rows=progress_rows,
             force=True,
@@ -444,153 +476,83 @@ async def _execute(job_id: uuid.UUID) -> None:
             stage_detail=f"{len(pricing_by_iso)} прайсов",
         )
 
-        _set_stage(job, "geo", "running")
+        _set_stage(job, "sample", "running")
         db.commit()
-        local_rows = [row for row in priced_rows if row.number_type == contract.GEO_NUMBER_TYPE]
-        first_pass_total = sum(len(contract.region_search_keys(row.country_iso)) for row in local_rows)
-        for row in local_rows:
-            item = _find_row(progress_rows, row.country_iso, row.number_type)
-            if item:
-                keys_n = len(contract.region_search_keys(row.country_iso))
-                item["status"] = "running"
-                item["detail"] = f"0 / {keys_n}"
+        tracker.requests_total = tracker.requests + len(priced_rows)
         tracker.apply(
             rows=progress_rows,
             force=True,
-            stage_id="geo",
+            stage_id="sample",
             stage_status="running",
-            stage_detail=f"первый прогон 0 / {first_pass_total}",
+            stage_detail=f"0 / {len(priced_rows)}",
         )
-
-        grid_queue: list[tuple[Any, str | None]] = []
-        first_done = 0
-        for row in local_rows:
-            item = _find_row(progress_rows, row.country_iso, row.number_type)
-            keys = contract.region_search_keys(row.country_iso)
-            for index, region_key in enumerate(keys, start=1):
-                first = await _search_or_empty(
-                    client,
-                    country_iso=row.country_iso,
-                    number_type=row.number_type,
-                    in_region=region_key,
-                )
-                tracker.bump_request()
-                first_done += 1
-                first_result = ingest_available_batch(
-                    db,
-                    provider_id=provider.id,
-                    job_id=job.id,
-                    country_iso=row.country_iso,
-                    country_name=row.country_name,
-                    number_type=row.number_type,
-                    region_filter=region_key or "",
-                    items=first,
-                )
-                tracker.note_batch(row.country_iso, row.number_type, first_result)
-                if first:
-                    grid_queue.append((row, region_key))
-                if item:
-                    item["status"] = "running"
-                    item["detail"] = _geo_detail(index, len(keys), region_key, None, len(first))
-                    _refresh_row_counts(db, tracker, item, row)
-                tracker.apply(
-                    current={
-                        "country_iso": row.country_iso,
-                        "in_region": region_key,
-                        "contains": None,
-                    },
-                    rows=progress_rows,
-                    stage_id="geo",
-                    stage_status="running",
-                    stage_detail=f"первый прогон {first_done} / {first_pass_total}",
-                )
-            if item:
-                pending = sum(1 for queued, _key in grid_queue if queued.country_iso == row.country_iso)
-                if pending == 0:
-                    item["status"] = "success"
-                    item["detail"] = ""
-                _refresh_row_counts(db, tracker, item, row)
-            tracker.apply(rows=progress_rows, force=True)
-
-        tracker.requests_total = contract.planned_request_total(tracker.requests, len(grid_queue))
-        tracker.apply(
-            rows=progress_rows,
-            force=True,
-            stage_id="geo",
-            stage_status="running",
-            stage_detail=f"сетка 0 / {len(grid_queue) * 100}",
-        )
-
-        remaining_by_iso: dict[str, int] = {}
-        for queued, _key in grid_queue:
-            remaining_by_iso[queued.country_iso] = remaining_by_iso.get(queued.country_iso, 0) + 1
-
-        grid_done = 0
-        grid_total = len(grid_queue) * 100
-        for row, region_key in grid_queue:
+        for index, row in enumerate(priced_rows, start=1):
             item = _find_row(progress_rows, row.country_iso, row.number_type)
             if item:
                 item["status"] = "running"
-            patterns = contract.contains_region_patterns()
-            for index, pattern in enumerate(patterns, start=1):
-                batch = await _search_or_empty(
-                    client,
-                    country_iso=row.country_iso,
-                    number_type=row.number_type,
-                    in_region=region_key,
-                    contains=pattern,
-                )
-                tracker.bump_request()
-                grid_done += 1
-                result = ingest_available_batch(
-                    db,
-                    provider_id=provider.id,
-                    job_id=job.id,
-                    country_iso=row.country_iso,
-                    country_name=row.country_name,
-                    number_type=row.number_type,
-                    region_filter=region_key or "",
-                    items=batch,
-                )
-                tracker.note_batch(row.country_iso, row.number_type, result)
-                if item:
-                    item["detail"] = _geo_detail(index, len(patterns), region_key, pattern, len(batch))
-                    _refresh_row_counts(db, tracker, item, row)
-                tracker.apply(
-                    current={
-                        "country_iso": row.country_iso,
-                        "in_region": region_key,
-                        "contains": pattern,
-                    },
-                    rows=progress_rows,
-                    stage_id="geo",
-                    stage_status="running",
-                    stage_detail=f"сетка {grid_done} / {grid_total}",
-                )
-            remaining_by_iso[row.country_iso] = remaining_by_iso.get(row.country_iso, 1) - 1
+                item["detail"] = "выборка"
+            batch = await _search_or_empty(
+                client,
+                country_iso=row.country_iso,
+                number_type=row.number_type,
+            )
+            tracker.bump_request()
+            result = ingest_available_batch(
+                db,
+                provider_id=provider.id,
+                job_id=job.id,
+                country_iso=row.country_iso,
+                country_name=row.country_name,
+                number_type=row.number_type,
+                region_filter="",
+                items=batch,
+            )
+            tracker.note_batch(row.country_iso, row.number_type, result)
             if item:
-                left = remaining_by_iso.get(row.country_iso, 0)
-                if left <= 0:
-                    item["status"] = "success"
-                    item["detail"] = ""
-                _refresh_row_counts(db, tracker, item, row)
-            tracker.apply(rows=progress_rows, force=True)
-
-        for item in progress_rows:
-            if item.get("number_type") != contract.GEO_NUMBER_TYPE and item.get("status") == "pending":
                 item["status"] = "success"
+                item["detail"] = ""
+                item["number_count"] = tracker.row_number_count(row.country_iso, row.number_type)
+                item["region_count"] = len(result.get("regions") or ())
+                item["city_count"] = len(result.get("cities") or ())
+                if not batch:
+                    item["number_count"] = 0
+            tracker.apply(
+                current={
+                    "country_iso": row.country_iso,
+                    "in_region": None,
+                    "contains": None,
+                },
+                rows=progress_rows,
+                stage_id="sample",
+                stage_status="running",
+                stage_detail=f"{index} / {len(priced_rows)}",
+            )
         tracker.apply(
             rows=progress_rows,
             force=True,
-            stage_id="geo",
+            stage_id="sample",
             stage_status="success",
-            stage_detail=f"{len(local_rows)} стран local",
+            stage_detail=f"{len(priced_rows)} строк",
         )
 
         _set_stage(job, "cutover", "running")
         db.commit()
         _ping_lock_gated(lock_conn, lock_gate)
+        counts = persist_twilio_coverage(
+            db,
+            provider_id=provider.id,
+            job_id=job.id,
+            countries=[c.raw for c in countries],
+            pricing_by_iso=pricing_by_iso,
+            rows=priced_rows,
+        )
         wipe = cutover_geo_snapshot(db, provider_id=provider.id, job_id=job.id)
+        for row in priced_rows:
+            item = _find_row(progress_rows, row.country_iso, row.number_type)
+            if item:
+                _refresh_row_counts(db, tracker, item, row)
+                item["status"] = "success"
+                item["detail"] = ""
         totals = snapshot_totals(db, provider_id=provider.id)
         tracker.phones = set()
         tracker.cities = set()

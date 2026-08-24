@@ -12,10 +12,12 @@ from app.models.sync import SyncJob
 from app.modules.twilio import (
     create_twilio_job,
     create_twilio_numbers_job,
+    get_active_twilio_job,
     get_latest_success_twilio_job,
     get_latest_twilio_job,
     get_latest_twilio_numbers_job,
     get_twilio_provider,
+    reclaim_stale_twilio_jobs,
     spawn_twilio_job,
     spawn_twilio_numbers_job,
     twilio_connection_config,
@@ -27,6 +29,7 @@ from app.modules.twilio.persist import (
     fill_number_counts,
     number_counts_by_type,
     snapshot_totals,
+    wipe_twilio_data,
 )
 from app.providers.errors import ProviderAuthError, ProviderError
 from app.providers.twilio import contract as twilio_contract
@@ -41,6 +44,7 @@ from app.schemas.twilio import (
     TwilioNumbersSyncIn,
     TwilioSyncJobOut,
     TwilioSyncStageOut,
+    TwilioWipeOut,
 )
 from app.services.twilio_service import TwilioCatalogService, TwilioNumbersService
 
@@ -104,7 +108,7 @@ def _progress_with_db_counts(progress: dict, db: Session, provider_id) -> dict:
 )
 def list_coverage(
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=500),
+    page_size: int = Query(50, ge=1, le=2000),
     sort_by: str | None = Query("country_name"),
     sort_dir: str = Query("asc", pattern="^(asc|desc)$"),
     filters: str | None = Query(None),
@@ -233,13 +237,27 @@ def latest_sync(db: Session = Depends(get_db)) -> TwilioSyncJobOut | None:
     return out
 
 
+@router.post("/wipe", response_model=TwilioWipeOut)
+def wipe_twilio(db: Session = Depends(get_db)) -> TwilioWipeOut:
+    reclaim_stale_twilio_jobs(db)
+    if get_active_twilio_job(db):
+        raise HTTPException(status_code=409, detail="Синхронизация Twilio уже выполняется")
+    provider = get_twilio_provider(db)
+    deleted = wipe_twilio_data(db, provider_id=provider.id)
+    return TwilioWipeOut(ok=True, deleted=deleted)
+
+
 @router.post("/numbers/sync", response_model=TwilioSyncJobOut)
-def start_numbers_sync(body: TwilioNumbersSyncIn, db: Session = Depends(get_db)) -> TwilioSyncJobOut:
+def start_numbers_sync(
+    body: TwilioNumbersSyncIn | None = None,
+    db: Session = Depends(get_db),
+) -> TwilioSyncJobOut:
+    payload = body or TwilioNumbersSyncIn()
     try:
         job = create_twilio_numbers_job(
             db,
-            country_iso=body.country_iso,
-            number_type=body.number_type,
+            country_iso=payload.country_iso,
+            number_type=payload.number_type,
             triggered_by="twilio_page",
         )
     except ProviderError as exc:

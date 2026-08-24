@@ -1,4 +1,4 @@
-"""Per-row Twilio number enrichment — isolated from the RU catalog."""
+"""Twilio number enrichment — per row or a chained pass over the catalog."""
 
 from __future__ import annotations
 
@@ -15,17 +15,23 @@ from sqlalchemy.orm.attributes import flag_modified
 from app.core.db import SessionLocal, lock_engine
 from app.models.enums import SyncJobStatus, SyncJobType
 from app.models.sync import SyncJob
+from app.models.twilio import TwilioCatalog
 from app.modules.sync_engine.locks import advisory_unlock_conn, try_advisory_lock_conn
-from app.modules.twilio.cells import NumberCell, build_number_cells, should_repeat_contains
+from app.modules.twilio.cells import (
+    NumberCell,
+    apply_batch_novelty,
+    enrich_cells,
+    should_repeat_pattern,
+)
 from app.modules.twilio.persist import (
-    EmptyTwilioFetchError,
-    begin_numbers_staging,
     catalog_has_rows,
-    cutover_numbers_from_staging,
-    drop_numbers_staging,
     get_catalog_row,
-    ingest_numbers_staging,
-    load_geo_rows,
+    ingest_available_batch,
+    list_catalog_rows,
+    load_row_known,
+    mark_numbers_synced,
+    number_count_for_row,
+    refresh_local_counts,
 )
 from app.modules.twilio.runner import (
     TWILIO_LOCK_KEY,
@@ -36,19 +42,24 @@ from app.modules.twilio.runner import (
     _search_or_empty,
     get_active_twilio_job,
     get_twilio_provider,
+    reclaim_stale_twilio_jobs,
     twilio_connection_config,
 )
-from app.providers.errors import ProviderError
+from app.providers.errors import ProviderAuthError, ProviderError
 from app.providers.twilio import contract
 from app.providers.twilio.client import TwilioClient
 
 logger = logging.getLogger(__name__)
 
 
-def _numbers_progress(country_iso: str, number_type: str) -> dict[str, Any]:
+def _numbers_progress(
+    country_iso: str | None = None,
+    number_type: str | None = None,
+) -> dict[str, Any]:
     return {
         "current_stage_id": "numbers",
         "target": {"country_iso": country_iso, "number_type": number_type},
+        "mode": "all" if not country_iso else "row",
         "stages": [
             {
                 "id": "numbers",
@@ -69,22 +80,26 @@ def _numbers_progress(country_iso: str, number_type: str) -> dict[str, Any]:
 def create_twilio_numbers_job(
     db: Session,
     *,
-    country_iso: str,
-    number_type: str,
+    country_iso: str | None = None,
+    number_type: str | None = None,
     triggered_by: str = "api",
 ) -> SyncJob:
     provider = get_twilio_provider(db)
+    reclaim_stale_twilio_jobs(db)
     if not catalog_has_rows(db, provider_id=provider.id):
-        raise ProviderError("Сначала выполните «Загрузка регионов»")
+        raise ProviderError("Сначала выполните «Загрузка стран»")
     if get_active_twilio_job(db):
         raise ProviderError("Синхронизация Twilio уже выполняется")
-    iso = country_iso.strip().upper()
-    ntype = number_type.strip()
-    if ntype not in contract.SEARCH_TYPE_PATHS:
+    iso = (country_iso or "").strip().upper() or None
+    ntype = (number_type or "").strip() or None
+    if bool(iso) != bool(ntype):
+        raise ProviderError("Укажите и страну, и тип — или оставьте оба поля пустыми")
+    if ntype and ntype not in contract.SEARCH_TYPE_PATHS:
         raise ProviderError(f"Неизвестный тип Twilio: {ntype}")
-    row = get_catalog_row(db, provider_id=provider.id, country_iso=iso, number_type=ntype)
-    if row is None:
-        raise ProviderError("Нет строки покрытия для этой страны и типа")
+    if iso and ntype:
+        row = get_catalog_row(db, provider_id=provider.id, country_iso=iso, number_type=ntype)
+        if row is None:
+            raise ProviderError("Нет строки покрытия для этой страны и типа")
     job = SyncJob(
         provider_id=provider.id,
         job_type=SyncJobType.twilio_numbers,
@@ -164,6 +179,182 @@ def _row_view(
     }
 
 
+async def _enrich_catalog_row(
+    *,
+    client: TwilioClient,
+    db: Session,
+    tracker: _Progress,
+    provider_id: uuid.UUID,
+    job_id: uuid.UUID,
+    catalog: TwilioCatalog,
+) -> dict[str, Any]:
+    country_iso = (catalog.country_iso or "").strip().upper()
+    number_type = (catalog.number_type or "").strip()
+    cells = enrich_cells(country_iso, number_type)
+    known_phones, known_regions, known_cities = load_row_known(
+        db,
+        provider_id=provider_id,
+        country_iso=country_iso,
+        number_type=number_type,
+    )
+    row_view = _row_view(
+        country_iso=country_iso,
+        country_name=catalog.country_name,
+        number_type=number_type,
+        status="running",
+        detail=f"0 / 1 / 1 / {len(cells)}",
+        number_count=number_count_for_row(
+            db, provider_id=provider_id, country_iso=country_iso, number_type=number_type
+        ),
+        region_count=catalog.region_count,
+        city_count=catalog.city_count,
+        period_price=catalog.period_price,
+        price_unit=catalog.price_unit,
+    )
+    progress = (tracker.job.stats or {}).get("progress") or {}
+    progress["target"] = {"country_iso": country_iso, "number_type": number_type}
+    tracker.apply(rows=[row_view], force=True, stage_id="numbers", stage_status="running")
+
+    async def _commit_batch(
+        *,
+        batch: list[dict[str, Any]],
+        cell: NumberCell,
+        cell_index: int,
+        pattern_index: int,
+        repeat: int,
+        contains: str | None,
+    ) -> None:
+        result = ingest_available_batch(
+            db,
+            provider_id=provider_id,
+            job_id=job_id,
+            country_iso=country_iso,
+            country_name=catalog.country_name,
+            number_type=number_type,
+            region_filter=cell.region_filter,
+            items=batch,
+            source=contract.NUMBER_SOURCE_NUMBERS,
+        )
+        tracker.note_batch(country_iso, number_type, result)
+        region_count, city_count = refresh_local_counts(
+            db,
+            provider_id=provider_id,
+            country_iso=country_iso,
+            number_type=number_type,
+        )
+        row_view["status"] = "running"
+        row_view["detail"] = _numbers_detail(
+            pattern_index,
+            repeat,
+            cell_index,
+            len(cells),
+            cell,
+            contains,
+            len(batch),
+        )
+        row_view["region_count"] = region_count
+        row_view["city_count"] = city_count
+        row_view["number_count"] = number_count_for_row(
+            db, provider_id=provider_id, country_iso=country_iso, number_type=number_type
+        )
+        tracker.apply(
+            current={
+                "country_iso": country_iso,
+                "in_region": cell.region_filter or None,
+                "contains": contains,
+            },
+            rows=[row_view],
+            stage_id="numbers",
+            stage_status="running",
+            stage_detail=row_view["detail"],
+        )
+
+    for cell_index, cell in enumerate(cells, start=1):
+        in_region = cell.region_filter or None
+        first = await _search_or_empty(
+            client,
+            country_iso=country_iso,
+            number_type=number_type,
+            in_region=in_region,
+        )
+        tracker.bump_request()
+        apply_batch_novelty(first, known_phones, known_regions, known_cities)
+        await _commit_batch(
+            batch=first,
+            cell=cell,
+            cell_index=cell_index,
+            pattern_index=0,
+            repeat=1,
+            contains=None,
+        )
+        if not first:
+            continue
+        patterns = contract.contains_region_patterns()
+        if tracker.requests_total is None:
+            tracker.requests_total = tracker.requests + len(patterns)
+        else:
+            tracker.requests_total = (tracker.requests_total or 0) + len(patterns)
+        for pattern_index, pattern in enumerate(patterns, start=1):
+            streak = 0
+            repeat = 0
+            while True:
+                repeat += 1
+                batch = await _search_or_empty(
+                    client,
+                    country_iso=country_iso,
+                    number_type=number_type,
+                    in_region=in_region,
+                    contains=pattern,
+                )
+                tracker.bump_request()
+                new_facts = apply_batch_novelty(batch, known_phones, known_regions, known_cities)
+                if new_facts:
+                    streak = 0
+                else:
+                    streak += 1
+                await _commit_batch(
+                    batch=batch,
+                    cell=cell,
+                    cell_index=cell_index,
+                    pattern_index=pattern_index,
+                    repeat=repeat,
+                    contains=pattern,
+                )
+                if not should_repeat_pattern(len(batch), streak):
+                    break
+
+    mark_numbers_synced(
+        db,
+        provider_id=provider_id,
+        country_iso=country_iso,
+        number_type=number_type,
+        job_id=job_id,
+        geo_job_id=catalog.last_sync_job_id,
+    )
+    region_count, city_count = refresh_local_counts(
+        db,
+        provider_id=provider_id,
+        country_iso=country_iso,
+        number_type=number_type,
+    )
+    row_view["status"] = "success"
+    row_view["detail"] = ""
+    row_view["region_count"] = region_count
+    row_view["city_count"] = city_count
+    row_view["number_count"] = number_count_for_row(
+        db, provider_id=provider_id, country_iso=country_iso, number_type=number_type
+    )
+    tracker.apply(
+        rows=[row_view],
+        force=True,
+        stage_id="numbers",
+        stage_status="running",
+        stage_detail=f"{row_view['number_count']} номеров",
+    )
+    db.commit()
+    return row_view
+
+
 async def _execute_numbers(job_id: uuid.UUID) -> None:
     db = SessionLocal()
     lock_conn = None
@@ -187,21 +378,32 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
             return
         progress = (job.stats or {}).get("progress") or {}
         target = progress.get("target") or {}
-        country_iso = str(target.get("country_iso") or "").strip().upper()
-        number_type = str(target.get("number_type") or "").strip()
+        country_iso = str(target.get("country_iso") or "").strip().upper() or None
+        number_type = str(target.get("number_type") or "").strip() or None
         provider = get_twilio_provider(db)
-        catalog = get_catalog_row(
-            db,
-            provider_id=provider.id,
-            country_iso=country_iso,
-            number_type=number_type,
-        )
-        if catalog is None:
-            job.status = SyncJobStatus.failed
-            job.error_summary = "Строка покрытия исчезла"
-            job.finished_at = _now()
-            db.commit()
-            return
+        if country_iso and number_type:
+            rows = []
+            one = get_catalog_row(
+                db,
+                provider_id=provider.id,
+                country_iso=country_iso,
+                number_type=number_type,
+            )
+            if one is None:
+                job.status = SyncJobStatus.failed
+                job.error_summary = "Строка покрытия исчезла"
+                job.finished_at = _now()
+                db.commit()
+                return
+            rows = [one]
+        else:
+            rows = list_catalog_rows(db, provider_id=provider.id)
+            if not rows:
+                job.status = SyncJobStatus.failed
+                job.error_summary = "Сначала выполните «Загрузка стран»"
+                job.finished_at = _now()
+                db.commit()
+                return
 
         job.status = SyncJobStatus.running
         job.started_at = _now()
@@ -214,168 +416,80 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
         )
         client = TwilioClient(twilio_connection_config(provider))
         tracker = _Progress(db, job)
-        geo_rows = load_geo_rows(
-            db,
-            provider_id=provider.id,
-            country_iso=country_iso,
-            number_type=number_type,
-        )
-        cells = build_number_cells(geo_rows)
-        tracker.requests_total = len(cells)
-        row_view = _row_view(
-            country_iso=country_iso,
-            country_name=catalog.country_name,
-            number_type=number_type,
-            status="running",
-            detail=f"0 / 1 / 1 / {len(cells)}",
-            number_count=0,
-            region_count=catalog.region_count,
-            city_count=catalog.city_count,
-            period_price=catalog.period_price,
-            price_unit=catalog.price_unit,
-        )
-        row_view["number_count"] = tracker.row_number_count(country_iso, number_type)
-        tracker.apply(rows=[row_view], force=True, stage_id="numbers", stage_status="running")
-        stg = begin_numbers_staging(db)
+        row_errors = 0
+        last_view: dict[str, Any] | None = None
+        for catalog in rows:
+            catalog = db.merge(catalog)
+            try:
+                last_view = await _enrich_catalog_row(
+                    client=client,
+                    db=db,
+                    tracker=tracker,
+                    provider_id=provider.id,
+                    job_id=job.id,
+                    catalog=catalog,
+                )
+            except ProviderAuthError:
+                raise
+            except Exception as exc:
+                logger.exception(
+                    "Twilio numbers row failed %s %s",
+                    catalog.country_iso,
+                    catalog.number_type,
+                )
+                try:
+                    db.rollback()
+                except Exception:
+                    logger.exception("Failed to rollback after Twilio numbers row error")
+                row_errors += 1
+                failed = _row_view(
+                    country_iso=(catalog.country_iso or "").strip().upper(),
+                    country_name=catalog.country_name,
+                    number_type=(catalog.number_type or "").strip(),
+                    status="failed",
+                    detail=str(exc)[:300],
+                    number_count=number_count_for_row(
+                        db,
+                        provider_id=provider.id,
+                        country_iso=(catalog.country_iso or "").strip().upper(),
+                        number_type=(catalog.number_type or "").strip(),
+                    ),
+                    region_count=catalog.region_count,
+                    city_count=catalog.city_count,
+                    period_price=catalog.period_price,
+                    price_unit=catalog.price_unit,
+                )
+                last_view = failed
+                tracker.apply(
+                    rows=[failed],
+                    force=True,
+                    stage_id="numbers",
+                    stage_status="running",
+                    stage_detail=failed["detail"],
+                )
 
-        def _commit_batch(
-            *,
-            batch: list[dict[str, Any]],
-            cell: NumberCell,
-            cell_index: int,
-            pattern_index: int,
-            repeat: int,
-            contains: str | None,
-        ) -> None:
-            result = ingest_numbers_staging(
-                db,
-                stg,
-                provider_id=provider.id,
-                job_id=job.id,
-                country_iso=country_iso,
-                country_name=catalog.country_name,
-                number_type=number_type,
-                items=batch,
-            )
-            tracker.note_batch(country_iso, number_type, result)
-            row_view["status"] = "running"
-            row_view["detail"] = _numbers_detail(
-                pattern_index,
-                repeat,
-                cell_index,
-                len(cells),
-                cell,
-                contains,
-                len(batch),
-            )
-            row_view["number_count"] = tracker.row_number_count(country_iso, number_type)
-            tracker.apply(
-                current={
-                    "country_iso": country_iso,
-                    "in_region": cell.region_filter or None,
-                    "contains": contains,
-                },
-                rows=[row_view],
-                stage_id="numbers",
-                stage_status="running",
-                stage_detail=row_view["detail"],
-            )
-
-        for cell_index, cell in enumerate(cells, start=1):
-            in_region = cell.region_filter or None
-            in_locality = cell.locality
-            first = await _search_or_empty(
-                client,
-                country_iso=country_iso,
-                number_type=number_type,
-                in_region=in_region,
-                in_locality=in_locality,
-            )
-            tracker.bump_request()
-            _commit_batch(
-                batch=first,
-                cell=cell,
-                cell_index=cell_index,
-                pattern_index=0,
-                repeat=1,
-                contains=None,
-            )
-            patterns = contract.geo_contains_queue(len(first))
-            if not patterns:
-                continue
-            tracker.requests_total = (tracker.requests_total or 0) + len(patterns)
-            for pattern_index, pattern in enumerate(patterns, start=1):
-                seen: set[str] = set()
-                repeat = 0
-                while True:
-                    repeat += 1
-                    batch = await _search_or_empty(
-                        client,
-                        country_iso=country_iso,
-                        number_type=number_type,
-                        in_region=in_region,
-                        in_locality=in_locality,
-                        contains=pattern,
-                    )
-                    tracker.bump_request()
-                    phones = {
-                        str(item.get("phone_number") or "").strip()
-                        for item in batch
-                        if str(item.get("phone_number") or "").strip()
-                    }
-                    new_unique = len(phones - seen)
-                    seen.update(phones)
-                    _commit_batch(
-                        batch=batch,
-                        cell=cell,
-                        cell_index=cell_index,
-                        pattern_index=pattern_index,
-                        repeat=repeat,
-                        contains=pattern,
-                    )
-                    if not should_repeat_contains(len(batch), new_unique):
-                        break
-
-        cut = cutover_numbers_from_staging(
-            db,
-            provider_id=provider.id,
-            job_id=job.id,
-            country_iso=country_iso,
-            number_type=number_type,
-            geo_job_id=catalog.last_sync_job_id,
-        )
-        row_view["status"] = "success"
-        row_view["detail"] = ""
-        row_view["number_count"] = cut["incoming"]
+        if last_view is not None and last_view.get("status") != "failed":
+            last_view["status"] = "success"
+            last_view["detail"] = ""
         tracker.requests_total = tracker.requests
         tracker.apply(
-            rows=[row_view],
+            rows=[last_view] if last_view else [],
             force=True,
             stage_id="numbers",
             stage_status="success",
-            stage_detail=f"{row_view['number_count']} номеров",
+            stage_detail=f"{tracker.requests} запросов",
         )
         job.status = SyncJobStatus.success
         job.finished_at = _now()
         stats = dict(job.stats or {})
         stats["counts"] = {
             "requests": tracker.requests,
-            "numbers_unique": cut["incoming"],
-            "numbers_deleted": cut["deleted"],
-            "numbers_previous": cut["previous"],
-            "cells": len(cells),
+            "rows": len(rows),
+            "row_errors": row_errors,
         }
         job.stats = stats
         flag_modified(job, "stats")
         db.commit()
-    except EmptyTwilioFetchError as exc:
-        db.rollback()
-        job = db.get(SyncJob, job_id)
-        if job:
-            job.status = SyncJobStatus.failed
-            job.error_summary = exc.message
-            job.finished_at = _now()
-            db.commit()
     except Exception as exc:
         logger.exception("Twilio numbers sync failed")
         db.rollback()
@@ -386,14 +500,6 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
             job.finished_at = _now()
             db.commit()
     finally:
-        try:
-            drop_numbers_staging(db)
-        except Exception:
-            logger.exception("Failed to drop Twilio numbers staging")
-            try:
-                db.rollback()
-            except Exception:
-                logger.exception("Failed to rollback after staging drop")
         stop_keepalive.set()
         if keepalive_task is not None:
             try:

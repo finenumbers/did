@@ -194,7 +194,7 @@ def test_available_search_params_gate_inregion_to_nanp():
     ) == {"InRegion": "AL", "AreaCode": "205"}
 
 
-def test_cutover_does_not_delete_number_sync_rows():
+def test_cutover_deletes_all_stale_numbers_not_only_geo_sync():
     from sqlalchemy.dialects import postgresql
 
     from app.modules.twilio.persist import cutover_geo_snapshot
@@ -220,9 +220,9 @@ def test_cutover_does_not_delete_number_sync_rows():
     )
     compiled = [stmt.compile(dialect=postgresql.dialect()) for stmt in captured]
     numbers = next(item for item in compiled if "twilio_available_numbers" in str(item))
-    assert contract.NUMBER_SOURCE_GEO in numbers.params.values()
-    assert contract.NUMBER_SOURCE_NUMBERS not in numbers.params.values()
-    assert "source =" in str(numbers)
+    sql = str(numbers).lower()
+    assert "source" not in sql
+    assert "last_sync_job_id" in sql
 
 
 def test_geo_status_detail_uses_region_and_contains():
@@ -233,37 +233,47 @@ def test_geo_status_detail_uses_region_and_contains():
     assert _geo_detail(12, 51, "AL", None, 4) == "12 / 51 · AL · 4 номеров"
 
 
-class _GeoStub:
-    def __init__(self, locality: str | None = None, region_filter: str = "") -> None:
-        self.locality = locality
-        self.region_filter = region_filter
+def test_enrich_cells_nanp_local_uses_states_other_is_country():
+    from app.modules.twilio.cells import country_cell, enrich_cells
+
+    us_local = enrich_cells("US", "local")
+    assert len(us_local) == len(contract.US_STATE_CODES)
+    assert us_local[0].region_filter == "AL"
+    assert us_local[0].locality is None
+
+    ca_local = enrich_cells("CA", "local")
+    assert len(ca_local) == len(contract.CA_PROVINCE_CODES)
+    assert {cell.region_filter for cell in ca_local} == set(contract.CA_PROVINCE_CODES)
+
+    assert enrich_cells("US", "toll_free") == [country_cell()]
+    assert enrich_cells("GB", "local") == [country_cell()]
 
 
-def test_build_number_cells_city_region_and_country_fallback():
-    from app.modules.twilio.cells import build_number_cells, country_cell
+def test_should_repeat_pattern_needs_two_empty_streak():
+    from app.modules.twilio.cells import apply_batch_novelty, should_repeat_pattern
 
-    city = build_number_cells([_GeoStub("Calgary", "AB")])
-    assert len(city) == 1
-    assert city[0].locality == "Calgary"
-    assert city[0].region_filter == "AB"
+    assert should_repeat_pattern(29, 0) is False
+    assert should_repeat_pattern(30, 0) is True
+    assert should_repeat_pattern(30, 1) is True
+    assert should_repeat_pattern(30, 2) is False
+    assert should_repeat_pattern(31, 1) is True
 
-    region_only = build_number_cells([_GeoStub(None, "AL"), _GeoStub("", "")])
-    assert len(region_only) == 1
-    assert region_only[0].locality is None
-    assert region_only[0].region_filter == "AL"
-
-    assert build_number_cells([]) == [country_cell()]
-    assert build_number_cells([_GeoStub("", ""), _GeoStub(None, "")]) == [country_cell()]
-    assert len(build_number_cells([_GeoStub("Calgary", "AB"), _GeoStub("Calgary", "ab")])) == 1
-
-
-def test_should_repeat_contains_at_ceiling():
-    from app.modules.twilio.cells import should_repeat_contains
-
-    assert should_repeat_contains(29, 29) is False
-    assert should_repeat_contains(30, 1) is True
-    assert should_repeat_contains(30, 0) is False
-    assert should_repeat_contains(31, 5) is True
+    phones: set[str] = set()
+    regions: set[str] = set()
+    cities: set[str] = set()
+    first = apply_batch_novelty(
+        [{"phone_number": "+12025550100", "region": "CA", "locality": "Oakland"}],
+        phones,
+        regions,
+        cities,
+    )
+    assert first >= 1
+    assert apply_batch_novelty(
+        [{"phone_number": "+12025550100", "region": "CA", "locality": "Oakland"}],
+        phones,
+        regions,
+        cities,
+    ) == 0
 
 
 def test_country_cell_search_omits_inregion_and_inlocality():
@@ -553,3 +563,60 @@ def test_numbers_status_detail_uses_pattern_repeat_cell_and_region():
         "78 / 1 / 15 / 98 · AB · %78% · 4 номеров"
     )
     assert _numbers_detail(0, 1, 15, 98, region, None, 4) == "0 / 1 / 15 / 98 · AB · 4 номеров"
+
+
+def test_reclaim_stale_jobs_only_when_lock_free():
+    from types import SimpleNamespace
+
+    from app.models.enums import SyncJobStatus
+    from app.modules.twilio.runner import STALE_JOB_MESSAGE, reclaim_stale_twilio_jobs
+
+    class _Job:
+        def __init__(self) -> None:
+            self.status = SyncJobStatus.running
+            self.error_summary = None
+            self.finished_at = None
+
+    class _Session:
+        def __init__(self, jobs):
+            self.jobs = jobs
+            self.committed = False
+
+        def scalars(self, _stmt):
+            return SimpleNamespace(all=lambda: self.jobs)
+
+        def commit(self):
+            self.committed = True
+
+    job = _Job()
+    held = _Session([job])
+    assert reclaim_stale_twilio_jobs(held, lock_free=False) == 0
+    assert job.status == SyncJobStatus.running
+    assert held.committed is False
+
+    stale = _Job()
+    free = _Session([stale])
+    assert reclaim_stale_twilio_jobs(free, lock_free=True) == 1
+    assert stale.status == SyncJobStatus.failed
+    assert stale.error_summary == STALE_JOB_MESSAGE
+    assert free.committed is True
+
+
+def test_numbers_sync_in_both_or_neither():
+    from pydantic import ValidationError
+
+    from app.schemas.twilio import TwilioNumbersSyncIn
+
+    assert TwilioNumbersSyncIn().country_iso is None
+    assert TwilioNumbersSyncIn(country_iso="us", number_type="local").country_iso == "US"
+    try:
+        TwilioNumbersSyncIn(country_iso="US")
+        raise AssertionError("expected ValidationError")
+    except ValidationError:
+        pass
+
+
+def test_runner_stages_are_sample_not_geo_grid():
+    from app.modules.twilio.runner import STAGES
+
+    assert [sid for sid, _label in STAGES] == ["countries", "pricing", "sample", "cutover"]

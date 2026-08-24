@@ -29,7 +29,7 @@ Coverage row (`twilio_catalog`) = **country + type** from live `subresource_uris
 
 Main UI row (`twilio_available_numbers`) = **E.164** from AvailablePhoneNumbers search. This is a **sample**, not a full inventory dump.
 
-Types come only from keys that actually appear on the country. Official HTML documents Local / TollFree / Mobile; OpenAPI also has National / Voip / SharedCost / MachineToMachine. Geo search runs only for `local`.
+Types come only from keys that actually appear on the country. Official HTML documents Local / TollFree / Mobile; OpenAPI also has National / Voip / SharedCost / MachineToMachine. Countries-load samples every type once; `%x%` enrichment uses `InRegion` only for US/CA `local`.
 
 ## Missing dictionaries (verified)
 
@@ -41,12 +41,10 @@ Types come only from keys that actually appear on the country. Official HTML doc
 ## Available numbers search
 
 - Typical ceiling ~30 numbers (`AVAILABLE_PAGE_CEILING`); not a dump; `Page`/`PageToken` do not walk inventory.
-- First geo pass: every `local` country and every US/CA state/province **without** `Contains`. Only after that pass is `requests_total` known (`done + 100 × nonempty cells`).
-- Empty first GET (no `Contains`) means this cell is empty: **do not** run the `%00%`…`%99%` grid.
-- If the first GET returns any numbers, run **all** 100 patterns `%00%`…`%99%` in a second pass. No streak stop.
-- Number-enrichment job (per country×type): each queryable geo cell (or one country-level cell) first GETs **without** `Contains`. Empty first response → do not run `%00%`…`%99%` for that cell. If the first GET returns any numbers, run all 100 patterns. If a patterned response returns `>= 30` and unique E.164 for that `(cell, Contains)` grew, repeat the same GET.
-- US/CA: fan-out `InRegion` over all US states+DC and 13 CA provinces. PR is not in the list. Empty state still stays in the first-pass queue; only the grid is skipped.
-- Other ISO: one country-level GET, then the grid if non-empty. No `InRegion`.
+- Countries load: one GET per country×type **without** `Contains` / `InRegion` / `InLocality`. No `%x%` grid.
+- Enrichment cell: first GET **without** `Contains`. Empty → skip that cell (row, US state, or CA province). Non-empty → all `%00%`…`%99%` without skipping indexes.
+- Repeat the same `%xx%` while the page has ≥ 30 and fewer than two consecutive responses with no new region / city / E.164. `< 30` or two empty-of-new loads → next `%x%`.
+- US/CA `local`: fan-out `InRegion` over US states+DC and 13 CA provinces. PR is not in the list. Other US/CA types and other ISO: one country-level cell.
 - `InRegion` / `AreaCode` apply only to US/CA (NANP) in `available_search_params`. Do not send them for other ISO codes.
 - Do not pass `Beta` (vendor default `true` includes beta numbers).
 - Official `Contains` wildcards: `*` = one character, `%` = a sequence (docs example `%979%`). Grid uses `contains_region_patterns()`.

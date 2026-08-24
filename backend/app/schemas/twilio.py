@@ -1,9 +1,9 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class TwilioCoverageItem(BaseModel):
@@ -78,8 +78,23 @@ class TwilioSyncJobOut(BaseModel):
 
 
 class TwilioNumbersSyncIn(BaseModel):
-    country_iso: str
-    number_type: str
+    country_iso: str | None = None
+    number_type: str | None = None
+
+    @model_validator(mode="after")
+    def both_or_neither(self) -> Self:
+        iso = (self.country_iso or "").strip()
+        ntype = (self.number_type or "").strip()
+        if bool(iso) != bool(ntype):
+            raise ValueError("Укажите и страну, и тип — или оставьте оба поля пустыми")
+        self.country_iso = iso.upper() if iso else None
+        self.number_type = ntype or None
+        return self
+
+
+class TwilioWipeOut(BaseModel):
+    ok: bool = True
+    deleted: dict[str, int] = Field(default_factory=dict)
 
 
 class TwilioAvailableNumberOut(BaseModel):

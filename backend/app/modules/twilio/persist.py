@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -16,6 +17,8 @@ from app.modules.sync_engine.hashing import payload_hash
 from app.modules.sync_engine.staging import ensure_temp_staging
 from app.providers.twilio import contract
 from app.providers.twilio.parser import CatalogRow, catalog_key, parse_available_number
+
+logger = logging.getLogger(__name__)
 
 FIELD_VERIFICATION = {
     "country": "verified",
@@ -483,31 +486,33 @@ def refresh_local_counts(
     number_type: str,
 ) -> tuple[int, int]:
     iso = country_iso.strip().upper()
-    if iso in contract.NANP_COUNTRIES:
-        region_count = (
-            db.scalar(
-                select(func.count(func.distinct(TwilioGeo.region_filter))).where(
-                    TwilioGeo.provider_id == provider_id,
-                    TwilioGeo.country_iso == iso,
-                    TwilioGeo.number_type == number_type,
-                    TwilioGeo.region_filter != "",
-                )
+    filter_count = (
+        db.scalar(
+            select(func.count(func.distinct(TwilioGeo.region_filter))).where(
+                TwilioGeo.provider_id == provider_id,
+                TwilioGeo.country_iso == iso,
+                TwilioGeo.number_type == number_type,
+                TwilioGeo.region_filter != "",
             )
-            or 0
         )
+        or 0
+    )
+    name_count = (
+        db.scalar(
+            select(func.count(func.distinct(TwilioGeo.region))).where(
+                TwilioGeo.provider_id == provider_id,
+                TwilioGeo.country_iso == iso,
+                TwilioGeo.number_type == number_type,
+                TwilioGeo.region.is_not(None),
+                TwilioGeo.region != "",
+            )
+        )
+        or 0
+    )
+    if iso in contract.NANP_COUNTRIES and int(filter_count) > 0:
+        region_count = int(filter_count)
     else:
-        region_count = (
-            db.scalar(
-                select(func.count(func.distinct(TwilioGeo.region))).where(
-                    TwilioGeo.provider_id == provider_id,
-                    TwilioGeo.country_iso == iso,
-                    TwilioGeo.number_type == number_type,
-                    TwilioGeo.region.is_not(None),
-                    TwilioGeo.region != "",
-                )
-            )
-            or 0
-        )
+        region_count = int(name_count)
     city_count = (
         db.scalar(
             select(func.count()).select_from(
@@ -553,7 +558,6 @@ def cutover_geo_snapshot(
     numbers_deleted = db.execute(
         delete(TwilioAvailableNumber).where(
             TwilioAvailableNumber.provider_id == provider_id,
-            TwilioAvailableNumber.source == contract.NUMBER_SOURCE_GEO,
             TwilioAvailableNumber.last_sync_job_id.is_distinct_from(job_id),
         )
     ).rowcount
@@ -737,6 +741,79 @@ def get_catalog_row(
             TwilioCatalog.is_currently_present.is_(True),
         )
     )
+
+
+def list_catalog_rows(db: Session, *, provider_id: uuid.UUID) -> list[TwilioCatalog]:
+    return list(
+        db.scalars(
+            select(TwilioCatalog)
+            .where(
+                TwilioCatalog.provider_id == provider_id,
+                TwilioCatalog.is_currently_present.is_(True),
+            )
+            .order_by(TwilioCatalog.country_name.asc(), TwilioCatalog.number_type.asc())
+        ).all()
+    )
+
+
+def load_row_known(
+    db: Session,
+    *,
+    provider_id: uuid.UUID,
+    country_iso: str,
+    number_type: str,
+) -> tuple[set[str], set[str], set[str]]:
+    iso = country_iso.strip().upper()
+    ntype = number_type.strip()
+    phones = {
+        str(phone)
+        for phone in db.scalars(
+            select(TwilioAvailableNumber.phone_number).where(
+                TwilioAvailableNumber.provider_id == provider_id,
+                TwilioAvailableNumber.country_iso == iso,
+                TwilioAvailableNumber.number_type == ntype,
+            )
+        ).all()
+        if str(phone or "").strip()
+    }
+    geo_rows = load_geo_rows(db, provider_id=provider_id, country_iso=iso, number_type=ntype)
+    regions: set[str] = set()
+    cities: set[str] = set()
+    for row in geo_rows:
+        region = (row.region or "").strip()
+        if region:
+            regions.add(region)
+        region_filter = (row.region_filter or "").strip()
+        if region_filter:
+            regions.add(region_filter)
+        locality = (row.locality or "").strip()
+        if locality:
+            cities.add(locality)
+    return phones, regions, cities
+
+
+def wipe_twilio_data(db: Session, *, provider_id: uuid.UUID) -> dict[str, int]:
+    numbers = db.execute(
+        delete(TwilioAvailableNumber).where(TwilioAvailableNumber.provider_id == provider_id)
+    ).rowcount
+    geo = db.execute(delete(TwilioGeo).where(TwilioGeo.provider_id == provider_id)).rowcount
+    catalog = db.execute(
+        delete(TwilioCatalog).where(TwilioCatalog.provider_id == provider_id)
+    ).rowcount
+    pricing = db.execute(delete(TwilioPricingRaw)).rowcount
+    countries = db.execute(delete(TwilioCountryRaw)).rowcount
+    db.commit()
+    try:
+        drop_numbers_staging(db)
+    except Exception:
+        logger.exception("Failed to drop Twilio numbers staging after wipe")
+    return {
+        "numbers": int(numbers or 0),
+        "geo": int(geo or 0),
+        "catalog": int(catalog or 0),
+        "pricing": int(pricing or 0),
+        "countries": int(countries or 0),
+    }
 
 
 def mark_numbers_synced(

@@ -12,11 +12,11 @@ Twilio never writes to `numbers_catalog_normalized`. Coverage lives in `twilio_c
 | `GET AvailablePhoneNumbers.json` | `twilio_countries_raw` | `country_name`, `country_iso`, `country_beta` |
 | `GET Pricing …/PhoneNumbers/Countries/{ISO}` | `twilio_pricing_raw` | `country_iso`, `price_unit` |
 
-Search results are persisted by the geo-sync job (`source=geo_sync`) and the per-row numbers job (`source=number_sync`). Documentation examples are never seeded.
+Search results are persisted by «Загрузка стран» (`source=geo_sync`) and the enrichment job (`source=number_sync`). Documentation examples are never seeded.
 
 ## Catalog (`twilio_catalog`)
 
-| API source | Column | UI (окно регионов) |
+| API source | Column | UI (окно синхронизации) |
 |---|---|---|
 | `{country_code}:{type}` | `provider_group_key` | — |
 | `country` | `country_name` | Страна |
@@ -25,7 +25,7 @@ Search results are persisted by the geo-sync job (`source=geo_sync`) and the per
 | Pricing `current_price` | `period_price` | Абонплата |
 | Pricing `price_unit` | `price_unit` | валюта абонплаты |
 | country `beta` | `country_beta` | — |
-| derived from `twilio_geo` | `region_count` / `city_count` | Регионы / Города (`local` only; 0 → «—») |
+| derived from `twilio_geo` | `region_count` / `city_count` | Регионы / Города (0 → «—») |
 | COUNT of E.164 for the pair | `number_count` (API, not a column) | Номера |
 | number-sync job | `numbers_synced_at` / `numbers_sync_job_id` / `numbers_sync_geo_job_id` | зелёная «Загрузка» только если geo-job id совпал |
 
@@ -41,7 +41,7 @@ Unique `(provider_id, country_iso, number_type, region_filter, locality_norm)`.
 | AvailableNumbers `region` | `region` |
 | AvailableNumbers `locality` | `locality` / `locality_norm` |
 
-Empty locality is not a city. US/CA region count = distinct `region_filter` with data. Other countries = distinct non-empty API `region`.
+Empty locality is not a city. US/CA region count = distinct nonempty `region_filter` when present, otherwise distinct API `region`. Other countries = distinct non-empty API `region`.
 
 ## Numbers (`twilio_available_numbers`)
 
@@ -56,4 +56,4 @@ Empty locality is not a city. US/CA region count = distinct `region_filter` with
 | `address_requirements` | `address_requirements` | Адрес |
 | job writer | `source` | `geo_sync` or `number_sync` |
 
-Geo cutover deletes only `source=geo_sync` rows that this geo job did not see. Numbers-job writes to staging first; cutover upserts that slice into live and then deletes any source for that country×type whose `last_sync_job_id` is not the numbers job. Conflict upsert does not change a row that already belongs to another country×type. Empty incoming never wipes a nonempty row.
+Countries-job cutover (success only) deletes catalog, geo, and **all** numbers whose `last_sync_job_id` is not this job. Enrichment upserts live geo+numbers (`source=number_sync`) and marks the row loaded. Conflict upsert does not change a row that already belongs to another country×type. `POST /wipe` clears the Twilio tables.
