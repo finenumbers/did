@@ -18,7 +18,7 @@ Unlike SipOut/UIS/Exolve, no vendor document upload was committed. If materials 
 |---|---|---|
 | **A — inventory** | Free numbers for Frontier INN as provider `finenumbers` | contract + field-mapping |
 | **B — operator cache** | PSTN ranges by INN → **Оператор** and GAR **Город**/**Регион** | contract + implementation-notes |
-| **C — REG / RTU** | Purchased endpoints from `reg.finenumbers.com` + column **Подключено в РТУ** | contract (sibling `/Users/dvpershin/Work/Reg`) |
+| **C — REG / RTU** | Purchased endpoints from `reg.finenumbers.com` + columns **Подключено в РТУ** and **Клиент** | contract (sibling `/Users/dvpershin/Work/Reg`) |
 
 ## Derived docs
 

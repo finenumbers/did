@@ -56,6 +56,11 @@ const CATALOG_COLUMNS: Col[] = [
     value: (r) => r.region_name,
   },
   {
+    key: "client",
+    header: "Клиент",
+    value: (r) => r.client,
+  },
+  {
     key: "operator",
     header: "Оператор",
     value: (r) => r.operator,
@@ -180,7 +185,7 @@ export function NumbersTable({ kind }: { kind: "free" | "purchased" }) {
     () =>
       kind === "purchased"
         ? CATALOG_COLUMNS
-        : CATALOG_COLUMNS.filter((c) => c.key !== "rtu_connected"),
+        : CATALOG_COLUMNS.filter((c) => c.key !== "rtu_connected" && c.key !== "client"),
     [kind],
   );
 

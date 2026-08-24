@@ -52,3 +52,6 @@ OPERATOR_NOT_IN_REGISTRY = "Нет в реестре"
 RTU_OWN = "Своя нумерация"
 RTU_EXTERNAL = "Внешняя нумерация"
 RTU_NOT_CONNECTED = "Не подключено"
+
+# Catalog column «Клиент» (purchased only) — REG data["Описание"]
+CLIENT_NOT_IN_RTU = "Нет в РТУ"

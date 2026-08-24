@@ -23,6 +23,7 @@ class NumberItem(BaseModel):
     premium: Decimal | None = None
     mask_purchase: Decimal | None = None
     operator: str | None = None
+    client: str | None = None
     rtu_connected: str | None = None
     is_currently_present: bool
 

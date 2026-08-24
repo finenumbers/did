@@ -26,6 +26,7 @@ Nav: [`finenumbers/SOURCE.md`](finenumbers/SOURCE.md) · [`finenumbers-contract.
   - **Внешняя нумерация** — Finenumbers + non-Frontier operator, or other provider present in REG
   - **Не подключено** — other provider absent from REG
 - Yellow row = Внешняя; red row = Не подключено.
+- Column **Клиент**: REG `data["Описание"]` matched by phone on every purchased row; missing/empty → **Нет в РТУ**. Set once in `persist_finenumbers_reg_purchased` (not stored in sync stats).
 
 ## Contour A — free inventory
 

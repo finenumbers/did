@@ -1203,6 +1203,7 @@ def apply_rtu_connected_flags(
     db: Session,
     *,
     reg_keys: set[str],
+    reg_clients: dict[str, str] | None = None,
 ) -> dict[str, int]:
     """Set rtu_connected on all present purchased rows.
 
@@ -1210,6 +1211,9 @@ def apply_rtu_connected_flags(
     Finenumbers + other/empty operator → Внешняя нумерация.
     Other provider + key in REG → Внешняя нумерация.
     Other provider + key not in REG → Не подключено.
+
+    If reg_clients is provided, also set client from REG «Описание»
+    (missing/empty → Нет в РТУ). If None, client is left unchanged.
     """
     from app.models.providers import Provider
     from app.providers.finenumbers import contract
@@ -1225,8 +1229,19 @@ def apply_rtu_connected_flags(
     own = 0
     external = 0
     not_connected = 0
+    client_filled = 0
+    client_not_in_rtu = 0
     for row, provider_code in rows:
         code = provider_code.value if hasattr(provider_code, "value") else str(provider_code)
+        key = _purchased_match_key_row(row)
+        if reg_clients is not None:
+            desc = reg_clients.get(key) if key else None
+            if desc:
+                row.client = desc
+                client_filled += 1
+            else:
+                row.client = contract.CLIENT_NOT_IN_RTU
+                client_not_in_rtu += 1
         if code == ProviderCode.finenumbers.value:
             if contract.is_frontier_operator(row.operator):
                 row.rtu_connected = contract.RTU_OWN
@@ -1235,7 +1250,6 @@ def apply_rtu_connected_flags(
                 row.rtu_connected = contract.RTU_EXTERNAL
                 external += 1
             continue
-        key = _purchased_match_key_row(row)
         if key and key in reg_keys:
             row.rtu_connected = contract.RTU_EXTERNAL
             external += 1
@@ -1243,11 +1257,15 @@ def apply_rtu_connected_flags(
             row.rtu_connected = contract.RTU_NOT_CONNECTED
             not_connected += 1
     db.flush()
-    return {
+    stats = {
         "rtu_own": own,
         "rtu_external": external,
         "rtu_not_connected": not_connected,
     }
+    if reg_clients is not None:
+        stats["client_filled"] = client_filled
+        stats["client_not_in_rtu"] = client_not_in_rtu
+    return stats
 
 
 def persist_finenumbers_reg_purchased(
@@ -1258,16 +1276,21 @@ def persist_finenumbers_reg_purchased(
     numbers: list[NormalizedNumber],
     on_progress: Callable[[str, int | None, int | None], Any] | None = None,
 ) -> dict[str, Any]:
-    """Wipe+cutover finenumbers purchased for REG-only rows; then apply RTU flags.
+    """Wipe+cutover finenumbers purchased for REG-only rows; then apply RTU + client.
 
     Duplicates already purchased by other providers are not inserted.
     Empty incoming is allowed (wipe REG-only slice when all REG numbers exist elsewhere).
     """
-    from app.providers.finenumbers.reg_mapper import catalog_match_key, reg_key_set
+    from app.providers.finenumbers.reg_mapper import (
+        catalog_match_key,
+        reg_client_map,
+        reg_key_set,
+    )
 
     # Keys from earlier sync stages (not Finenumbers REG slice).
     early_keys = snapshot_purchased_match_keys(db, exclude_provider_id=provider_id)
     reg_keys = reg_key_set(numbers)
+    reg_clients = reg_client_map(numbers)
     only_reg: list[NormalizedNumber] = []
     for num in numbers:
         key = catalog_match_key(num.abc_code, num.number_local, num.msisdn)
@@ -1283,7 +1306,9 @@ def persist_finenumbers_reg_purchased(
         numbers=only_reg,
         on_progress=on_progress,
     )
-    rtu_stats = apply_rtu_connected_flags(db, reg_keys=reg_keys)
+    rtu_stats = apply_rtu_connected_flags(
+        db, reg_keys=reg_keys, reg_clients=reg_clients
+    )
     return {
         **persist_stats,
         **rtu_stats,

@@ -55,6 +55,7 @@ class NumbersService:
         "city_name": NumbersCatalogNormalized.city_name,
         "type_label": NumbersCatalogNormalized.type_label,
         "operator": NumbersCatalogNormalized.operator,
+        "client": NumbersCatalogNormalized.client,
         "rtu_connected": NumbersCatalogNormalized.rtu_connected,
     }
 
@@ -80,6 +81,7 @@ class NumbersService:
             "type_label",
             "premium",
             "operator",
+            "client",
             "rtu_connected",
         }
     )
@@ -98,6 +100,7 @@ class NumbersService:
         "type_label": NumbersCatalogNormalized.type_label,
         "premium": NumbersCatalogNormalized.premium,
         "operator": NumbersCatalogNormalized.operator,
+        "client": NumbersCatalogNormalized.client,
         "rtu_connected": NumbersCatalogNormalized.rtu_connected,
     }
 
@@ -298,6 +301,7 @@ class NumbersService:
             premium=row.premium,
             mask_purchase=row.mask_purchase,
             operator=row.operator,
+            client=row.client,
             rtu_connected=row.rtu_connected,
             is_currently_present=row.is_currently_present,
         )

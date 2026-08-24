@@ -8,6 +8,17 @@ from app.models.enums import InventoryKind, MappingConfidence
 from app.providers.dto.numbers import NormalizedNumber
 from app.providers.finenumbers.mapper import msisdn_from_abc_local, parse_msisdn_parts
 
+REG_DESCRIPTION_FIELD = "Описание"
+
+
+def _read_reg_description(row: dict[str, Any]) -> str | None:
+    data = row.get("data") if isinstance(row.get("data"), dict) else {}
+    raw = data.get(REG_DESCRIPTION_FIELD)
+    if raw is None or isinstance(raw, (dict, list)):
+        return None
+    text = str(raw).strip()
+    return text or None
+
 
 def catalog_match_key(abc_code: str | None, number_local: str | None, msisdn: str | None) -> str | None:
     """Stable key from MSISDN (always 3+7). Fallback: stored abc + zero-padded local."""
@@ -42,6 +53,7 @@ def map_reg_endpoint(row: dict[str, Any]) -> NormalizedNumber | None:
     abc, local = parts
     msisdn = msisdn_from_abc_local(abc, local)
     number_local = f"{local:07d}"
+    description = _read_reg_description(row)
     return NormalizedNumber(
         inventory_kind=InventoryKind.purchased,
         provider_number_key=msisdn,
@@ -58,6 +70,7 @@ def map_reg_endpoint(row: dict[str, Any]) -> NormalizedNumber | None:
             "source": "finenumbers_reg_phones",
             "reg_id": row.get("id"),
             "reg_name": row.get("name"),
+            "reg_description": description,
         },
         raw_payload=dict(row),
         abc_code=abc,
@@ -90,3 +103,20 @@ def reg_key_set(numbers: list[NormalizedNumber]) -> set[str]:
         if k:
             keys.add(k)
     return keys
+
+
+def reg_client_map(numbers: list[NormalizedNumber]) -> dict[str, str]:
+    """Phone match key → REG «Описание». First non-empty description wins."""
+    out: dict[str, str] = {}
+    for n in numbers:
+        key = catalog_match_key(n.abc_code, n.number_local, n.msisdn)
+        if not key or key in out:
+            continue
+        payload = n.normalized_payload if isinstance(n.normalized_payload, dict) else {}
+        raw = payload.get("reg_description")
+        if raw is None:
+            continue
+        text = str(raw).strip()
+        if text:
+            out[key] = text
+    return out

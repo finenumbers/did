@@ -23,6 +23,7 @@ export interface NumberItem {
   type_label: string | null;
   premium: string | null;
   operator: string | null;
+  client?: string | null;
   rtu_connected?: string | null;
   is_currently_present: boolean;
 }

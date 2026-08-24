@@ -25,6 +25,7 @@ EXPORT_COLUMNS: list[tuple[str, str]] = [
     ("number_category", "Категория"),
     ("city_name", "Город"),
     ("region_name", "Регион"),
+    ("client", "Клиент"),
     ("operator", "Оператор"),
     ("buy_price", "Покупка (Входящая)"),
     ("period_price", "Абонплата (Входящая)"),
@@ -52,6 +53,7 @@ _HEADER_MIN_CHARS: dict[str, int] = {
     "Категория": 12,
     "Город": 16,
     "Регион": 18,
+    "Клиент": 20,
     "Оператор": 18,
     "Покупка (Входящая)": 18,
     "Абонплата (Входящая)": 20,
@@ -68,6 +70,7 @@ _EXPORT_LOAD_ONLY = (
     NumbersCatalogNormalized.number_category,
     NumbersCatalogNormalized.city_name,
     NumbersCatalogNormalized.region_name,
+    NumbersCatalogNormalized.client,
     NumbersCatalogNormalized.operator,
     NumbersCatalogNormalized.buy_price,
     NumbersCatalogNormalized.period_price,
@@ -226,7 +229,7 @@ class NumbersExportService:
         columns = [
             (k, h)
             for k, h in EXPORT_COLUMNS
-            if inventory_kind == InventoryKind.purchased or k != "rtu_connected"
+            if inventory_kind == InventoryKind.purchased or k not in {"rtu_connected", "client"}
         ]
         headers = [header for _, header in columns]
         keys = [key for key, _ in columns]

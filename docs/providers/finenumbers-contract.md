@@ -11,7 +11,7 @@ Vendor HTML/PDF materials are not checked into this repo; markers below reflect 
 |---|---|---|
 | **A — inventory** | Free numbers for operator ИНН «Фронтир» (`5406978329`) as a provider inventory slice | `numbers_catalog_normalized` free via Finenumbers sync |
 | **B — operator cache** | PSTN ranges by INN for catalog **Оператор** and GAR overlay of **Город**/**Регион**; terminal miss → **Нет в реестре** on operator/city/region | `pstn_inn_cache_operators` / `pstn_inn_ranges_cache`; enrich writes `operator` and, when `garTerritory` is present, `city_name`/`region_name` |
-| **C — REG / RTU** | Purchased endpoints from REG + column **Подключено в РТУ** | `GET https://reg.finenumbers.com/api/phones` (read-only); purchased + `rtu_connected` |
+| **C — REG / RTU** | Purchased endpoints from REG + columns **Подключено в РТУ** and **Клиент** | `GET https://reg.finenumbers.com/api/phones` (read-only); purchased + `rtu_connected` + `client` |
 
 Same INN may appear in A/B (e.g. Frontier). Contour C uses a separate REG API key (`auth_settings.reg_key`).
 
@@ -21,7 +21,9 @@ Same INN may appear in A/B (e.g. Frontier). Contour C uses a separate REG API ke
 - Auth: `Authorization: Bearer reg_…` (`auth_settings.reg_key`)
 - Read-only: `GET /api/phones?kind=endpoints_registered|endpoints_unregistered|endpoints_error`
 - Number field: `endpointNumber`
+- Description field: `data["Описание"]` → catalog **Клиент** (`client`)
 - Free inventory = PSTN expand minus REG keys
+- `client` (purchased, all providers): match by phone (`catalog_match_key`); value = REG «Описание»; missing/empty → **Нет в РТУ**. Applied once after REG persist (not re-applied in `rtu_flags`)
 - `rtu_connected` (purchased):
   - Finenumbers + Frontier operator (any PSTN/code spelling of ООО «Фронтир Нетворк») → **Своя нумерация**
   - Finenumbers + other/empty operator → **Внешняя нумерация** (yellow)

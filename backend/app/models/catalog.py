@@ -47,6 +47,7 @@ class NumbersCatalogNormalized(Base, TimestampMixin):
     premium: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
     mask_purchase: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
     operator: Mapped[str | None] = mapped_column(Text, nullable=True)
+    client: Mapped[str | None] = mapped_column(Text, nullable=True)
     rtu_connected: Mapped[str | None] = mapped_column(Text, nullable=True)
     raw_source_table: Mapped[str] = mapped_column(Text, nullable=False)
     raw_source_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)

@@ -12,6 +12,7 @@ from app.providers.finenumbers.reg_mapper import (
     catalog_match_key,
     map_reg_endpoint,
     map_reg_endpoints,
+    reg_client_map,
     reg_key_set,
 )
 from app.modules.sync_engine import persist
@@ -40,6 +41,48 @@ def test_catalog_match_key_prefers_msisdn_over_stored_abc():
     assert catalog_match_key("3842", "666666", "73842666666") == catalog_match_key(
         "384", "2666666", "73842666666"
     )
+
+
+def test_map_reg_endpoint_reads_description():
+    num = map_reg_endpoint(
+        {
+            "id": "1",
+            "endpointNumber": "79001234567",
+            "name": "ep",
+            "data": {"Описание": "  ООО Клиент  "},
+        }
+    )
+    assert num is not None
+    assert num.normalized_payload.get("reg_description") == "ООО Клиент"
+
+
+def test_map_reg_endpoint_blank_description_is_none():
+    num = map_reg_endpoint(
+        {
+            "endpointNumber": "79001234567",
+            "data": {"Описание": "   "},
+        }
+    )
+    assert num is not None
+    assert num.normalized_payload.get("reg_description") is None
+
+
+def test_reg_client_map_first_nonempty_wins():
+    mapped, _ = map_reg_endpoints(
+        [
+            {
+                "id": "1",
+                "endpointNumber": "79001234567",
+                "data": {"Описание": "Первый"},
+            },
+            {
+                "id": "2",
+                "endpointNumber": "79001234567",
+                "data": {"Описание": "Второй"},
+            },
+        ]
+    )
+    assert reg_client_map(mapped) == {"900|1234567": "Первый"}
 
 
 def test_reg_key_set_dedupes():
@@ -112,6 +155,53 @@ def test_apply_rtu_connected_flags_semantics():
     assert row_other_in_reg.rtu_connected == contract.RTU_EXTERNAL
     assert row_other_missing.rtu_connected == contract.RTU_NOT_CONNECTED
     assert stats == {"rtu_own": 2, "rtu_external": 2, "rtu_not_connected": 1}
+    assert not hasattr(row_other_in_reg, "client")
+
+
+def test_apply_rtu_sets_client_from_reg_description():
+    row_with_desc = SimpleNamespace(
+        abc_code="900",
+        number_local="3333333",
+        msisdn="79003333333",
+        operator="SipOut Op",
+        rtu_connected=None,
+        client=None,
+    )
+    row_empty_desc = SimpleNamespace(
+        abc_code="900",
+        number_local="1111111",
+        msisdn="79001111111",
+        operator=contract.OPERATOR_DISPLAY_NAME,
+        rtu_connected=None,
+        client=None,
+    )
+    row_missing = SimpleNamespace(
+        abc_code="900",
+        number_local="4444444",
+        msisdn="79004444444",
+        operator="SipOut Op",
+        rtu_connected=None,
+        client=None,
+    )
+    db = MagicMock()
+    result = MagicMock()
+    result.all.return_value = [
+        (row_empty_desc, "finenumbers"),
+        (row_with_desc, "sipout"),
+        (row_missing, "sipout"),
+    ]
+    db.execute.return_value = result
+
+    stats = persist.apply_rtu_connected_flags(
+        db,
+        reg_keys={"900|3333333", "900|1111111"},
+        reg_clients={"900|3333333": "ООО Клиент"},
+    )
+    assert row_with_desc.client == "ООО Клиент"
+    assert row_empty_desc.client == contract.CLIENT_NOT_IN_RTU
+    assert row_missing.client == contract.CLIENT_NOT_IN_RTU
+    assert stats["client_filled"] == 1
+    assert stats["client_not_in_rtu"] == 2
 
 
 def test_is_frontier_operator_normalizes_quotes_and_case():
