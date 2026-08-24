@@ -477,13 +477,11 @@ def test_numbers_status_detail_uses_pattern_repeat_cell_and_region():
     from app.modules.twilio.numbers_runner import _numbers_detail
 
     country = NumberCell(region_filter="", locality=None, label="")
-    assert _numbers_detail(78, 1, 1, 1, country, "%78%", 4) == "78 / 1 / 1 / 1 · %78% · 4 номеров"
-    assert _numbers_detail(0, 1, 1, 1, country, None, 0) == "0 / 1 / 1 / 1 · 0 номеров"
-    region = NumberCell(region_filter="AB", locality="Calgary", label="Calgary")
-    assert _numbers_detail(78, 1, 15, 98, region, "%78%", 4) == (
-        "78 / 1 / 15 / 98 · AB · %78% · 4 номеров"
-    )
-    assert _numbers_detail(0, 1, 15, 98, region, None, 4) == "0 / 1 / 15 / 98 · AB · 4 номеров"
+    assert _numbers_detail(3, 2, 1, 1, country, "%02%", 4) == "3 / 2 - %02%"
+    assert _numbers_detail(0, 1, 1, 1, country, None, 0) == "0 / 1"
+    region = NumberCell(region_filter="TX", locality="Austin", label="TX")
+    assert _numbers_detail(3, 2, 15, 98, region, "%02%", 4) == "3 / 2 - %02% - TX"
+    assert _numbers_detail(0, 1, 15, 98, region, None, 4) == "0 / 1 - TX"
 
 
 def test_reclaim_stale_jobs_only_when_lock_free():

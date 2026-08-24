@@ -75,11 +75,23 @@ function jobStatusLabel(job: TwilioSyncJob | null): string {
   return job.status;
 }
 
-function rowStatusText(row: TwilioCoverageRow): string {
-  if (row.status === "running") return row.detail ? `сейчас · ${row.detail}` : "сейчас";
-  if (row.status === "success") return row.detail || "";
+function sameCoverageRow(
+  row: { country_iso?: string | null; number_type?: string | null },
+  target?: { country_iso?: string | null; number_type?: string | null } | null,
+): boolean {
+  return (
+    (row.country_iso || "").trim().toUpperCase() === (target?.country_iso || "").trim().toUpperCase() &&
+    (row.number_type || "").trim() === (target?.number_type || "").trim() &&
+    Boolean(target?.country_iso && target?.number_type)
+  );
+}
+
+function rowStatusText(row: TwilioCoverageRow, jobActive: boolean): string {
+  if (row.status === "running") return row.detail || "0 / 1";
   if (row.status === "failed") return row.detail || "ошибка";
-  return "";
+  if (!jobActive) return row.detail || "";
+  if (row.status === "success") return row.detail || "готово";
+  return "ожидание";
 }
 
 function requestsText(summary: TwilioSyncJob["progress"]["summary"] | undefined): string {
@@ -327,10 +339,7 @@ export function TwilioTable() {
   const tableRows = (
     syncActive ? (job?.progress?.rows ?? []) : coverageRowsDb
   ).map((row) => {
-    const isRunning =
-      numbersActive &&
-      row.country_iso === numbersTarget?.country_iso &&
-      row.number_type === numbersTarget?.number_type;
+    const isRunning = numbersActive && sameCoverageRow(row, numbersTarget);
     if (!isRunning) return row;
     const live = numbersJob?.progress?.rows?.[0];
     return {
@@ -540,10 +549,7 @@ export function TwilioTable() {
                 </thead>
                 <tbody>
                   {tableRows.map((row) => {
-                    const isRunning =
-                      numbersActive &&
-                      row.country_iso === numbersTarget?.country_iso &&
-                      row.number_type === numbersTarget?.number_type;
+                    const isRunning = numbersActive && sameCoverageRow(row, numbersTarget);
                     return (
                       <tr key={`${row.country_iso}-${row.number_type}`}>
                         <td>{row.country_name || row.country_iso || "—"}</td>
@@ -579,7 +585,7 @@ export function TwilioTable() {
                             </button>
                           )}
                         </td>
-                        <td>{rowStatusText(row) || "—"}</td>
+                        <td>{rowStatusText(row, twilioBusy) || "—"}</td>
                       </tr>
                     );
                   })}

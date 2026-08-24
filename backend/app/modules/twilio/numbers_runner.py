@@ -148,15 +148,13 @@ def _numbers_detail(
     contains: str | None,
     returned: int,
 ) -> str:
-    parts = [f"{pattern_index} / {repeat} / {cell_index} / {cell_total}"]
-    if cell.region_filter:
-        parts.append(cell.region_filter)
-    elif cell.label:
-        parts.append(cell.label)
+    del cell_index, cell_total, returned
+    parts = [f"{pattern_index} / {repeat}"]
     if contains:
         parts.append(contains)
-    parts.append(f"{returned} номеров")
-    return " · ".join(parts)
+    if cell.region_filter:
+        parts.append(cell.region_filter)
+    return " - ".join(parts)
 
 
 def _row_view(
@@ -209,7 +207,7 @@ async def _enrich_catalog_row(
         country_name=catalog.country_name,
         number_type=number_type,
         status="running",
-        detail=f"0 / 1 / 1 / {len(cells)}",
+        detail="0 / 1",
         number_count=number_count_for_row(
             db, provider_id=provider_id, country_iso=country_iso, number_type=number_type
         ),

@@ -155,8 +155,11 @@ def _row_payload(
 
 
 def _find_row(rows: list[dict[str, Any]], country_iso: str, number_type: str) -> dict[str, Any] | None:
+    iso = (country_iso or "").strip().upper()
+    ntype = (number_type or "").strip()
     for item in rows:
-        if item.get("country_iso") == country_iso and item.get("number_type") == number_type:
+        if (str(item.get("country_iso") or "").strip().upper() == iso
+            and str(item.get("number_type") or "").strip() == ntype):
             return item
     return None
 
@@ -540,7 +543,7 @@ async def _execute(job_id: uuid.UUID) -> None:
             item = _find_row(progress_rows, row.country_iso, row.number_type)
             if item:
                 item["status"] = "running"
-                item["detail"] = "выборка"
+                item["detail"] = "0 / 1"
             batch = await _search_or_empty(
                 client,
                 country_iso=row.country_iso,
