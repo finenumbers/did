@@ -7,12 +7,13 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import and_, delete, func, select
+from sqlalchemy import Table, and_, delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.models.twilio import TwilioAvailableNumber, TwilioCatalog, TwilioCountryRaw, TwilioGeo, TwilioPricingRaw
 from app.modules.sync_engine.hashing import payload_hash
+from app.modules.sync_engine.staging import ensure_temp_staging
 from app.providers.twilio import contract
 from app.providers.twilio.parser import CatalogRow, catalog_key, parse_available_number
 
@@ -24,6 +25,24 @@ FIELD_VERIFICATION = {
     "current_price": "verified",
     "price_unit": "verified",
 }
+
+NUMBERS_STG_TABLE = "twilio_available_numbers_stg"
+_CUTOVER_UPDATE_COLS = (
+    "country_iso",
+    "country_name",
+    "number_type",
+    "region",
+    "locality",
+    "address_requirements",
+    "voice",
+    "sms",
+    "mms",
+    "fax",
+    "source",
+    "last_sync_job_id",
+    "last_seen_at",
+    "updated_at",
+)
 
 
 class EmptyTwilioFetchError(Exception):
@@ -263,6 +282,197 @@ def ingest_available_batch(
         "had_geo": had_geo,
         "filter_key": filter_key,
     }
+
+
+def begin_numbers_staging(db: Session) -> Table:
+    stg = ensure_temp_staging(
+        db,
+        live_table="twilio_available_numbers",
+        stg_table=NUMBERS_STG_TABLE,
+    )
+    db.execute(
+        text(
+            f"CREATE UNIQUE INDEX IF NOT EXISTS uq_{NUMBERS_STG_TABLE} "
+            f"ON {NUMBERS_STG_TABLE} (provider_id, phone_number)"
+        )
+    )
+    db.commit()
+    return stg
+
+
+def drop_numbers_staging(db: Session) -> None:
+    db.execute(text(f"DROP TABLE IF EXISTS {NUMBERS_STG_TABLE}"))
+    db.commit()
+
+
+def ingest_numbers_staging(
+    db: Session,
+    stg: Table,
+    *,
+    provider_id: uuid.UUID,
+    job_id: uuid.UUID,
+    country_iso: str,
+    country_name: str | None,
+    number_type: str,
+    items: list[dict[str, Any]],
+) -> dict[str, Any]:
+    loaded = datetime.now(timezone.utc)
+    phones: set[str] = set()
+    cities: set[tuple[str, str]] = set()
+    iso = (country_iso or "").strip().upper()
+    ntype = (number_type or "").strip()
+
+    for item in items:
+        parsed = parse_available_number(item)
+        if parsed is None:
+            continue
+        phone = parsed["phone_number"]
+        phones.add(phone)
+        locality = parsed["locality"]
+        region = parsed["region"]
+        if locality:
+            cities.add(("", locality))
+        stmt = pg_insert(stg).values(
+            id=uuid.uuid4(),
+            provider_id=provider_id,
+            phone_number=phone,
+            country_iso=parsed["country_iso"] or iso,
+            country_name=country_name,
+            number_type=ntype,
+            region=region,
+            locality=locality,
+            address_requirements=parsed["address_requirements"],
+            voice=parsed["voice"],
+            sms=parsed["sms"],
+            mms=parsed["mms"],
+            fax=parsed["fax"],
+            source=contract.NUMBER_SOURCE_NUMBERS,
+            last_sync_job_id=job_id,
+            first_seen_at=loaded,
+            last_seen_at=loaded,
+            created_at=loaded,
+            updated_at=loaded,
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["provider_id", "phone_number"],
+            set_={
+                "country_iso": stmt.excluded.country_iso,
+                "country_name": stmt.excluded.country_name,
+                "number_type": stmt.excluded.number_type,
+                "region": stmt.excluded.region,
+                "locality": stmt.excluded.locality,
+                "address_requirements": stmt.excluded.address_requirements,
+                "voice": stmt.excluded.voice,
+                "sms": stmt.excluded.sms,
+                "mms": stmt.excluded.mms,
+                "fax": stmt.excluded.fax,
+                "source": stmt.excluded.source,
+                "last_sync_job_id": stmt.excluded.last_sync_job_id,
+                "last_seen_at": stmt.excluded.last_seen_at,
+                "updated_at": stmt.excluded.updated_at,
+            },
+        )
+        db.execute(stmt)
+
+    return {
+        "phones": phones,
+        "cities": cities,
+        "regions": set(),
+        "had_geo": False,
+        "filter_key": "",
+    }
+
+
+def _staging_number_count(db: Session) -> int:
+    return int(db.scalar(text(f"SELECT COUNT(*) FROM {NUMBERS_STG_TABLE}")) or 0)
+
+
+def _cutover_insert_sql() -> str:
+    live_cols = [c.name for c in TwilioAvailableNumber.__table__.columns]
+    col_list = ", ".join(live_cols)
+    set_clause = ", ".join(f"{col} = EXCLUDED.{col}" for col in _CUTOVER_UPDATE_COLS)
+    return (
+        f"INSERT INTO twilio_available_numbers ({col_list}) "
+        f"SELECT {col_list} FROM {NUMBERS_STG_TABLE} "
+        f"ON CONFLICT (provider_id, phone_number) DO UPDATE SET {set_clause} "
+        f"WHERE twilio_available_numbers.country_iso = EXCLUDED.country_iso "
+        f"AND twilio_available_numbers.number_type = EXCLUDED.number_type"
+    )
+
+
+def cutover_numbers_from_staging(
+    db: Session,
+    *,
+    provider_id: uuid.UUID,
+    job_id: uuid.UUID,
+    country_iso: str,
+    number_type: str,
+    geo_job_id: uuid.UUID | None,
+) -> dict[str, int]:
+    iso = (country_iso or "").strip().upper()
+    ntype = (number_type or "").strip()
+    incoming = _staging_number_count(db)
+    previous = number_count_for_row(
+        db,
+        provider_id=provider_id,
+        country_iso=iso,
+        number_type=ntype,
+    )
+    if incoming <= 0 and previous > 0:
+        raise EmptyTwilioFetchError(
+            f"Twilio returned 0 numbers for {iso} {ntype}; refusing wipe (row has {previous})"
+        )
+    deleted = 0
+    if incoming > 0:
+        db.execute(text(_cutover_insert_sql()))
+        deleted = cutover_numbers_row(
+            db,
+            provider_id=provider_id,
+            job_id=job_id,
+            country_iso=iso,
+            number_type=ntype,
+        )
+    mark_numbers_synced(
+        db,
+        provider_id=provider_id,
+        country_iso=iso,
+        number_type=ntype,
+        job_id=job_id,
+        geo_job_id=geo_job_id,
+    )
+    db.execute(text(f"TRUNCATE {NUMBERS_STG_TABLE}"))
+    db.commit()
+    return {"incoming": incoming, "previous": previous, "deleted": deleted}
+
+
+def attach_numbers_progress_counts(
+    progress: dict[str, Any],
+    *,
+    running: bool,
+    counts: dict[tuple[str, str], int],
+) -> dict[str, Any]:
+    out = dict(progress)
+    rows = [dict(row) for row in (out.get("rows") or [])]
+    target = out.get("target") or {}
+    iso = str(target.get("country_iso") or "").strip().upper()
+    ntype = str(target.get("number_type") or "").strip()
+    summary = dict(out.get("summary") or {})
+    if running:
+        this_run = int(rows[0].get("number_count") or 0) if rows else 0
+        others = sum(
+            int(cnt) for (country, typ), cnt in counts.items() if country != iso or typ != ntype
+        )
+        summary["numbers_unique"] = others + this_run
+        out["summary"] = summary
+        if rows:
+            out["rows"] = rows
+        return out
+    if rows:
+        fill_number_counts(rows, counts)
+        out["rows"] = rows
+    summary["numbers_unique"] = sum(int(cnt) for cnt in counts.values())
+    out["summary"] = summary
+    return out
 
 
 def refresh_local_counts(

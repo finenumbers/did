@@ -21,6 +21,7 @@ from app.modules.twilio import (
     twilio_connection_config,
 )
 from app.modules.twilio.persist import (
+    attach_numbers_progress_counts,
     catalog_has_rows,
     catalog_progress_rows,
     fill_number_counts,
@@ -257,7 +258,12 @@ def latest_numbers_sync(db: Session = Depends(get_db)) -> TwilioSyncJobOut | Non
     if job is None:
         return None
     out = _job_out(job, has_catalog=has_catalog)
-    out.progress = _progress_with_db_counts(out.progress or {}, db, provider.id)
+    running = job.status in (SyncJobStatus.pending, SyncJobStatus.running)
+    out.progress = attach_numbers_progress_counts(
+        out.progress or {},
+        running=running,
+        counts=number_counts_by_type(db, provider_id=provider.id),
+    )
     return out
 
 

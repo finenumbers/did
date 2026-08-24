@@ -326,7 +326,7 @@ export function TwilioTable() {
       ...row,
       status: "running",
       detail: live?.detail || row.detail,
-      number_count: Math.max(live?.number_count ?? 0, row.number_count ?? 0),
+      number_count: live?.number_count ?? 0,
     };
   });
 

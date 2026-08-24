@@ -18,13 +18,14 @@ from app.models.sync import SyncJob
 from app.modules.sync_engine.locks import advisory_unlock_conn, try_advisory_lock_conn
 from app.modules.twilio.cells import NumberCell, build_number_cells, should_repeat_contains
 from app.modules.twilio.persist import (
+    EmptyTwilioFetchError,
+    begin_numbers_staging,
     catalog_has_rows,
-    cutover_numbers_row,
+    cutover_numbers_from_staging,
+    drop_numbers_staging,
     get_catalog_row,
-    ingest_available_batch,
+    ingest_numbers_staging,
     load_geo_rows,
-    mark_numbers_synced,
-    number_count_for_row,
 )
 from app.modules.twilio.runner import (
     TWILIO_LOCK_KEY,
@@ -233,13 +234,9 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
             period_price=catalog.period_price,
             price_unit=catalog.price_unit,
         )
-        row_view["number_count"] = number_count_for_row(
-            db,
-            provider_id=provider.id,
-            country_iso=country_iso,
-            number_type=number_type,
-        )
+        row_view["number_count"] = tracker.row_number_count(country_iso, number_type)
         tracker.apply(rows=[row_view], force=True, stage_id="numbers", stage_status="running")
+        stg = begin_numbers_staging(db)
 
         def _commit_batch(
             *,
@@ -250,16 +247,15 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
             repeat: int,
             contains: str | None,
         ) -> None:
-            result = ingest_available_batch(
+            result = ingest_numbers_staging(
                 db,
+                stg,
                 provider_id=provider.id,
                 job_id=job.id,
                 country_iso=country_iso,
                 country_name=catalog.country_name,
                 number_type=number_type,
-                region_filter=cell.region_filter,
                 items=batch,
-                source=contract.NUMBER_SOURCE_NUMBERS,
             )
             tracker.note_batch(country_iso, number_type, result)
             row_view["status"] = "running"
@@ -272,12 +268,7 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
                 contains,
                 len(batch),
             )
-            row_view["number_count"] = number_count_for_row(
-                db,
-                provider_id=provider.id,
-                country_iso=country_iso,
-                number_type=number_type,
-            )
+            row_view["number_count"] = tracker.row_number_count(country_iso, number_type)
             tracker.apply(
                 current={
                     "country_iso": country_iso,
@@ -345,29 +336,17 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
                     if not should_repeat_contains(len(batch), new_unique):
                         break
 
-        wipe = cutover_numbers_row(
+        cut = cutover_numbers_from_staging(
             db,
             provider_id=provider.id,
             job_id=job.id,
             country_iso=country_iso,
             number_type=number_type,
-        )
-        mark_numbers_synced(
-            db,
-            provider_id=provider.id,
-            country_iso=country_iso,
-            number_type=number_type,
-            job_id=job.id,
             geo_job_id=catalog.last_sync_job_id,
         )
         row_view["status"] = "success"
         row_view["detail"] = ""
-        row_view["number_count"] = number_count_for_row(
-            db,
-            provider_id=provider.id,
-            country_iso=country_iso,
-            number_type=number_type,
-        )
+        row_view["number_count"] = cut["incoming"]
         tracker.requests_total = tracker.requests
         tracker.apply(
             rows=[row_view],
@@ -381,13 +360,22 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
         stats = dict(job.stats or {})
         stats["counts"] = {
             "requests": tracker.requests,
-            "numbers_unique": tracker.row_number_count(country_iso, number_type),
-            "numbers_deleted": wipe,
+            "numbers_unique": cut["incoming"],
+            "numbers_deleted": cut["deleted"],
+            "numbers_previous": cut["previous"],
             "cells": len(cells),
         }
         job.stats = stats
         flag_modified(job, "stats")
         db.commit()
+    except EmptyTwilioFetchError as exc:
+        db.rollback()
+        job = db.get(SyncJob, job_id)
+        if job:
+            job.status = SyncJobStatus.failed
+            job.error_summary = exc.message
+            job.finished_at = _now()
+            db.commit()
     except Exception as exc:
         logger.exception("Twilio numbers sync failed")
         db.rollback()
@@ -398,6 +386,14 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
             job.finished_at = _now()
             db.commit()
     finally:
+        try:
+            drop_numbers_staging(db)
+        except Exception:
+            logger.exception("Failed to drop Twilio numbers staging")
+            try:
+                db.rollback()
+            except Exception:
+                logger.exception("Failed to rollback after staging drop")
         stop_keepalive.set()
         if keepalive_task is not None:
             try:

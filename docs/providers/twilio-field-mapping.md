@@ -56,4 +56,4 @@ Empty locality is not a city. US/CA region count = distinct `region_filter` with
 | `address_requirements` | `address_requirements` | Адрес |
 | job writer | `source` | `geo_sync` or `number_sync` |
 
-Geo cutover deletes only `source=geo_sync` rows that this geo job did not see. Numbers-job cutover deletes any source for that country×type whose `last_sync_job_id` is not the numbers job. Conflict upsert does not change a row that already belongs to another country×type.
+Geo cutover deletes only `source=geo_sync` rows that this geo job did not see. Numbers-job writes to staging first; cutover upserts that slice into live and then deletes any source for that country×type whose `last_sync_job_id` is not the numbers job. Conflict upsert does not change a row that already belongs to another country×type. Empty incoming never wipes a nonempty row.

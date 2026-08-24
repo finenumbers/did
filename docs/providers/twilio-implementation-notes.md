@@ -47,8 +47,8 @@ Page button only opens the viewer (`GET /coverage`). Start is **per catalog row*
 
 1. `build_number_cells`: queryable geo = nonempty `locality` and/or `region_filter`. Empty list → one country cell (no `InRegion`/`InLocality`), including `local` with numbers but no cities.
 2. Each cell of the selected row first GETs **without** `Contains`. Empty first response → skip `%00%`…`%99%` for that cell. Nonempty → run all 100 patterns. If a patterned response returns `>= 30` and the unique set for that `(cell, Contains)` grew, repeat the same GET.
-3. Upsert `source=number_sync`. Conflict updates only when existing `country_iso`+`number_type` match this row (no steal).
-4. After success: wipe numbers of this country×type whose `last_sync_job_id` is not this job. Then set `numbers_synced_at` / `numbers_sync_job_id` / `numbers_sync_geo_job_id=catalog.last_sync_job_id`.
+3. Write `source=number_sync` into UNLOGGED `twilio_available_numbers_stg` only (no live numbers, no `twilio_geo`). Staging upsert is last-wins on `(provider_id, phone_number)`. Modal column «Номера» during the job is this-run unique, not the live union.
+4. After success: one transaction upserts staging → live (`ON CONFLICT` updates only the same country×type, keeps `first_seen_at`), deletes this country×type whose `last_sync_job_id` is not this job, then sets `numbers_synced_at` / `numbers_sync_job_id` / `numbers_sync_geo_job_id=catalog.last_sync_job_id`. Empty incoming with existing live rows → `EmptyTwilioFetchError`, live unchanged.
 5. A new geo persist clears the three number-sync fields. Green button only when `numbers_sync_geo_job_id == last_sync_job_id`.
 
 Row status: first pass `0 / 1 / 15 / 98 · AB · 4 номеров` (no Contains); grid `78 / 1 / 15 / 98 · AB · %78% · 4 номеров` (pattern / repeat / cell index / cells). Country fallback is `1 / 1` cells.

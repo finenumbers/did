@@ -394,6 +394,153 @@ def test_fill_number_counts_uses_db_totals_not_stage():
     assert rows[2]["number_count"] == 0
 
 
+def test_ingest_numbers_staging_targets_stg_not_live_or_geo():
+    from sqlalchemy.dialects import postgresql
+
+    from app.models.twilio import TwilioAvailableNumber
+    from app.modules.sync_engine.staging import staging_table_from_live
+    from app.modules.twilio.persist import ingest_numbers_staging
+
+    stg = staging_table_from_live(TwilioAvailableNumber.__table__, "twilio_available_numbers_stg")
+    captured: list[object] = []
+
+    class _Capture:
+        def execute(self, stmt):
+            captured.append(stmt)
+
+    ingest_numbers_staging(
+        _Capture(),
+        stg,
+        provider_id="11111111-1111-1111-1111-111111111111",
+        job_id="22222222-2222-2222-2222-222222222222",
+        country_iso="US",
+        country_name="United States",
+        number_type="mobile",
+        items=[{"phone_number": "+12025550100", "iso_country": "US"}],
+    )
+    compiled = [stmt.compile(dialect=postgresql.dialect()) for stmt in captured]
+    assert compiled
+    joined = " ".join(str(item).lower() for item in compiled)
+    assert "twilio_available_numbers_stg" in joined
+    assert "twilio_geo" not in joined
+    assert "into twilio_available_numbers " not in joined
+    assert "on conflict" in joined
+
+
+def test_cutover_from_staging_refuses_empty_when_live_has_rows():
+    from app.modules.twilio.persist import EmptyTwilioFetchError, cutover_numbers_from_staging
+
+    class _Session:
+        def __init__(self) -> None:
+            self.n = 0
+
+        def scalar(self, _stmt):
+            self.n += 1
+            return 0 if self.n == 1 else 7
+
+        def execute(self, *_args, **_kwargs):
+            raise AssertionError("empty Twilio numbers fetch must not write live")
+
+        def commit(self):
+            raise AssertionError("empty Twilio numbers fetch must not commit")
+
+        def flush(self):
+            raise AssertionError("empty Twilio numbers fetch must not flush")
+
+    try:
+        cutover_numbers_from_staging(
+            _Session(),
+            provider_id="11111111-1111-1111-1111-111111111111",
+            job_id="22222222-2222-2222-2222-222222222222",
+            country_iso="GB",
+            number_type="mobile",
+            geo_job_id=None,
+        )
+        raise AssertionError("expected EmptyTwilioFetchError")
+    except EmptyTwilioFetchError as exc:
+        assert "0 numbers" in exc.message
+        assert "7" in exc.message
+
+
+def test_cutover_from_staging_empty_and_empty_is_noop():
+    from app.modules.twilio.persist import cutover_numbers_from_staging
+
+    executed: list[str] = []
+
+    class _Session:
+        def scalar(self, stmt):
+            raw = str(stmt).lower()
+            if "twilio_catalog" in raw:
+                return None
+            return 0
+
+        def execute(self, stmt):
+            executed.append(str(stmt).lower())
+
+            class _Result:
+                rowcount = 0
+
+            return _Result()
+
+        def commit(self):
+            executed.append("commit")
+
+        def flush(self):
+            executed.append("flush")
+
+    result = cutover_numbers_from_staging(
+        _Session(),
+        provider_id="11111111-1111-1111-1111-111111111111",
+        job_id="22222222-2222-2222-2222-222222222222",
+        country_iso="GB",
+        number_type="mobile",
+        geo_job_id=None,
+    )
+    assert result == {"incoming": 0, "previous": 0, "deleted": 0}
+    assert any("truncate" in item for item in executed)
+    assert any(item == "commit" for item in executed)
+    assert not any("delete" in item and "twilio_available_numbers" in item for item in executed)
+    assert not any("insert into twilio_available_numbers" in item for item in executed)
+
+
+def test_cutover_insert_sql_preserves_first_seen_and_does_not_steal():
+    from app.modules.twilio.persist import _cutover_insert_sql
+
+    sql = _cutover_insert_sql().lower()
+    set_part = sql.split("do update set", 1)[1]
+    set_cols, where_part = set_part.split("where", 1)
+    assert "first_seen_at" not in set_cols
+    assert "created_at" not in set_cols
+    assert "country_iso = excluded.country_iso" in where_part
+    assert "number_type = excluded.number_type" in where_part
+    assert "on conflict (provider_id, phone_number)" in sql
+
+
+def test_attach_numbers_progress_keeps_this_run_count_while_running():
+    from app.modules.twilio.persist import attach_numbers_progress_counts
+
+    progress = {
+        "target": {"country_iso": "GB", "number_type": "mobile"},
+        "rows": [{"country_iso": "GB", "number_type": "mobile", "number_count": 12}],
+        "summary": {"numbers_unique": 12},
+    }
+    out = attach_numbers_progress_counts(
+        progress,
+        running=True,
+        counts={("GB", "mobile"): 40, ("US", "local"): 5},
+    )
+    assert out["rows"][0]["number_count"] == 12
+    assert out["summary"]["numbers_unique"] == 17
+
+    done = attach_numbers_progress_counts(
+        progress,
+        running=False,
+        counts={("GB", "mobile"): 12, ("US", "local"): 5},
+    )
+    assert done["rows"][0]["number_count"] == 12
+    assert done["summary"]["numbers_unique"] == 17
+
+
 def test_numbers_status_detail_uses_pattern_repeat_cell_and_region():
     from app.modules.twilio.cells import NumberCell
     from app.modules.twilio.numbers_runner import _numbers_detail
