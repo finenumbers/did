@@ -70,10 +70,6 @@ CA_PROVINCE_CODES: tuple[str, ...] = (
 )
 
 
-def contains_rotate_pattern(index: int) -> str:
-    return f"%{index % 100:02d}%"
-
-
 def contains_region_patterns() -> tuple[str, ...]:
     return tuple(f"%{index:02d}%" for index in range(100))
 
@@ -85,16 +81,6 @@ def region_search_keys(country_iso: str) -> tuple[str | None, ...]:
     if iso == "CA":
         return CA_PROVINCE_CODES
     return (None,)
-
-
-def geo_contains_queue(first_batch_count: int) -> tuple[str, ...]:
-    if first_batch_count <= 0:
-        return ()
-    return contains_region_patterns()
-
-
-def planned_request_total(done: int, nonempty_cells: int) -> int:
-    return int(done) + len(contains_region_patterns()) * int(nonempty_cells)
 
 
 def available_search_params(

@@ -7,7 +7,7 @@ import logging
 import threading
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -31,6 +31,7 @@ from app.modules.twilio.persist import (
     persist_twilio_coverage,
     refresh_local_counts,
     snapshot_totals,
+    wipe_twilio_data,
 )
 from app.providers.dto.common import ConnectionConfig
 from app.providers.errors import ProviderAuthError, ProviderError
@@ -52,6 +53,7 @@ STAGES = (
 )
 
 STALE_JOB_MESSAGE = "прервано, процесс перезапущен"
+RECLAIM_PENDING_GRACE = timedelta(seconds=60)
 
 
 def _now() -> datetime:
@@ -235,6 +237,25 @@ def twilio_lock_is_free() -> bool:
         lock_conn.close()
 
 
+def _aware(dt: datetime | None) -> datetime | None:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _should_reclaim_job(job: SyncJob, now: datetime) -> bool:
+    if job.status == SyncJobStatus.running:
+        return True
+    if job.status != SyncJobStatus.pending:
+        return False
+    created = _aware(getattr(job, "created_at", None))
+    if created is None:
+        return True
+    return now - created >= RECLAIM_PENDING_GRACE
+
+
 def reclaim_stale_twilio_jobs(db: Session, *, lock_free: bool | None = None) -> int:
     jobs = list_active_twilio_jobs(db)
     if not jobs:
@@ -244,12 +265,39 @@ def reclaim_stale_twilio_jobs(db: Session, *, lock_free: bool | None = None) -> 
     if not lock_free:
         return 0
     now = _now()
+    reclaimed = 0
     for job in jobs:
+        if not _should_reclaim_job(job, now):
+            continue
         job.status = SyncJobStatus.failed
         job.error_summary = STALE_JOB_MESSAGE
         job.finished_at = now
-    db.commit()
-    return len(jobs)
+        reclaimed += 1
+    if reclaimed:
+        db.commit()
+    return reclaimed
+
+
+def wipe_twilio_locked(db: Session) -> dict[str, int]:
+    lock_conn = lock_engine.connect()
+    acquired = False
+    try:
+        acquired = try_advisory_lock_conn(lock_conn, TWILIO_LOCK_KEY)
+        if not acquired:
+            raise ProviderError("Синхронизация Twilio уже выполняется")
+        reclaim_stale_twilio_jobs(db, lock_free=True)
+        provider = get_twilio_provider(db)
+        return wipe_twilio_data(db, provider_id=provider.id)
+    finally:
+        if acquired:
+            try:
+                advisory_unlock_conn(lock_conn, TWILIO_LOCK_KEY)
+            except Exception:
+                logger.exception("Failed to unlock Twilio lock after wipe")
+        try:
+            lock_conn.close()
+        except Exception:
+            logger.exception("Failed to close Twilio lock connection after wipe")
 
 
 def create_twilio_job(db: Session, *, triggered_by: str = "api") -> SyncJob:
@@ -377,6 +425,8 @@ async def _search_or_empty(
         raise
     except ProviderError as exc:
         status = (exc.details or {}).get("status")
+        if isinstance(status, int) and status == 429:
+            raise
         if isinstance(status, int) and 400 <= status < 500:
             logger.warning(
                 "Twilio search %s %s in_region=%s contains=%s HTTP %s; treat as empty",
@@ -401,7 +451,7 @@ async def _execute(job_id: uuid.UUID) -> None:
         lock_conn = lock_engine.connect()
         if not try_advisory_lock_conn(lock_conn, TWILIO_LOCK_KEY):
             job = db.get(SyncJob, job_id)
-            if job:
+            if job and job.status == SyncJobStatus.pending:
                 job.status = SyncJobStatus.failed
                 job.error_summary = "Синхронизация Twilio уже выполняется (lock)"
                 job.finished_at = _now()
@@ -409,7 +459,7 @@ async def _execute(job_id: uuid.UUID) -> None:
             return
 
         job = db.get(SyncJob, job_id)
-        if job is None:
+        if job is None or job.status != SyncJobStatus.pending:
             return
         provider = db.scalar(
             select(Provider)
@@ -649,19 +699,3 @@ def _refresh_row_counts(
         country_iso=row.country_iso,
         number_type=row.number_type,
     )
-
-
-def _geo_detail(
-    index: int,
-    total: int,
-    region_key: str | None,
-    contains: str | None,
-    returned: int,
-) -> str:
-    parts = [f"{index} / {total}"]
-    if region_key:
-        parts.append(region_key)
-    if contains:
-        parts.append(contains)
-    parts.append(f"{returned} номеров")
-    return " · ".join(parts)

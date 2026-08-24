@@ -13,6 +13,7 @@ from app.modules.twilio.runner import (
     reclaim_stale_twilio_jobs,
     spawn_twilio_job,
     twilio_connection_config,
+    wipe_twilio_locked,
 )
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "spawn_twilio_numbers_job",
     "twilio_connection_config",
     "wipe_twilio_data",
+    "wipe_twilio_locked",
 ]

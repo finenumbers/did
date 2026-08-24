@@ -25,6 +25,7 @@ from app.modules.twilio.cells import (
 )
 from app.modules.twilio.persist import (
     catalog_has_rows,
+    cutover_numbers_row,
     get_catalog_row,
     ingest_available_batch,
     list_catalog_rows,
@@ -50,6 +51,12 @@ from app.providers.twilio import contract
 from app.providers.twilio.client import TwilioClient
 
 logger = logging.getLogger(__name__)
+
+
+def numbers_job_outcome(row_errors: int, row_count: int) -> SyncJobStatus:
+    if row_count > 0 and row_errors == row_count:
+        return SyncJobStatus.failed
+    return SyncJobStatus.success
 
 
 def _numbers_progress(
@@ -323,6 +330,13 @@ async def _enrich_catalog_row(
                 if not should_repeat_pattern(len(batch), streak):
                     break
 
+    cutover_numbers_row(
+        db,
+        provider_id=provider_id,
+        job_id=job_id,
+        country_iso=country_iso,
+        number_type=number_type,
+    )
     mark_numbers_synced(
         db,
         provider_id=provider_id,
@@ -366,7 +380,7 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
         lock_conn = lock_engine.connect()
         if not try_advisory_lock_conn(lock_conn, TWILIO_LOCK_KEY):
             job = db.get(SyncJob, job_id)
-            if job:
+            if job and job.status == SyncJobStatus.pending:
                 job.status = SyncJobStatus.failed
                 job.error_summary = "Синхронизация Twilio уже выполняется (lock)"
                 job.finished_at = _now()
@@ -374,7 +388,7 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
             return
 
         job = db.get(SyncJob, job_id)
-        if job is None:
+        if job is None or job.status != SyncJobStatus.pending:
             return
         progress = (job.stats or {}).get("progress") or {}
         target = progress.get("target") or {}
@@ -471,15 +485,18 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
         if last_view is not None and last_view.get("status") != "failed":
             last_view["status"] = "success"
             last_view["detail"] = ""
+        outcome = numbers_job_outcome(row_errors, len(rows))
         tracker.requests_total = tracker.requests
         tracker.apply(
             rows=[last_view] if last_view else [],
             force=True,
             stage_id="numbers",
-            stage_status="success",
+            stage_status=outcome.value,
             stage_detail=f"{tracker.requests} запросов",
         )
-        job.status = SyncJobStatus.success
+        job.status = outcome
+        if outcome == SyncJobStatus.failed:
+            job.error_summary = f"Не удалось загрузить номера: {row_errors} из {len(rows)} строк"
         job.finished_at = _now()
         stats = dict(job.stats or {})
         stats["counts"] = {

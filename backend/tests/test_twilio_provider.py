@@ -155,22 +155,11 @@ def test_search_type_paths_cover_openapi_keys():
         assert key in contract.SEARCH_TYPE_PATHS
 
 
-def test_contains_rotate_pattern_uses_sequence_wildcard():
-    assert contract.contains_rotate_pattern(0) == "%00%"
-    assert contract.contains_rotate_pattern(9) == "%09%"
-    assert contract.contains_rotate_pattern(99) == "%99%"
-    assert contract.contains_rotate_pattern(100) == "%00%"
-    assert "*" not in contract.contains_rotate_pattern(12)
-
-
 def test_region_grid_is_exactly_100_patterns():
     patterns = contract.contains_region_patterns()
     assert len(patterns) == 100
     assert patterns[0] == "%00%"
     assert patterns[-1] == "%99%"
-    assert contract.geo_contains_queue(0) == ()
-    assert contract.geo_contains_queue(1) == patterns
-    assert contract.planned_request_total(896, 100) == 896 + 100 * 100
 
 
 def test_region_search_keys_nanp_and_other():
@@ -223,14 +212,6 @@ def test_cutover_deletes_all_stale_numbers_not_only_geo_sync():
     sql = str(numbers).lower()
     assert "source" not in sql
     assert "last_sync_job_id" in sql
-
-
-def test_geo_status_detail_uses_region_and_contains():
-    from app.modules.twilio.runner import _geo_detail
-
-    assert _geo_detail(78, 100, None, "%78%", 4) == "78 / 100 · %78% · 4 номеров"
-    assert _geo_detail(78, 100, "AB", "%17%", 30) == "78 / 100 · AB · %17% · 30 номеров"
-    assert _geo_detail(12, 51, "AL", None, 4) == "12 / 51 · AL · 4 номеров"
 
 
 def test_enrich_cells_nanp_local_uses_states_other_is_country():
@@ -295,44 +276,6 @@ def test_country_cell_search_omits_inregion_and_inlocality():
         in_locality="Birmingham",
         contains="%00%",
     ) == {"InRegion": "AL", "InLocality": "Birmingham", "Contains": "%00%"}
-
-
-def test_cutover_numbers_row_scopes_to_own_country_type():
-    from sqlalchemy.dialects import postgresql
-
-    from app.modules.twilio.persist import cutover_numbers_row
-
-    captured: list[object] = []
-
-    class _Capture:
-        def execute(self, stmt):
-            captured.append(stmt)
-
-            class _Result:
-                rowcount = 2
-
-            return _Result()
-
-        def flush(self):
-            return None
-
-    deleted = cutover_numbers_row(
-        _Capture(),
-        provider_id="11111111-1111-1111-1111-111111111111",
-        job_id="22222222-2222-2222-2222-222222222222",
-        country_iso="GB",
-        number_type="mobile",
-    )
-    assert deleted == 2
-    compiled = captured[0].compile(dialect=postgresql.dialect())
-    sql = str(compiled).lower()
-    assert "twilio_available_numbers" in sql
-    assert "country_iso" in sql
-    assert "number_type" in sql
-    assert "last_sync_job_id" in sql
-    assert "gb" in compiled.params.values() or "GB" in compiled.params.values()
-    assert "mobile" in compiled.params.values()
-    assert "source" not in sql
 
 
 def test_ingest_upsert_does_not_steal_other_country_type():
@@ -404,126 +347,104 @@ def test_fill_number_counts_uses_db_totals_not_stage():
     assert rows[2]["number_count"] == 0
 
 
-def test_ingest_numbers_staging_targets_stg_not_live_or_geo():
+def test_cutover_numbers_row_scopes_and_refuses_empty():
     from sqlalchemy.dialects import postgresql
 
-    from app.models.twilio import TwilioAvailableNumber
-    from app.modules.sync_engine.staging import staging_table_from_live
-    from app.modules.twilio.persist import ingest_numbers_staging
+    from app.modules.twilio.persist import EmptyTwilioFetchError, cutover_numbers_row
 
-    stg = staging_table_from_live(TwilioAvailableNumber.__table__, "twilio_available_numbers_stg")
-    captured: list[object] = []
-
-    class _Capture:
-        def execute(self, stmt):
-            captured.append(stmt)
-
-    ingest_numbers_staging(
-        _Capture(),
-        stg,
-        provider_id="11111111-1111-1111-1111-111111111111",
-        job_id="22222222-2222-2222-2222-222222222222",
-        country_iso="US",
-        country_name="United States",
-        number_type="mobile",
-        items=[{"phone_number": "+12025550100", "iso_country": "US"}],
-    )
-    compiled = [stmt.compile(dialect=postgresql.dialect()) for stmt in captured]
-    assert compiled
-    joined = " ".join(str(item).lower() for item in compiled)
-    assert "twilio_available_numbers_stg" in joined
-    assert "twilio_geo" not in joined
-    assert "into twilio_available_numbers " not in joined
-    assert "on conflict" in joined
-
-
-def test_cutover_from_staging_refuses_empty_when_live_has_rows():
-    from app.modules.twilio.persist import EmptyTwilioFetchError, cutover_numbers_from_staging
-
-    class _Session:
-        def __init__(self) -> None:
+    class _EmptyLive:
+        def __init__(self, previous: int, incoming: int):
+            self.previous = previous
+            self.incoming = incoming
             self.n = 0
 
         def scalar(self, _stmt):
             self.n += 1
-            return 0 if self.n == 1 else 7
+            return self.incoming if self.n == 2 else self.previous
 
         def execute(self, *_args, **_kwargs):
-            raise AssertionError("empty Twilio numbers fetch must not write live")
-
-        def commit(self):
-            raise AssertionError("empty Twilio numbers fetch must not commit")
+            raise AssertionError("empty Twilio numbers fetch must not wipe the row")
 
         def flush(self):
             raise AssertionError("empty Twilio numbers fetch must not flush")
 
     try:
-        cutover_numbers_from_staging(
-            _Session(),
+        cutover_numbers_row(
+            _EmptyLive(7, 0),
             provider_id="11111111-1111-1111-1111-111111111111",
             job_id="22222222-2222-2222-2222-222222222222",
             country_iso="GB",
             number_type="mobile",
-            geo_job_id=None,
         )
         raise AssertionError("expected EmptyTwilioFetchError")
     except EmptyTwilioFetchError as exc:
         assert "0 numbers" in exc.message
         assert "7" in exc.message
 
+    captured: list[object] = []
 
-def test_cutover_from_staging_empty_and_empty_is_noop():
-    from app.modules.twilio.persist import cutover_numbers_from_staging
-
-    executed: list[str] = []
-
-    class _Session:
-        def scalar(self, stmt):
-            raw = str(stmt).lower()
-            if "twilio_catalog" in raw:
-                return None
-            return 0
+    class _Capture:
+        def scalar(self, _stmt):
+            if getattr(self, "n", 0) == 0:
+                self.n = 1
+                return 5
+            return 3
 
         def execute(self, stmt):
-            executed.append(str(stmt).lower())
+            captured.append(stmt)
 
             class _Result:
-                rowcount = 0
+                rowcount = 2
 
             return _Result()
 
-        def commit(self):
-            executed.append("commit")
-
         def flush(self):
-            executed.append("flush")
+            return None
 
-    result = cutover_numbers_from_staging(
-        _Session(),
+    result = cutover_numbers_row(
+        _Capture(),
         provider_id="11111111-1111-1111-1111-111111111111",
         job_id="22222222-2222-2222-2222-222222222222",
         country_iso="GB",
         number_type="mobile",
-        geo_job_id=None,
     )
-    assert result == {"incoming": 0, "previous": 0, "deleted": 0}
-    assert any("truncate" in item for item in executed)
-    assert any(item == "commit" for item in executed)
-    assert not any("delete" in item and "twilio_available_numbers" in item for item in executed)
-    assert not any("insert into twilio_available_numbers" in item for item in executed)
+    assert result["incoming"] == 3
+    assert result["previous"] == 5
+    assert result["numbers_deleted"] == 2
+    compiled = [stmt.compile(dialect=postgresql.dialect()) for stmt in captured]
+    numbers = next(item for item in compiled if "twilio_available_numbers" in str(item))
+    sql = str(numbers).lower()
+    assert "country_iso" in sql
+    assert "number_type" in sql
+    assert "last_sync_job_id" in sql
+    assert "source" not in sql
 
 
-def test_cutover_insert_sql_preserves_first_seen_and_does_not_steal():
-    from app.modules.twilio.persist import _cutover_insert_sql
+def test_numbers_job_outcome_fails_only_when_all_rows_failed():
+    from app.models.enums import SyncJobStatus
+    from app.modules.twilio.numbers_runner import numbers_job_outcome
 
-    sql = _cutover_insert_sql().lower()
-    set_part = sql.split("do update set", 1)[1]
-    set_cols, where_part = set_part.split("where", 1)
-    assert "first_seen_at" not in set_cols
-    assert "created_at" not in set_cols
-    assert "country_iso = excluded.country_iso" in where_part
-    assert "number_type = excluded.number_type" in where_part
-    assert "on conflict (provider_id, phone_number)" in sql
+    assert numbers_job_outcome(0, 3) == SyncJobStatus.success
+    assert numbers_job_outcome(1, 3) == SyncJobStatus.success
+    assert numbers_job_outcome(3, 3) == SyncJobStatus.failed
+    assert numbers_job_outcome(0, 0) == SyncJobStatus.success
+
+
+def test_progress_with_db_counts_preserves_live_on_running_countries():
+    from app.api.routes.twilio import _progress_with_db_counts
+
+    progress = {
+        "rows": [{"country_iso": "GB", "number_type": "mobile", "number_count": 7}],
+        "summary": {"numbers_unique": 7},
+    }
+
+    class _Boom:
+        def execute(self, *_args, **_kwargs):
+            raise AssertionError("running countries must not overwrite live counts from DB")
+
+    kept = _progress_with_db_counts(progress, _Boom(), "ignored", preserve_live_counts=True)
+    assert kept is progress
+    assert kept["rows"][0]["number_count"] == 7
 
 
 def test_attach_numbers_progress_keeps_this_run_count_while_running():
@@ -566,16 +487,20 @@ def test_numbers_status_detail_uses_pattern_repeat_cell_and_region():
 
 
 def test_reclaim_stale_jobs_only_when_lock_free():
+    from datetime import datetime, timedelta, timezone
     from types import SimpleNamespace
 
     from app.models.enums import SyncJobStatus
     from app.modules.twilio.runner import STALE_JOB_MESSAGE, reclaim_stale_twilio_jobs
 
+    now = datetime.now(timezone.utc)
+
     class _Job:
-        def __init__(self) -> None:
-            self.status = SyncJobStatus.running
+        def __init__(self, status, *, created_at=None):
+            self.status = status
             self.error_summary = None
             self.finished_at = None
+            self.created_at = created_at
 
     class _Session:
         def __init__(self, jobs):
@@ -588,18 +513,140 @@ def test_reclaim_stale_jobs_only_when_lock_free():
         def commit(self):
             self.committed = True
 
-    job = _Job()
-    held = _Session([job])
+    running = _Job(SyncJobStatus.running)
+    held = _Session([running])
     assert reclaim_stale_twilio_jobs(held, lock_free=False) == 0
-    assert job.status == SyncJobStatus.running
+    assert running.status == SyncJobStatus.running
     assert held.committed is False
 
-    stale = _Job()
-    free = _Session([stale])
+    stale_running = _Job(SyncJobStatus.running)
+    free = _Session([stale_running])
     assert reclaim_stale_twilio_jobs(free, lock_free=True) == 1
-    assert stale.status == SyncJobStatus.failed
-    assert stale.error_summary == STALE_JOB_MESSAGE
+    assert stale_running.status == SyncJobStatus.failed
+    assert stale_running.error_summary == STALE_JOB_MESSAGE
     assert free.committed is True
+
+    young = _Job(SyncJobStatus.pending, created_at=now - timedelta(seconds=5))
+    young_session = _Session([young])
+    assert reclaim_stale_twilio_jobs(young_session, lock_free=True) == 0
+    assert young.status == SyncJobStatus.pending
+    assert young_session.committed is False
+
+    old = _Job(SyncJobStatus.pending, created_at=now - timedelta(seconds=61))
+    old_session = _Session([old])
+    assert reclaim_stale_twilio_jobs(old_session, lock_free=True) == 1
+    assert old.status == SyncJobStatus.failed
+    assert old_session.committed is True
+
+
+def test_search_or_empty_raises_429_treats_404_as_empty():
+    from app.modules.twilio.runner import _search_or_empty
+    from app.providers.errors import ProviderError
+
+    class _Client:
+        def __init__(self, exc: ProviderError):
+            self.exc = exc
+
+        async def search_available(self, **_kwargs):
+            raise self.exc
+
+    async def _run_429():
+        try:
+            await _search_or_empty(
+                _Client(ProviderError("throttled", details={"status": 429})),
+                country_iso="US",
+                number_type="local",
+            )
+            raise AssertionError("expected 429 to propagate")
+        except ProviderError as exc:
+            assert (exc.details or {}).get("status") == 429
+
+    async def _run_404():
+        rows = await _search_or_empty(
+            _Client(ProviderError("missing", details={"status": 404})),
+            country_iso="US",
+            number_type="local",
+        )
+        assert rows == []
+
+    asyncio.run(_run_429())
+    asyncio.run(_run_404())
+
+
+def test_fetch_pricing_reraises_auth():
+    from app.providers.errors import ProviderAuthError
+    from app.providers.twilio.client import TwilioClient
+
+    client = TwilioClient(
+        ConnectionConfig(
+            base_url="https://api.twilio.com/2010-04-01",
+            auth_settings={"account_sid": "ACtest", "auth_token": "token"},
+        )
+    )
+
+    async def _boom(*_args, **_kwargs):
+        raise ProviderAuthError("Twilio auth failed HTTP 401", details={"status": 401})
+
+    client._get = _boom  # type: ignore[method-assign]
+
+    async def _run():
+        try:
+            await client.fetch_pricing("US")
+            raise AssertionError("expected ProviderAuthError")
+        except ProviderAuthError:
+            return
+
+    asyncio.run(_run())
+
+
+def test_wipe_twilio_locked_busy_and_self_held(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.modules.twilio import runner as twilio_runner
+    from app.providers.errors import ProviderError
+
+    class _Conn:
+        def close(self):
+            return None
+
+    monkeypatch.setattr(twilio_runner.lock_engine, "connect", lambda: _Conn())
+    monkeypatch.setattr(twilio_runner, "try_advisory_lock_conn", lambda *_args, **_kwargs: False)
+    try:
+        twilio_runner.wipe_twilio_locked(SimpleNamespace())
+        raise AssertionError("expected ProviderError")
+    except ProviderError as exc:
+        assert "уже выполняется" in str(exc)
+
+    calls: list[object] = []
+
+    def _lock(*_args, **_kwargs):
+        calls.append("lock")
+        return True
+
+    def _reclaim(db, *, lock_free=None):
+        calls.append(("reclaim", lock_free))
+        return 1
+
+    def _provider(_db):
+        return SimpleNamespace(id="11111111-1111-1111-1111-111111111111")
+
+    def _wipe(_db, *, provider_id):
+        calls.append(("wipe", str(provider_id)))
+        return {"numbers": 1}
+
+    def _unlock(*_args, **_kwargs):
+        calls.append("unlock")
+
+    monkeypatch.setattr(twilio_runner, "try_advisory_lock_conn", _lock)
+    monkeypatch.setattr(twilio_runner, "reclaim_stale_twilio_jobs", _reclaim)
+    monkeypatch.setattr(twilio_runner, "get_twilio_provider", _provider)
+    monkeypatch.setattr(twilio_runner, "wipe_twilio_data", _wipe)
+    monkeypatch.setattr(twilio_runner, "advisory_unlock_conn", _unlock)
+    assert twilio_runner.wipe_twilio_locked(SimpleNamespace()) == {"numbers": 1}
+    assert calls[0] == "lock"
+    assert calls[1] == ("reclaim", True)
+    assert calls[2][0] == "wipe"
+    assert calls[-1] == "unlock"
 
 
 def test_numbers_sync_in_both_or_neither():

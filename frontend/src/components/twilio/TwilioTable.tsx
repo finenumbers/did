@@ -388,10 +388,6 @@ export function TwilioTable() {
         )}
       </div>
 
-      <div className="notice" role="note">
-        Выборка, не полный список. Twilio не отдаёт весь инвентарь — в таблице сохранённые номера
-        последней загрузки стран и номеров.
-      </div>
       {syncError && !syncOpen && <div className="state error">{syncError}</div>}
       {exportError && <div className="state error">{exportError}</div>}
 
@@ -481,9 +477,41 @@ export function TwilioTable() {
           >
             <div className="filters" style={{ justifyContent: "space-between" }}>
               <strong>Синхронизация</strong>
-              <button type="button" className="secondary" onClick={() => setSyncOpen(false)}>
-                Закрыть
-              </button>
+              <div className="filters" style={{ marginBottom: 0 }}>
+                <button type="button" disabled={starting || twilioBusy} onClick={() => void startCountries()}>
+                  {syncActive ? "Загрузка стран…" : "Загрузка стран"}
+                </button>
+                <button
+                  type="button"
+                  disabled={startingNumbers || twilioBusy || !hasCatalog}
+                  title={hasCatalog ? undefined : "Сначала выполните «Загрузка стран»"}
+                  onClick={() => void startNumbers()}
+                >
+                  {numbersActive ? "Загрузка номеров…" : "Загрузка номеров"}
+                </button>
+                {wipeConfirm ? (
+                  <>
+                    <button type="button" className="secondary" disabled={wiping} onClick={() => setWipeConfirm(false)}>
+                      Отмена
+                    </button>
+                    <button type="button" disabled={wiping || twilioBusy} onClick={() => void wipeData()}>
+                      {wiping ? "Удаление…" : "Подтвердить удаление"}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={wiping || twilioBusy}
+                    onClick={() => setWipeConfirm(true)}
+                  >
+                    Стереть данные
+                  </button>
+                )}
+                <button type="button" className="secondary" onClick={() => setSyncOpen(false)}>
+                  Закрыть
+                </button>
+              </div>
             </div>
             <div className="notice" role="status">
               <div>Статус: {jobStatusLabel(displayJob)}</div>
@@ -496,38 +524,6 @@ export function TwilioTable() {
             </div>
             {syncError && <div className="state error">{syncError}</div>}
             {numbersError && <div className="state error">{numbersError}</div>}
-            <div className="filters">
-              <button type="button" disabled={starting || twilioBusy} onClick={() => void startCountries()}>
-                {syncActive ? "Загрузка стран…" : "Загрузка стран"}
-              </button>
-              <button
-                type="button"
-                disabled={startingNumbers || twilioBusy || !hasCatalog}
-                title={hasCatalog ? undefined : "Сначала выполните «Загрузка стран»"}
-                onClick={() => void startNumbers()}
-              >
-                {numbersActive ? "Загрузка номеров…" : "Загрузка номеров"}
-              </button>
-              {wipeConfirm ? (
-                <>
-                  <button type="button" className="secondary" disabled={wiping} onClick={() => setWipeConfirm(false)}>
-                    Отмена
-                  </button>
-                  <button type="button" disabled={wiping || twilioBusy} onClick={() => void wipeData()}>
-                    {wiping ? "Удаление…" : "Подтвердить удаление"}
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={wiping || twilioBusy}
-                  onClick={() => setWipeConfirm(true)}
-                >
-                  Стереть данные
-                </button>
-              )}
-            </div>
             <div className="table-scroll">
               <table>
                 <thead>

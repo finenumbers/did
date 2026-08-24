@@ -70,7 +70,7 @@ function cellText(value: string | number | boolean | null | undefined): string {
   return String(value);
 }
 
-function syncStatusText(job: DidwwSyncJob): string {
+function syncStatusText(job: DidwwSyncJob): string | null {
   const stages = job.stages || [];
   const running = stages.find((s) => s.status === "running");
   if (ACTIVE_STATUSES.has(job.status)) {
@@ -82,13 +82,17 @@ function syncStatusText(job: DidwwSyncJob): string {
     return `Ошибка синхронизации: ${job.error_summary || "неизвестная ошибка"}`;
   }
   if (job.status === "success") {
-    const groups = job.counts?.groups;
-    const at = job.finished_at ? new Date(job.finished_at).toLocaleString("ru-RU") : "";
-    return `Последняя синхронизация: ${
-      groups != null ? `${formatCount(groups)} групп` : "успешно"
-    }${at ? ` · ${at}` : ""}`;
+    return null;
   }
   return `Статус: ${job.status}`;
+}
+
+function catalogSyncMeta(job: DidwwSyncJob | null): string | null {
+  if (!job || job.status !== "success") return null;
+  const groups = job.counts?.groups;
+  if (groups == null) return null;
+  const at = job.finished_at ? new Date(job.finished_at).toLocaleString("ru-RU") : "";
+  return at ? `${formatCount(groups)} групп · ${at}` : `${formatCount(groups)} групп`;
 }
 
 export function DidwwTable() {
@@ -98,6 +102,7 @@ export function DidwwTable() {
   const [openColumn, setOpenColumn] = useState<string | null>(null);
   const [scrollRoot, setScrollRoot] = useState<HTMLElement | null>(null);
   const [job, setJob] = useState<DidwwSyncJob | null>(null);
+  const [lastSuccessJob, setLastSuccessJob] = useState<DidwwSyncJob | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -155,6 +160,7 @@ export function DidwwTable() {
   const loadJob = useCallback(async () => {
     const latest = await apiFetch<DidwwSyncJob | null>("/api/v1/didww/sync/latest");
     setJob(latest);
+    if (latest?.status === "success") setLastSuccessJob(latest);
     return latest;
   }, []);
 
@@ -239,6 +245,8 @@ export function DidwwTable() {
 
   const hasActiveFilters =
     Object.keys(filters).length > 0 || searchInput.trim().length > 0;
+  const headerMeta = catalogSyncMeta(lastSuccessJob || (job?.status === "success" ? job : null));
+  const jobBanner = job ? syncStatusText(job) : null;
 
   return (
     <div className="panel numbers-panel">
@@ -274,20 +282,12 @@ export function DidwwTable() {
         >
           {exporting ? "Экспорт…" : "Экспорт XLSX"}
         </button>
-        {!loading && (
-          <span className="filters-meta">
-            {items.length > 0
-              ? `загружено ${formatCount(items.length)} из ${formatCount(total)}`
-              : total === 0
-                ? "0 записей"
-                : null}
-          </span>
-        )}
+        {headerMeta && <span className="filters-meta">{headerMeta}</span>}
       </div>
 
-      {job && (
-        <div className={job.status === "failed" ? "state error" : "notice"} role="status">
-          {syncStatusText(job)}
+      {jobBanner && (
+        <div className={job?.status === "failed" ? "state error" : "notice"} role="status">
+          {jobBanner}
         </div>
       )}
       {syncError && <div className="state error">{syncError}</div>}

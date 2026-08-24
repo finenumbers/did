@@ -118,33 +118,3 @@ class TwilioAvailableNumbersResponse(BaseModel):
     items: list[TwilioAvailableNumberOut] = Field(default_factory=list)
     returned: int = 0
     same_set: bool = False
-
-
-class TwilioSampleProbeStageOut(BaseModel):
-    id: str
-    label: str
-    status: str
-    detail: str = ""
-
-
-class TwilioSampleProbeRecentOut(BaseModel):
-    request_n: int | None = None
-    detail: str
-    stage: str | None = None
-
-
-class TwilioSampleProbeOut(BaseModel):
-    exists: bool
-    running: bool
-    status: str
-    started_at: str | None = None
-    updated_at: str | None = None
-    elapsed_s: float | None = None
-    requests: int = 0
-    cities_total: int = 0
-    numbers_total: int = 0
-    numbers_after_stage2: int = 0
-    by_country: dict[str, Any] = Field(default_factory=dict)
-    current_detail: str = ""
-    stages: list[TwilioSampleProbeStageOut] = Field(default_factory=list)
-    recent: list[TwilioSampleProbeRecentOut] = Field(default_factory=list)

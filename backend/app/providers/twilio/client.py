@@ -160,6 +160,8 @@ class TwilioClient:
         url = self._abs(self.pricing_base_url, path)
         try:
             payload = await self._get(url)
+        except ProviderAuthError:
+            raise
         except ProviderError as exc:
             details = exc.details or {}
             if details.get("status") == 404:

@@ -12,7 +12,6 @@ from app.models.sync import SyncJob
 from app.modules.twilio import (
     create_twilio_job,
     create_twilio_numbers_job,
-    get_active_twilio_job,
     get_latest_success_twilio_job,
     get_latest_twilio_job,
     get_latest_twilio_numbers_job,
@@ -21,6 +20,7 @@ from app.modules.twilio import (
     spawn_twilio_job,
     spawn_twilio_numbers_job,
     twilio_connection_config,
+    wipe_twilio_locked,
 )
 from app.modules.twilio.persist import (
     attach_numbers_progress_counts,
@@ -29,7 +29,6 @@ from app.modules.twilio.persist import (
     fill_number_counts,
     number_counts_by_type,
     snapshot_totals,
-    wipe_twilio_data,
 )
 from app.providers.errors import ProviderAuthError, ProviderError
 from app.providers.twilio import contract as twilio_contract
@@ -91,7 +90,15 @@ def _job_out(job: SyncJob, *, last_success_at=None, has_catalog: bool = False) -
     )
 
 
-def _progress_with_db_counts(progress: dict, db: Session, provider_id) -> dict:
+def _progress_with_db_counts(
+    progress: dict,
+    db: Session,
+    provider_id,
+    *,
+    preserve_live_counts: bool = False,
+) -> dict:
+    if preserve_live_counts:
+        return progress
     rows = [dict(row) for row in (progress.get("rows") or [])]
     if not rows:
         return progress
@@ -210,6 +217,7 @@ def start_sync(db: Session = Depends(get_db)) -> TwilioSyncJobOut:
 
 @router.get("/sync/latest", response_model=TwilioSyncJobOut | None)
 def latest_sync(db: Session = Depends(get_db)) -> TwilioSyncJobOut | None:
+    reclaim_stale_twilio_jobs(db)
     job = get_latest_twilio_job(db)
     provider = get_twilio_provider(db)
     has_catalog = catalog_has_rows(db, provider_id=provider.id)
@@ -233,17 +241,21 @@ def latest_sync(db: Session = Depends(get_db)) -> TwilioSyncJobOut | None:
         progress["summary"] = summary
         out.progress = progress
     else:
-        out.progress = _progress_with_db_counts(out.progress or {}, db, provider.id)
+        out.progress = _progress_with_db_counts(
+            out.progress or {},
+            db,
+            provider.id,
+            preserve_live_counts=job.status in (SyncJobStatus.pending, SyncJobStatus.running),
+        )
     return out
 
 
 @router.post("/wipe", response_model=TwilioWipeOut)
 def wipe_twilio(db: Session = Depends(get_db)) -> TwilioWipeOut:
-    reclaim_stale_twilio_jobs(db)
-    if get_active_twilio_job(db):
-        raise HTTPException(status_code=409, detail="Синхронизация Twilio уже выполняется")
-    provider = get_twilio_provider(db)
-    deleted = wipe_twilio_data(db, provider_id=provider.id)
+    try:
+        deleted = wipe_twilio_locked(db)
+    except ProviderError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return TwilioWipeOut(ok=True, deleted=deleted)
 
 
@@ -270,6 +282,7 @@ def start_numbers_sync(
 
 @router.get("/numbers/sync/latest", response_model=TwilioSyncJobOut | None)
 def latest_numbers_sync(db: Session = Depends(get_db)) -> TwilioSyncJobOut | None:
+    reclaim_stale_twilio_jobs(db)
     job = get_latest_twilio_numbers_job(db)
     provider = get_twilio_provider(db)
     has_catalog = catalog_has_rows(db, provider_id=provider.id)
