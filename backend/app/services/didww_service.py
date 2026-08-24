@@ -19,6 +19,17 @@ from app.services.xlsx_style import StyledSheetWriter, open_styled_workbook
 BOOL_TRUE = "да"
 BOOL_FALSE = "нет"
 
+DIDWW_FEATURE_FLAGS = (
+    "voice_in",
+    "voice_out",
+    "t38",
+    "sms_in",
+    "p2p",
+    "a2p",
+    "emergency",
+    "cnam_out",
+)
+
 # DIDWW SKU prices are fractions of a dollar ("0.0", "0.3", "0.8"), so the integer
 # ruble formatting used by the RU catalog would collapse them all to 0 or 1.
 PRICE_SCALE = 4
@@ -37,10 +48,24 @@ DIDWW_XLSX_HEADERS = [
     "Каналы",
     "В наличии",
     "Выбор номера",
-    "Возможности",
+    *DIDWW_FEATURE_FLAGS,
     "Регистрация",
     "Поминутно",
 ]
+
+
+def features_has(features: str | None, flag: str) -> bool:
+    if not features:
+        return False
+    return flag in {part.strip() for part in features.split(",") if part.strip()}
+
+
+def _packed_features_expr() -> ColumnElement[Any]:
+    return func.concat(",", func.replace(func.coalesce(DidwwCatalog.features, ""), " ", ""), ",")
+
+
+def _feature_present_expr(flag: str) -> ColumnElement[Any]:
+    return _packed_features_expr().like(f"%,{flag},%")
 
 
 def _as_bool_label(value: bool | None) -> str:
@@ -76,7 +101,6 @@ class DidwwCatalogService:
         "city_name": DidwwCatalog.city_name,
         "area_prefix": DidwwCatalog.area_prefix,
         "did_type": DidwwCatalog.did_type,
-        "features": DidwwCatalog.features,
     }
     PRICE_COLUMNS = {
         "buy_price": DidwwCatalog.buy_price,
@@ -87,6 +111,7 @@ class DidwwCatalogService:
         "needs_registration": DidwwCatalog.needs_registration,
         "is_metered": DidwwCatalog.is_metered,
     }
+    FEATURE_FLAG_COLUMNS = {flag: _feature_present_expr(flag) for flag in DIDWW_FEATURE_FLAGS}
     INT_COLUMNS = {
         "channels_included": DidwwCatalog.channels_included,
         "stock_count": DidwwCatalog.stock_count,
@@ -95,6 +120,7 @@ class DidwwCatalogService:
         set(TEXT_COLUMNS)
         | set(PRICE_COLUMNS)
         | set(BOOL_COLUMNS)
+        | set(FEATURE_FLAG_COLUMNS)
         | set(INT_COLUMNS)
     )
     SORTABLE = {
@@ -109,7 +135,6 @@ class DidwwCatalogService:
         "period_price": DidwwCatalog.period_price,
         "channels_included": DidwwCatalog.channels_included,
         "stock_count": DidwwCatalog.stock_count,
-        "features": DidwwCatalog.features,
     }
 
     def __init__(self, db: Session):
@@ -191,6 +216,14 @@ class DidwwCatalogService:
                     preds.append(col.in_(wanted))
                 if include_empty:
                     preds.append(col.is_(None))
+            elif field in self.FEATURE_FLAG_COLUMNS:
+                expr = self.FEATURE_FLAG_COLUMNS[field]
+                wanted_true = BOOL_TRUE in concrete
+                wanted_false = BOOL_FALSE in concrete
+                if wanted_true and not wanted_false:
+                    preds.append(expr)
+                elif wanted_false and not wanted_true:
+                    preds.append(~expr)
             elif field in self.INT_COLUMNS:
                 col = self.INT_COLUMNS[field]
                 ints: list[int] = []
@@ -259,6 +292,8 @@ class DidwwCatalogService:
         if column in self.BOOL_COLUMNS:
             col = self.BOOL_COLUMNS[column]
             return case((col.is_(True), BOOL_TRUE), (col.is_(False), BOOL_FALSE), else_=None)
+        if column in self.FEATURE_FLAG_COLUMNS:
+            return case((self.FEATURE_FLAG_COLUMNS[column], BOOL_TRUE), else_=BOOL_FALSE)
         if column in self.INT_COLUMNS:
             return self.INT_COLUMNS[column]
         return func.nullif(func.btrim(cast(self.TEXT_COLUMNS[column], String)), "")
@@ -339,7 +374,10 @@ class DidwwCatalogService:
                         row.channels_included if row.channels_included is not None else "",
                         row.stock_count if row.stock_count is not None else "",
                         _as_bool_label(row.number_select),
-                        row.features or "",
+                        *[
+                            _as_bool_label(features_has(row.features, flag))
+                            for flag in DIDWW_FEATURE_FLAGS
+                        ],
                         _as_bool_label(row.needs_registration),
                         _as_bool_label(row.is_metered),
                     ]

@@ -462,7 +462,7 @@ def test_catalog_queries_compile_and_facets_exclude_their_own_column():
         filters=filters,
         q="lond",
     )
-    for column in ("country_name", "buy_price", "number_select", "channels_included", "features"):
+    for column in ("country_name", "buy_price", "number_select", "channels_included", "voice_in"):
         service.list_facets(column=column, filters=filters, q="lond", value_q="lo")
 
     country_facet_sql = db.sql[2]
@@ -488,6 +488,46 @@ def test_didww_prices_keep_their_decimals():
     assert format_didww_price(Decimal("12.0000")) == "12"
     assert format_didww_price(Decimal("1500.0000")) == "1 500"
     assert format_didww_price(None) == ""
+
+
+def test_features_has_membership_is_token_exact():
+    from app.services.didww_service import features_has
+
+    assert features_has("voice_in, sms_in", "voice_in") is True
+    assert features_has("voice_in, sms_in", "sms_in") is True
+    assert features_has("voice_in, sms_in", "voice_out") is False
+    assert features_has("voice_out", "voice_in") is False
+    assert features_has("voice_in,sms_in", "sms_in") is True
+    assert features_has(None, "voice_in") is False
+    assert features_has("", "t38") is False
+
+
+def test_feature_flag_filter_compiles_to_features_like():
+    from app.services.didww_service import DidwwCatalogService
+
+    db = _CompilingSession()
+    service = DidwwCatalogService(db)
+    service.list_groups(
+        page=1,
+        page_size=50,
+        sort_by="country_name",
+        sort_dir="asc",
+        filters={"voice_in": ["да"], "voice_out": ["нет"]},
+        q=None,
+    )
+    sql = db.sql[0]
+    assert "didww_catalog.features" in sql
+    assert "%,voice_in,%" in sql
+    assert "%,voice_out,%" in sql
+    assert "didww_catalog.voice_in" not in sql
+
+
+def test_features_text_is_not_a_facet_column():
+    from app.services.didww_service import DidwwCatalogService
+
+    service = DidwwCatalogService(_CompilingSession())
+    with pytest.raises(ValueError):
+        service.list_facets(column="features", filters={}, q=None)
 
 
 def test_parse_filters_accepts_json_and_rejects_garbage():

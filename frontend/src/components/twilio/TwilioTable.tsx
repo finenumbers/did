@@ -7,7 +7,7 @@ import { InfiniteScrollSentinel } from "@/components/table/InfiniteScrollSentine
 import { apiDownload, apiFetch } from "@/lib/api/client";
 import { formatCount, formatDecimal } from "@/lib/format";
 import { useInfinitePage } from "@/lib/hooks/useInfinitePage";
-import { encodeFilters } from "@/lib/numbers/filters";
+import { encodeFilters, formatTwilioNumberType } from "@/lib/numbers/filters";
 import type {
   ColumnFilters,
   FacetResponse,
@@ -26,7 +26,7 @@ type Col = {
 const TWILIO_COLUMNS: Col[] = [
   { key: "country_name", header: "Страна", value: (r) => r.country_name },
   { key: "phone_number", header: "Номер", value: (r) => r.phone_number },
-  { key: "number_type", header: "Тип", value: (r) => r.number_type },
+  { key: "number_type", header: "Тип", value: (r) => formatTwilioNumberType(r.number_type) },
   { key: "region", header: "Регион", value: (r) => r.region },
   { key: "locality", header: "Город", value: (r) => r.locality },
   { key: "period_price", header: "Абонплата", value: (r) => formatDecimal(r.period_price) },
@@ -513,7 +513,7 @@ export function TwilioTable() {
                   {coverageRows.map((row) => (
                     <tr key={`${row.country_iso}-${row.number_type}`}>
                       <td>{row.country_name || row.country_iso || "—"}</td>
-                      <td>{row.number_type || "—"}</td>
+                      <td>{formatTwilioNumberType(row.number_type)}</td>
                       <td>{countText(row.region_count, row.number_type)}</td>
                       <td>{countText(row.city_count, row.number_type)}</td>
                       <td>{optionalCount(row.number_count)}</td>
@@ -595,7 +595,7 @@ export function TwilioTable() {
                     return (
                       <tr key={`${row.country_iso}-${row.number_type}`}>
                         <td>{row.country_name || row.country_iso || "—"}</td>
-                        <td>{row.number_type || "—"}</td>
+                        <td>{formatTwilioNumberType(row.number_type)}</td>
                         <td>{countText(row.region_count, row.number_type)}</td>
                         <td>{countText(row.city_count, row.number_type)}</td>
                         <td>{optionalCount(row.number_count)}</td>

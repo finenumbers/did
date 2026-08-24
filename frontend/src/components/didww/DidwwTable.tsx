@@ -21,6 +21,22 @@ type Col = {
   value: (row: DidwwGroupItem) => string | number | boolean | null | undefined;
 };
 
+const DIDWW_FEATURE_FLAGS = [
+  "voice_in",
+  "voice_out",
+  "t38",
+  "sms_in",
+  "p2p",
+  "a2p",
+  "emergency",
+  "cnam_out",
+] as const;
+
+function hasDidwwFeature(features: string | null | undefined, flag: string): boolean {
+  if (!features) return false;
+  return features.split(",").some((part) => part.trim() === flag);
+}
+
 /** DIDWW coverage columns — deliberately separate from the RU catalog column set. */
 const DIDWW_COLUMNS: Col[] = [
   { key: "country_name", header: "Страна", value: (r) => r.country_name },
@@ -35,7 +51,11 @@ const DIDWW_COLUMNS: Col[] = [
   { key: "channels_included", header: "Каналы", value: (r) => r.channels_included },
   { key: "stock_count", header: "В наличии", value: (r) => r.stock_count },
   { key: "number_select", header: "Выбор номера", value: (r) => r.number_select },
-  { key: "features", header: "Возможности", value: (r) => r.features },
+  ...DIDWW_FEATURE_FLAGS.map((flag) => ({
+    key: flag,
+    header: flag,
+    value: (r: DidwwGroupItem) => hasDidwwFeature(r.features, flag),
+  })),
   { key: "needs_registration", header: "Регистрация", value: (r) => r.needs_registration },
   { key: "is_metered", header: "Поминутно", value: (r) => r.is_metered },
 ];

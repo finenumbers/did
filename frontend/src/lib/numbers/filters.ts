@@ -26,9 +26,23 @@ export function displayProviderCode(code: string): string {
   return PROVIDER_LABELS[code] ?? code;
 }
 
+const TWILIO_NUMBER_TYPE_LABELS: Record<string, string> = {
+  local: "Local",
+  toll_free: "Toll-free",
+  mobile: "Mobile",
+  voip: "VoIP",
+  national: "National",
+};
+
+export function formatTwilioNumberType(type: string | null | undefined): string {
+  if (type == null || type === "") return "—";
+  return TWILIO_NUMBER_TYPE_LABELS[type] ?? type;
+}
+
 export function displayFacetValue(value: string, column?: string): string {
   if (value === "" || value === EMPTY_FILTER_TOKEN) return "(пусто)";
   if (column === "provider_code") return displayProviderCode(value);
+  if (column === "number_type") return formatTwilioNumberType(value);
   return value;
 }
 
