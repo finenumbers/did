@@ -48,7 +48,7 @@ Background `SyncJobType.twilio`. Poll `GET /sync/latest`.
 4. Persist catalog + cutover **only after success**: upsert catalog (resets `numbers_sync_*` so all load buttons go red), then delete catalog/geo/**all** numbers whose `last_sync_job_id` is not this job.
 5. Empty countries list → `EmptyTwilioFetchError`, live data unchanged. A failed run does not replace the previous catalog.
 
-After each sample/enrich write, `finalize_coverage_geo` classifies `region`/`locality` from `region_raw`/`locality_raw` and recounts from those cleaned columns. Existing rows were classified once by alembic `0037` (`backfill_classified_geo`); GET coverage/numbers only reads. `InRegion` is still US/CA local only.
+After each sample/enrich write, `finalize_coverage_geo` classifies `region`/`locality` from `region_raw`/`locality_raw` and recounts from those cleaned columns. Existing rows were classified once by alembic `0037` (`backfill_classified_geo`); GET coverage/numbers only reads. Backend serves `/health` during that upgrade so Portainer does not mark the container unhealthy. `InRegion` is still US/CA local only.
 
 ## Загрузка (row or chain)
 

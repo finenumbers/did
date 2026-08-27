@@ -176,6 +176,27 @@ def test_list_getters_do_not_rewrite_geo():
     assert not hasattr(TwilioNumbersService, "_ensure_classified")
 
 
+def test_bootstrap_health_listens_before_uvicorn():
+    import urllib.error
+    import urllib.request
+
+    from app.bootstrap import _serve_health
+
+    httpd = _serve_health("127.0.0.1", 0)
+    port = httpd.server_address[1]
+    try:
+        body = urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=2).read()
+        assert b'"status":"ok"' in body
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/api/v1/twilio/numbers", timeout=2)
+            raise AssertionError("expected 503 while migrating")
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 503
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
 def test_needs_geo_finalize_is_limit_one():
     captured: list[object] = []
 

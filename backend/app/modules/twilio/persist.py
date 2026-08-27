@@ -429,25 +429,28 @@ def backfill_classified_geo(conn: Any) -> dict[str, int]:
             """
         )
     )
-    rows = conn.execute(
-        text(
-            """
-            SELECT id, country_iso, country_name, region_raw, locality_raw
-            FROM twilio_available_numbers
-            """
-        )
-    )
     updated = 0
-    batch: list[dict[str, Any]] = []
-    for row in rows:
-        batch.extend(classified_column_updates([row]))
-        if len(batch) >= CLASSIFY_UPDATE_BATCH:
-            _flush_classified_updates(conn, batch)
-            updated += len(batch)
-            batch = []
-    if batch:
-        _flush_classified_updates(conn, batch)
-        updated += len(batch)
+    last_id: Any = None
+    while True:
+        rows = conn.execute(
+            text(
+                """
+                SELECT id, country_iso, country_name, region_raw, locality_raw
+                FROM twilio_available_numbers
+                WHERE CAST(:last_id AS uuid) IS NULL OR id > CAST(:last_id AS uuid)
+                ORDER BY id
+                LIMIT :batch
+                """
+            ),
+            {"last_id": str(last_id) if last_id else None, "batch": CLASSIFY_UPDATE_BATCH},
+        ).all()
+        if not rows:
+            break
+        updates = classified_column_updates(rows)
+        _flush_classified_updates(conn, updates)
+        updated += len(updates)
+        last_id = rows[-1]._mapping["id"]
+        logger.info("Twilio geo backfill classified %s numbers", updated)
 
     conn.execute(text("DELETE FROM twilio_geo WHERE region_filter = ''"))
     geo_inserted = conn.execute(
@@ -467,15 +470,7 @@ def backfill_classified_geo(conn: Any) -> dict[str, int]:
                 lower(btrim(coalesce(n.region, ''))),
                 n.locality,
                 lower(btrim(coalesce(n.locality, ''))),
-                (
-                    SELECT n2.last_sync_job_id
-                    FROM twilio_available_numbers AS n2
-                    WHERE n2.provider_id = n.provider_id
-                      AND n2.country_iso = n.country_iso
-                      AND n2.number_type = n.number_type
-                      AND n2.last_sync_job_id IS NOT NULL
-                    LIMIT 1
-                )
+                NULL
             FROM (
                 SELECT DISTINCT provider_id, country_iso, number_type, region, locality
                 FROM twilio_available_numbers
