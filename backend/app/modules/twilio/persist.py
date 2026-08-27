@@ -765,20 +765,20 @@ def cutover_geo_snapshot(
     }
 
 
-NUMBER_COUNTS_BY_CATALOG_NAME_SQL = """
-            SELECT
-                upper(btrim(c.country_iso)) AS country_iso,
-                btrim(c.number_type) AS number_type,
-                COUNT(n.id) AS cnt
-            FROM twilio_catalog AS c
-            LEFT JOIN twilio_available_numbers AS n
-              ON n.provider_id = c.provider_id
-             AND btrim(n.number_type) = btrim(c.number_type)
-             AND btrim(coalesce(n.country_name, '')) = btrim(c.country_name)
-             AND btrim(coalesce(n.country_name, '')) <> ''
-            WHERE c.provider_id = :provider_id
-              AND c.is_currently_present IS TRUE
-            GROUP BY upper(btrim(c.country_iso)), btrim(c.number_type)
+NUMBER_COUNTS_BY_NAME_SQL = """
+            SELECT country_name, number_type, COUNT(*) AS cnt
+            FROM twilio_available_numbers
+            WHERE provider_id = :provider_id
+              AND country_name IS NOT NULL
+              AND country_name <> ''
+            GROUP BY country_name, number_type
+            """
+
+CATALOG_NAME_TO_ISO_SQL = """
+            SELECT country_name, number_type, country_iso
+            FROM twilio_catalog
+            WHERE provider_id = :provider_id
+              AND is_currently_present IS TRUE
             """
 
 REALIGN_ISO_SQL = """
@@ -816,13 +816,27 @@ RECOUNT_CATALOG_LOCAL_SQL = """
             """
 
 
+def _name_type_key(country_name: Any, number_type: Any) -> tuple[str, str]:
+    return ((country_name or "").strip(), (number_type or "").strip())
+
+
 def number_counts_by_type(db: Session, *, provider_id: uuid.UUID) -> dict[tuple[str, str], int]:
     """Count numbers the same way the table filters: catalog country_name + type."""
-    rows = db.execute(text(NUMBER_COUNTS_BY_CATALOG_NAME_SQL), {"provider_id": provider_id}).all()
-    return {
-        (str(iso or "").strip().upper(), str(typ or "").strip()): int(cnt)
-        for iso, typ, cnt in rows
-    }
+    catalog = db.execute(text(CATALOG_NAME_TO_ISO_SQL), {"provider_id": provider_id}).all()
+    iso_by_name: dict[tuple[str, str], str] = {}
+    for name, ntype, iso in catalog:
+        key = _name_type_key(name, ntype)
+        if key[0] and key[1]:
+            iso_by_name[key] = str(iso or "").strip().upper()
+    rows = db.execute(text(NUMBER_COUNTS_BY_NAME_SQL), {"provider_id": provider_id}).all()
+    out: dict[tuple[str, str], int] = {}
+    for name, ntype, cnt in rows:
+        key = _name_type_key(name, ntype)
+        iso = iso_by_name.get(key)
+        if not iso:
+            continue
+        out[(iso, key[1])] = int(cnt)
+    return out
 
 
 def realign_available_number_iso(db: Session, *, provider_id: uuid.UUID) -> dict[str, int]:
@@ -845,17 +859,19 @@ def recount_catalog_local_counts(conn: Any) -> None:
 
 
 NUMBER_COUNT_FOR_ROW_SQL = """
-            SELECT COUNT(n.id)
-            FROM twilio_catalog AS c
-            LEFT JOIN twilio_available_numbers AS n
-              ON n.provider_id = c.provider_id
-             AND btrim(n.number_type) = btrim(c.number_type)
-             AND btrim(coalesce(n.country_name, '')) = btrim(c.country_name)
-             AND btrim(coalesce(n.country_name, '')) <> ''
-            WHERE c.provider_id = :provider_id
-              AND upper(btrim(c.country_iso)) = :country_iso
-              AND btrim(c.number_type) = :number_type
-              AND c.is_currently_present IS TRUE
+            SELECT COUNT(*)
+            FROM twilio_available_numbers
+            WHERE provider_id = :provider_id
+              AND number_type = :number_type
+              AND country_name = (
+                    SELECT country_name
+                    FROM twilio_catalog
+                    WHERE provider_id = :provider_id
+                      AND country_iso = :country_iso
+                      AND number_type = :number_type
+                      AND is_currently_present IS TRUE
+                    LIMIT 1
+              )
             """
 
 

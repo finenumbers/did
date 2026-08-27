@@ -363,13 +363,35 @@ def test_ingest_classifies_gb_town_out_of_region():
     assert params.get("locality") == "Sanday"
 
 
-def test_number_counts_join_catalog_name_not_iso():
-    from app.modules.twilio.persist import NUMBER_COUNTS_BY_CATALOG_NAME_SQL
+def test_number_counts_group_by_name_without_join_btrim():
+    from app.modules.twilio.persist import NUMBER_COUNTS_BY_NAME_SQL, number_counts_by_type
 
-    sql = " ".join(NUMBER_COUNTS_BY_CATALOG_NAME_SQL.lower().split())
-    assert "twilio_catalog" in sql
-    assert "btrim(coalesce(n.country_name, '')) = btrim(c.country_name)" in sql
-    assert "group by upper(btrim(c.country_iso))" in sql
+    sql = " ".join(NUMBER_COUNTS_BY_NAME_SQL.lower().split())
+    assert "left join" not in sql
+    assert "btrim" not in sql
+    assert "group by country_name, number_type" in sql
+
+    class _Db:
+        def __init__(self):
+            self.n = 0
+
+        def execute(self, _stmt, _params=None):
+            self.n += 1
+
+            class _Rows:
+                def __init__(self, rows):
+                    self._rows = rows
+
+                def all(self):
+                    return self._rows
+
+            if self.n == 1:
+                return _Rows([("United States", "toll_free", "US"), ("Argentina", "toll_free", "AR")])
+            return _Rows([("United States", "toll_free", 30), ("Argentina", "toll_free", 99)])
+
+    out = number_counts_by_type(_Db(), provider_id="11111111-1111-1111-1111-111111111111")
+    assert out[("US", "toll_free")] == 30
+    assert out[("AR", "toll_free")] == 99
 
 
 def test_realign_sql_joins_catalog_name_and_type():

@@ -123,6 +123,7 @@ export function TwilioTable() {
   const [reloadTick, setReloadTick] = useState(0);
   const [syncOpen, setSyncOpen] = useState(false);
   const [coverageRowsDb, setCoverageRowsDb] = useState<TwilioCoverageRow[]>([]);
+  const [coverageLoading, setCoverageLoading] = useState(false);
   const [hasCatalog, setHasCatalog] = useState(false);
   const [numbersJob, setNumbersJob] = useState<TwilioSyncJob | null>(null);
   const [numbersError, setNumbersError] = useState<string | null>(null);
@@ -186,12 +187,17 @@ export function TwilioTable() {
   }, []);
 
   const loadCoverage = useCallback(async () => {
-    const page = await apiFetch<Page<TwilioCoverageRow>>(
-      "/api/v1/twilio/coverage?page=1&page_size=2000&sort_by=country_name&sort_dir=asc",
-    );
-    setCoverageRowsDb(page.items);
-    setHasCatalog(page.total > 0);
-    return page;
+    setCoverageLoading(true);
+    try {
+      const page = await apiFetch<Page<TwilioCoverageRow>>(
+        "/api/v1/twilio/coverage?page=1&page_size=2000&sort_by=country_name&sort_dir=asc",
+      );
+      setCoverageRowsDb(page.items);
+      setHasCatalog(page.total > 0);
+      return page;
+    } finally {
+      setCoverageLoading(false);
+    }
   }, []);
 
   const loadNumbersJob = useCallback(async () => {
@@ -202,9 +208,13 @@ export function TwilioTable() {
 
   useEffect(() => {
     void loadJob().catch(() => undefined);
-    void loadCoverage().catch(() => undefined);
     void loadNumbersJob().catch(() => undefined);
-  }, [loadJob, loadCoverage, loadNumbersJob]);
+  }, [loadJob, loadNumbersJob]);
+
+  useEffect(() => {
+    if (!syncOpen) return;
+    void loadCoverage().catch(() => undefined);
+  }, [syncOpen, loadCoverage]);
 
   const syncActive = Boolean(job && ACTIVE_STATUSES.has(job.status));
   const numbersActive = Boolean(numbersJob && ACTIVE_STATUSES.has(numbersJob.status));
@@ -228,10 +238,10 @@ export function TwilioTable() {
           }
         })
         .catch(() => undefined);
-      void loadCoverage().catch(() => undefined);
+      if (syncOpen) void loadCoverage().catch(() => undefined);
     }, 2000);
     return () => clearInterval(timer);
-  }, [twilioBusy, loadJob, loadNumbersJob, loadCoverage]);
+  }, [twilioBusy, syncOpen, loadJob, loadNumbersJob, loadCoverage]);
 
   const startCountries = async () => {
     setStarting(true);
@@ -372,7 +382,6 @@ export function TwilioTable() {
             setSyncOpen(true);
             setWipeConfirm(false);
             void loadJob().catch(() => undefined);
-            void loadCoverage().catch(() => undefined);
             void loadNumbersJob().catch(() => undefined);
           }}
         >
@@ -591,7 +600,8 @@ export function TwilioTable() {
                   })}
                 </tbody>
               </table>
-              {tableRows.length === 0 && (
+              {coverageLoading && tableRows.length === 0 && <div className="state">Загрузка…</div>}
+              {!coverageLoading && tableRows.length === 0 && (
                 <div className="state">Нет строк. Нажмите «Загрузка стран», чтобы загрузить справочник.</div>
               )}
             </div>

@@ -66,7 +66,7 @@ Per cell:
 3. Repeat the same `%xx%` while the page has ≥ 30 **and** fewer than two consecutive responses with no new region / city / E.164 (novelty is vs already stored facts for the row).
 4. `< 30` or two empty-of-new loads → next `%x%`, not the end of the grid.
 
-Writes go live via `ingest_available_batch` (`source=number_sync`). E.164 ownership is the catalog pair we searched (`coverage_owner`); payload `iso_country` does not change `country_iso`. Sync «Номера» counts `country_name` + type (same grain as the table filter). Alembic `0038` and numbers ingest realign leaked ISO by trimmed `country_name` + type. GET coverage does not write. The row is marked loaded even if every cell was empty. A row error in the chain marks that row failed and continues; auth / missing catalog fail the job.
+Writes go live via `ingest_available_batch` (`source=number_sync`). E.164 ownership is the catalog pair we searched (`coverage_owner`); payload `iso_country` does not change `country_iso`. Sync «Номера» counts `GROUP BY country_name, number_type` (same grain as the table filter, no join+btrim on GET). Alembic `0038` and numbers ingest realign leaked ISO by trimmed `country_name` + type. GET coverage does not write. The row is marked loaded even if every cell was empty. A row error in the chain marks that row failed and continues; auth / missing catalog fail the job.
 
 ## Wipe
 
