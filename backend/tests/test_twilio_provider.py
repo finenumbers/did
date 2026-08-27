@@ -363,6 +363,15 @@ def test_ingest_classifies_gb_town_out_of_region():
     assert params.get("locality") == "Sanday"
 
 
+def test_number_counts_join_catalog_name_not_iso():
+    from app.modules.twilio.persist import NUMBER_COUNTS_BY_CATALOG_NAME_SQL
+
+    sql = " ".join(NUMBER_COUNTS_BY_CATALOG_NAME_SQL.lower().split())
+    assert "twilio_catalog" in sql
+    assert "btrim(coalesce(n.country_name, '')) = btrim(c.country_name)" in sql
+    assert "group by upper(btrim(c.country_iso))" in sql
+
+
 def test_realign_sql_joins_catalog_name_and_type():
     from sqlalchemy.dialects import postgresql
 
@@ -393,8 +402,8 @@ def test_realign_sql_joins_catalog_name_and_type():
     text_sql = str(compiled) if compiled is not None else sql
     lowered = text_sql.lower()
     assert "twilio_catalog" in lowered
-    assert "country_name" in lowered
-    assert "number_type" in lowered
+    assert "btrim(n.country_name) = btrim(c.country_name)" in lowered
+    assert "btrim(n.number_type) = btrim(c.number_type)" in lowered
     assert "is distinct from" in lowered
     assert params is None or params.get("provider_id") or getattr(compiled, "params", {}).get(
         "provider_id"

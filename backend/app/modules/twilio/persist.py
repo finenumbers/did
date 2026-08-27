@@ -765,27 +765,23 @@ def cutover_geo_snapshot(
     }
 
 
-def number_counts_by_type(db: Session, *, provider_id: uuid.UUID) -> dict[tuple[str, str], int]:
-    rows = db.execute(
-        select(
-            TwilioAvailableNumber.country_iso,
-            TwilioAvailableNumber.number_type,
-            func.count(),
-        )
-        .where(TwilioAvailableNumber.provider_id == provider_id)
-        .group_by(TwilioAvailableNumber.country_iso, TwilioAvailableNumber.number_type)
-    ).all()
-    return {
-        (str(iso or "").strip().upper(), str(typ or "").strip()): int(cnt)
-        for iso, typ, cnt in rows
-    }
-
-
-def realign_available_number_iso(db: Session, *, provider_id: uuid.UUID) -> dict[str, int]:
-    """Move leaked E.164 back to the catalog pair that owns country_name + type."""
-    result = db.execute(
-        text(
+NUMBER_COUNTS_BY_CATALOG_NAME_SQL = """
+            SELECT
+                upper(btrim(c.country_iso)) AS country_iso,
+                btrim(c.number_type) AS number_type,
+                COUNT(n.id) AS cnt
+            FROM twilio_catalog AS c
+            LEFT JOIN twilio_available_numbers AS n
+              ON n.provider_id = c.provider_id
+             AND btrim(n.number_type) = btrim(c.number_type)
+             AND btrim(coalesce(n.country_name, '')) = btrim(c.country_name)
+             AND btrim(coalesce(n.country_name, '')) <> ''
+            WHERE c.provider_id = :provider_id
+              AND c.is_currently_present IS TRUE
+            GROUP BY upper(btrim(c.country_iso)), btrim(c.number_type)
             """
+
+REALIGN_ISO_SQL = """
             UPDATE twilio_available_numbers AS n
             SET country_iso = c.country_iso,
                 updated_at = NOW()
@@ -795,13 +791,43 @@ def realign_available_number_iso(db: Session, *, provider_id: uuid.UUID) -> dict
               AND c.is_currently_present IS TRUE
               AND n.country_name IS NOT NULL
               AND btrim(n.country_name) <> ''
-              AND n.country_name = c.country_name
-              AND n.number_type = c.number_type
+              AND btrim(n.country_name) = btrim(c.country_name)
+              AND btrim(n.number_type) = btrim(c.number_type)
               AND n.country_iso IS DISTINCT FROM c.country_iso
             """
-        ),
-        {"provider_id": provider_id},
-    )
+
+RECOUNT_CATALOG_LOCAL_SQL = """
+            UPDATE twilio_catalog AS c
+            SET region_count = sub.rc,
+                city_count = sub.cc
+            FROM (
+                SELECT
+                    provider_id,
+                    country_iso,
+                    number_type,
+                    COUNT(DISTINCT NULLIF(btrim(region), '')) AS rc,
+                    COUNT(DISTINCT NULLIF(btrim(locality), '')) AS cc
+                FROM twilio_available_numbers
+                GROUP BY provider_id, country_iso, number_type
+            ) AS sub
+            WHERE c.provider_id = sub.provider_id
+              AND c.country_iso = sub.country_iso
+              AND c.number_type = sub.number_type
+            """
+
+
+def number_counts_by_type(db: Session, *, provider_id: uuid.UUID) -> dict[tuple[str, str], int]:
+    """Count numbers the same way the table filters: catalog country_name + type."""
+    rows = db.execute(text(NUMBER_COUNTS_BY_CATALOG_NAME_SQL), {"provider_id": provider_id}).all()
+    return {
+        (str(iso or "").strip().upper(), str(typ or "").strip()): int(cnt)
+        for iso, typ, cnt in rows
+    }
+
+
+def realign_available_number_iso(db: Session, *, provider_id: uuid.UUID) -> dict[str, int]:
+    """Move leaked E.164 back to the catalog pair that owns country_name + type."""
+    result = db.execute(text(REALIGN_ISO_SQL), {"provider_id": provider_id})
     db.flush()
     updated = int(result.rowcount or 0)
     if updated:
@@ -811,6 +837,26 @@ def realign_available_number_iso(db: Session, *, provider_id: uuid.UUID) -> dict
             provider_id,
         )
     return {"realigned": updated}
+
+
+def recount_catalog_local_counts(conn: Any) -> None:
+    conn.execute(text("UPDATE twilio_catalog SET region_count = 0, city_count = 0"))
+    conn.execute(text(RECOUNT_CATALOG_LOCAL_SQL))
+
+
+NUMBER_COUNT_FOR_ROW_SQL = """
+            SELECT COUNT(n.id)
+            FROM twilio_catalog AS c
+            LEFT JOIN twilio_available_numbers AS n
+              ON n.provider_id = c.provider_id
+             AND btrim(n.number_type) = btrim(c.number_type)
+             AND btrim(coalesce(n.country_name, '')) = btrim(c.country_name)
+             AND btrim(coalesce(n.country_name, '')) <> ''
+            WHERE c.provider_id = :provider_id
+              AND upper(btrim(c.country_iso)) = :country_iso
+              AND btrim(c.number_type) = :number_type
+              AND c.is_currently_present IS TRUE
+            """
 
 
 def number_count_for_row(
@@ -824,12 +870,10 @@ def number_count_for_row(
     ntype = (number_type or "").strip()
     return int(
         db.scalar(
-            select(func.count())
-            .select_from(TwilioAvailableNumber)
-            .where(
-                TwilioAvailableNumber.provider_id == provider_id,
-                TwilioAvailableNumber.country_iso == iso,
-                TwilioAvailableNumber.number_type == ntype,
+            text(NUMBER_COUNT_FOR_ROW_SQL).bindparams(
+                provider_id=provider_id,
+                country_iso=iso,
+                number_type=ntype,
             )
         )
         or 0
