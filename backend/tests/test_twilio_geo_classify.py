@@ -198,6 +198,17 @@ def test_list_getters_do_not_rewrite_geo():
     assert not hasattr(TwilioNumbersService, "_ensure_classified")
 
 
+def test_numbers_commit_batch_does_not_finalize_geo():
+    from app.modules.twilio.numbers_runner import _enrich_catalog_row
+
+    src = inspect.getsource(_enrich_catalog_row)
+    commit = src[src.index("async def _commit_batch") : src.index("for cell_index")]
+    assert "finalize_coverage_geo" not in commit
+    assert "refresh_local_counts" in commit
+    assert 'if result.get("phones")' in commit
+    assert src.count("finalize_coverage_geo") == 1
+
+
 def _list_numbers_count_sql(filters: dict[str, list[str]], q: str | None = None) -> str:
     from sqlalchemy.dialects import postgresql
 

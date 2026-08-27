@@ -90,6 +90,19 @@ def _job_out(job: SyncJob, *, last_success_at=None, has_catalog: bool = False) -
     )
 
 
+def _job_is_active(job: SyncJob | None) -> bool:
+    return bool(job and job.status in (SyncJobStatus.pending, SyncJobStatus.running))
+
+
+def should_rebuild_countries_progress(
+    countries_job: SyncJob | None,
+    numbers_job: SyncJob | None,
+) -> bool:
+    if countries_job is None or countries_job.status != SyncJobStatus.success:
+        return False
+    return not _job_is_active(numbers_job)
+
+
 def _progress_with_db_counts(
     progress: dict,
     db: Session,
@@ -229,7 +242,7 @@ def latest_sync(db: Session = Depends(get_db)) -> TwilioSyncJobOut | None:
         last_success_at=success.finished_at if success else None,
         has_catalog=has_catalog,
     )
-    if job.status == SyncJobStatus.success:
+    if should_rebuild_countries_progress(job, get_latest_twilio_numbers_job(db)):
         progress = dict(out.progress or {})
         progress["rows"] = catalog_progress_rows(db, provider_id=provider.id)
         totals = snapshot_totals(db, provider_id=provider.id)
@@ -240,12 +253,12 @@ def latest_sync(db: Session = Depends(get_db)) -> TwilioSyncJobOut | None:
             summary["requests_total"] = summary["requests"]
         progress["summary"] = summary
         out.progress = progress
-    else:
+    elif job.status in (SyncJobStatus.pending, SyncJobStatus.running):
         out.progress = _progress_with_db_counts(
             out.progress or {},
             db,
             provider.id,
-            preserve_live_counts=job.status in (SyncJobStatus.pending, SyncJobStatus.running),
+            preserve_live_counts=True,
         )
     return out
 
@@ -289,10 +302,11 @@ def latest_numbers_sync(db: Session = Depends(get_db)) -> TwilioSyncJobOut | Non
     if job is None:
         return None
     out = _job_out(job, has_catalog=has_catalog)
-    running = job.status in (SyncJobStatus.pending, SyncJobStatus.running)
+    if _job_is_active(job):
+        return out
     out.progress = attach_numbers_progress_counts(
         out.progress or {},
-        running=running,
+        running=False,
         counts=number_counts_by_type(db, provider_id=provider.id),
     )
     return out

@@ -34,6 +34,7 @@ from app.modules.twilio.persist import (
     mark_numbers_synced,
     number_count_for_row,
     realign_available_number_iso,
+    refresh_local_counts,
 )
 from app.modules.twilio.runner import (
     TWILIO_LOCK_KEY,
@@ -242,13 +243,18 @@ async def _enrich_catalog_row(
             source=contract.NUMBER_SOURCE_NUMBERS,
         )
         tracker.note_batch(country_iso, number_type, result)
-        region_count, city_count = finalize_coverage_geo(
-            db,
-            provider_id=provider_id,
-            country_iso=country_iso,
-            number_type=number_type,
-            job_id=job_id,
-        )
+        if result.get("phones"):
+            region_count, city_count = refresh_local_counts(
+                db,
+                provider_id=provider_id,
+                country_iso=country_iso,
+                number_type=number_type,
+            )
+            row_view["region_count"] = region_count
+            row_view["city_count"] = city_count
+            row_view["number_count"] = number_count_for_row(
+                db, provider_id=provider_id, country_iso=country_iso, number_type=number_type
+            )
         row_view["status"] = "running"
         row_view["detail"] = _numbers_detail(
             pattern_index,
@@ -258,11 +264,6 @@ async def _enrich_catalog_row(
             cell,
             contains,
             len(batch),
-        )
-        row_view["region_count"] = region_count
-        row_view["city_count"] = city_count
-        row_view["number_count"] = number_count_for_row(
-            db, provider_id=provider_id, country_iso=country_iso, number_type=number_type
         )
         tracker.apply(
             current={

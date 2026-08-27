@@ -601,6 +601,37 @@ def test_progress_with_db_counts_preserves_live_on_running_countries():
     assert kept["rows"][0]["number_count"] == 7
 
 
+def test_countries_latest_skips_rebuild_while_numbers_running():
+    from types import SimpleNamespace
+
+    from app.api.routes.twilio import should_rebuild_countries_progress
+    from app.models.enums import SyncJobStatus
+
+    success = SimpleNamespace(status=SyncJobStatus.success)
+    running = SimpleNamespace(status=SyncJobStatus.running)
+    pending = SimpleNamespace(status=SyncJobStatus.pending)
+    failed = SimpleNamespace(status=SyncJobStatus.failed)
+    assert should_rebuild_countries_progress(success, None) is True
+    assert should_rebuild_countries_progress(success, failed) is True
+    assert should_rebuild_countries_progress(success, running) is False
+    assert should_rebuild_countries_progress(success, pending) is False
+    assert should_rebuild_countries_progress(running, None) is False
+
+
+def test_latest_numbers_sync_skips_counts_while_running():
+    import inspect
+
+    from app.api.routes.twilio import latest_numbers_sync, latest_sync
+
+    numbers_src = inspect.getsource(latest_numbers_sync)
+    assert numbers_src.index("if _job_is_active(job)") < numbers_src.index("number_counts_by_type")
+    countries_src = inspect.getsource(latest_sync)
+    assert "should_rebuild_countries_progress" in countries_src
+    assert countries_src.index("should_rebuild_countries_progress") < countries_src.index(
+        "catalog_progress_rows"
+    )
+
+
 def test_attach_numbers_progress_keeps_this_run_count_while_running():
     from app.modules.twilio.persist import attach_numbers_progress_counts
 
