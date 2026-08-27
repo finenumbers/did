@@ -27,13 +27,13 @@ from app.modules.twilio.persist import (
     catalog_has_rows,
     cutover_numbers_row,
     get_catalog_row,
+    finalize_coverage_geo,
     ingest_available_batch,
     list_catalog_rows,
     load_row_known,
     mark_numbers_synced,
     number_count_for_row,
     realign_available_number_iso,
-    refresh_local_counts,
 )
 from app.modules.twilio.runner import (
     TWILIO_LOCK_KEY,
@@ -242,11 +242,12 @@ async def _enrich_catalog_row(
             source=contract.NUMBER_SOURCE_NUMBERS,
         )
         tracker.note_batch(country_iso, number_type, result)
-        region_count, city_count = refresh_local_counts(
+        region_count, city_count = finalize_coverage_geo(
             db,
             provider_id=provider_id,
             country_iso=country_iso,
             number_type=number_type,
+            job_id=job_id,
         )
         row_view["status"] = "running"
         row_view["detail"] = _numbers_detail(
@@ -344,11 +345,12 @@ async def _enrich_catalog_row(
         job_id=job_id,
         geo_job_id=catalog.last_sync_job_id,
     )
-    region_count, city_count = refresh_local_counts(
+    region_count, city_count = finalize_coverage_geo(
         db,
         provider_id=provider_id,
         country_iso=country_iso,
         number_type=number_type,
+        job_id=job_id,
     )
     row_view["status"] = "success"
     row_view["detail"] = ""

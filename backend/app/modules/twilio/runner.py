@@ -25,11 +25,11 @@ from app.modules.twilio.persist import (
     EmptyTwilioFetchError,
     cutover_geo_snapshot,
     fill_number_counts,
+    finalize_coverage_geo,
     ingest_available_batch,
     number_count_for_row,
     number_counts_by_type,
     persist_twilio_coverage,
-    refresh_local_counts,
     snapshot_totals,
     wipe_twilio_data,
 )
@@ -688,11 +688,12 @@ def _refresh_row_counts(
     item: dict[str, Any],
     row: CatalogRow,
 ) -> None:
-    region_count, city_count = refresh_local_counts(
+    region_count, city_count = finalize_coverage_geo(
         db,
         provider_id=tracker.job.provider_id,
         country_iso=row.country_iso,
         number_type=row.number_type,
+        job_id=tracker.job.id,
     )
     item["region_count"] = region_count
     item["city_count"] = city_count

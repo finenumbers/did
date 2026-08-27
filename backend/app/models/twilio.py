@@ -80,6 +80,7 @@ class TwilioGeo(Base):
             "country_iso",
             "number_type",
             "region_filter",
+            "region_norm",
             "locality_norm",
             name="uq_twilio_geo_cell",
         ),
@@ -93,6 +94,7 @@ class TwilioGeo(Base):
     number_type: Mapped[str] = mapped_column(Text, nullable=False)
     region_filter: Mapped[str] = mapped_column(Text, nullable=False, default="")
     region: Mapped[str | None] = mapped_column(Text, nullable=True)
+    region_norm: Mapped[str] = mapped_column(Text, nullable=False, default="")
     locality: Mapped[str | None] = mapped_column(Text, nullable=True)
     locality_norm: Mapped[str] = mapped_column(Text, nullable=False, default="")
     last_sync_job_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -122,6 +124,8 @@ class TwilioAvailableNumber(Base):
     number_type: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
     region: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
     locality: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
+    region_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
+    locality_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
     address_requirements: Mapped[str | None] = mapped_column(Text, nullable=True)
     voice: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     sms: Mapped[bool | None] = mapped_column(Boolean, nullable=True)

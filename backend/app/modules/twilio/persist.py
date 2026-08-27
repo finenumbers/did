@@ -14,6 +14,13 @@ from sqlalchemy.orm import Session
 
 from app.models.twilio import TwilioAvailableNumber, TwilioCatalog, TwilioCountryRaw, TwilioGeo, TwilioPricingRaw
 from app.modules.sync_engine.hashing import payload_hash
+from app.modules.twilio.geo_classify import (
+    KEEP_COUNTRIES,
+    classify_geo,
+    keep_region_displays,
+    locality_norm,
+    region_norm,
+)
 from app.providers.twilio import contract
 from app.providers.twilio.parser import CatalogRow, catalog_key, coverage_owner, parse_available_number
 
@@ -188,18 +195,25 @@ def ingest_available_batch(
             continue
         phone = parsed["phone_number"]
         phones.add(phone)
-        locality = parsed["locality"]
-        region = parsed["region"]
-        if locality:
-            cities.add((filter_key, locality))
+        locality_raw = parsed["locality"]
+        region_raw = parsed["region"]
+        region, locality = classify_geo(
+            country_iso=iso,
+            country_name=name,
+            region_raw=region_raw,
+            locality_raw=locality_raw,
+        )
+        if locality_raw:
+            cities.add((filter_key, locality_raw))
             had_geo = True
-        if region:
-            regions.add(region)
+        if region_raw:
+            regions.add(region_raw)
             had_geo = True
         elif filter_key:
             had_geo = True
 
-        loc_norm = parsed["locality_norm"]
+        loc_norm = locality_norm(locality)
+        reg_norm = region_norm(region)
         if locality or region or filter_key:
             geo_stmt = pg_insert(TwilioGeo).values(
                 id=uuid.uuid4(),
@@ -208,6 +222,7 @@ def ingest_available_batch(
                 number_type=ntype,
                 region_filter=filter_key,
                 region=region,
+                region_norm=reg_norm,
                 locality=locality,
                 locality_norm=loc_norm,
                 last_sync_job_id=job_id,
@@ -232,6 +247,8 @@ def ingest_available_batch(
             number_type=ntype,
             region=region,
             locality=locality,
+            region_raw=region_raw,
+            locality_raw=locality_raw,
             address_requirements=parsed["address_requirements"],
             voice=parsed["voice"],
             sms=parsed["sms"],
@@ -250,6 +267,8 @@ def ingest_available_batch(
                 "number_type": number_stmt.excluded.number_type,
                 "region": number_stmt.excluded.region,
                 "locality": number_stmt.excluded.locality,
+                "region_raw": number_stmt.excluded.region_raw,
+                "locality_raw": number_stmt.excluded.locality_raw,
                 "address_requirements": number_stmt.excluded.address_requirements,
                 "voice": number_stmt.excluded.voice,
                 "sms": number_stmt.excluded.sms,
@@ -318,46 +337,27 @@ def refresh_local_counts(
     number_type: str,
 ) -> tuple[int, int]:
     iso = country_iso.strip().upper()
-    filter_count = (
+    ntype = number_type.strip()
+    region_count = (
         db.scalar(
-            select(func.count(func.distinct(TwilioGeo.region_filter))).where(
-                TwilioGeo.provider_id == provider_id,
-                TwilioGeo.country_iso == iso,
-                TwilioGeo.number_type == number_type,
-                TwilioGeo.region_filter != "",
+            select(func.count(func.distinct(TwilioAvailableNumber.region))).where(
+                TwilioAvailableNumber.provider_id == provider_id,
+                TwilioAvailableNumber.country_iso == iso,
+                TwilioAvailableNumber.number_type == ntype,
+                TwilioAvailableNumber.region.is_not(None),
+                TwilioAvailableNumber.region != "",
             )
         )
         or 0
     )
-    name_count = (
-        db.scalar(
-            select(func.count(func.distinct(TwilioGeo.region))).where(
-                TwilioGeo.provider_id == provider_id,
-                TwilioGeo.country_iso == iso,
-                TwilioGeo.number_type == number_type,
-                TwilioGeo.region.is_not(None),
-                TwilioGeo.region != "",
-            )
-        )
-        or 0
-    )
-    if iso in contract.NANP_COUNTRIES and int(filter_count) > 0:
-        region_count = int(filter_count)
-    else:
-        region_count = int(name_count)
     city_count = (
         db.scalar(
-            select(func.count()).select_from(
-                select(TwilioGeo.region_filter, TwilioGeo.locality)
-                .where(
-                    TwilioGeo.provider_id == provider_id,
-                    TwilioGeo.country_iso == iso,
-                    TwilioGeo.number_type == number_type,
-                    TwilioGeo.locality.is_not(None),
-                    TwilioGeo.locality != "",
-                )
-                .distinct()
-                .subquery()
+            select(func.count(func.distinct(TwilioAvailableNumber.locality))).where(
+                TwilioAvailableNumber.provider_id == provider_id,
+                TwilioAvailableNumber.country_iso == iso,
+                TwilioAvailableNumber.number_type == ntype,
+                TwilioAvailableNumber.locality.is_not(None),
+                TwilioAvailableNumber.locality != "",
             )
         )
         or 0
@@ -366,13 +366,165 @@ def refresh_local_counts(
         select(TwilioCatalog).where(
             TwilioCatalog.provider_id == provider_id,
             TwilioCatalog.country_iso == iso,
-            TwilioCatalog.number_type == number_type,
+            TwilioCatalog.number_type == ntype,
         )
     )
     if row is not None:
         row.region_count = int(region_count)
         row.city_count = int(city_count)
     return int(region_count), int(city_count)
+
+
+def finalize_coverage_geo(
+    db: Session,
+    *,
+    provider_id: uuid.UUID,
+    country_iso: str,
+    number_type: str,
+    job_id: uuid.UUID | None = None,
+) -> tuple[int, int]:
+    iso = country_iso.strip().upper()
+    ntype = number_type.strip()
+    rows = list(
+        db.scalars(
+            select(TwilioAvailableNumber).where(
+                TwilioAvailableNumber.provider_id == provider_id,
+                TwilioAvailableNumber.country_iso == iso,
+                TwilioAvailableNumber.number_type == ntype,
+            )
+        ).all()
+    )
+    loaded = datetime.now(timezone.utc)
+    country_name = rows[0].country_name if rows else None
+    pairs: set[tuple[str | None, str | None]] = set()
+    latest_job = job_id
+    for row in rows:
+        if row.region_raw is None and row.locality_raw is None:
+            row.region_raw = row.region
+            row.locality_raw = row.locality
+        region, locality = classify_geo(
+            country_iso=iso,
+            country_name=row.country_name or country_name,
+            region_raw=row.region_raw,
+            locality_raw=row.locality_raw,
+        )
+        row.region = region
+        row.locality = locality
+        if region or locality:
+            pairs.add((region, locality))
+        if latest_job is None:
+            latest_job = row.last_sync_job_id
+    db.execute(
+        delete(TwilioGeo).where(
+            TwilioGeo.provider_id == provider_id,
+            TwilioGeo.country_iso == iso,
+            TwilioGeo.number_type == ntype,
+            TwilioGeo.region_filter == "",
+        )
+    )
+    for region, locality in pairs:
+        db.execute(
+            pg_insert(TwilioGeo)
+            .values(
+                id=uuid.uuid4(),
+                provider_id=provider_id,
+                country_iso=iso,
+                number_type=ntype,
+                region_filter="",
+                region=region,
+                region_norm=region_norm(region),
+                locality=locality,
+                locality_norm=locality_norm(locality),
+                last_sync_job_id=latest_job,
+            )
+            .on_conflict_do_update(
+                constraint="uq_twilio_geo_cell",
+                set_={
+                    "region": region,
+                    "locality": locality,
+                    "last_sync_job_id": latest_job,
+                    "updated_at": loaded,
+                },
+            )
+        )
+    if iso in contract.NANP_COUNTRIES:
+        for geo in db.scalars(
+            select(TwilioGeo).where(
+                TwilioGeo.provider_id == provider_id,
+                TwilioGeo.country_iso == iso,
+                TwilioGeo.number_type == ntype,
+                TwilioGeo.region_filter != "",
+            )
+        ).all():
+            display, _city = classify_geo(
+                country_iso=iso,
+                country_name=country_name,
+                region_raw=geo.region_filter,
+                locality_raw=None,
+            )
+            if display:
+                geo.region = display
+                geo.region_norm = region_norm(display)
+    db.flush()
+    return refresh_local_counts(
+        db, provider_id=provider_id, country_iso=iso, number_type=ntype
+    )
+
+
+def finalize_all_geo(db: Session, *, provider_id: uuid.UUID) -> int:
+    pairs = [
+        ((row.country_iso or "").strip().upper(), (row.number_type or "").strip())
+        for row in list_catalog_rows(db, provider_id=provider_id)
+        if (row.country_iso or "").strip() and (row.number_type or "").strip()
+    ]
+    seen: set[tuple[str, str]] = set()
+    updated = 0
+    for iso, ntype in pairs:
+        if (iso, ntype) in seen:
+            continue
+        seen.add((iso, ntype))
+        finalize_coverage_geo(db, provider_id=provider_id, country_iso=iso, number_type=ntype)
+        updated += 1
+    extra = db.execute(
+        select(
+            TwilioAvailableNumber.country_iso,
+            TwilioAvailableNumber.number_type,
+        )
+        .where(TwilioAvailableNumber.provider_id == provider_id)
+        .distinct()
+    ).all()
+    for iso_raw, ntype_raw in extra:
+        iso = str(iso_raw or "").strip().upper()
+        ntype = str(ntype_raw or "").strip()
+        if not iso or not ntype or (iso, ntype) in seen:
+            continue
+        finalize_coverage_geo(db, provider_id=provider_id, country_iso=iso, number_type=ntype)
+        updated += 1
+    return updated
+
+
+def needs_geo_finalize(db: Session, *, provider_id: uuid.UUID) -> bool:
+    rows = db.execute(
+        select(
+            TwilioAvailableNumber.country_iso,
+            TwilioAvailableNumber.region,
+        ).where(
+            TwilioAvailableNumber.provider_id == provider_id,
+            TwilioAvailableNumber.country_iso.in_(sorted(KEEP_COUNTRIES)),
+            TwilioAvailableNumber.region.is_not(None),
+            TwilioAvailableNumber.region != "",
+        )
+    ).all()
+    allowed: dict[str, set[str]] = {}
+    for iso, region in rows:
+        country = str(iso or "").strip().upper()
+        value = str(region or "").strip()
+        if not country or not value:
+            continue
+        names = allowed.setdefault(country, {item.casefold() for item in keep_region_displays(country)})
+        if value.casefold() not in names:
+            return True
+    return False
 
 
 def cutover_geo_snapshot(
@@ -574,11 +726,15 @@ def snapshot_totals(db: Session, *, provider_id: uuid.UUID) -> dict[str, int]:
     cities = (
         db.scalar(
             select(func.count()).select_from(
-                select(TwilioGeo.country_iso, TwilioGeo.region_filter, TwilioGeo.locality)
+                select(
+                    TwilioAvailableNumber.country_iso,
+                    TwilioAvailableNumber.number_type,
+                    TwilioAvailableNumber.locality,
+                )
                 .where(
-                    TwilioGeo.provider_id == provider_id,
-                    TwilioGeo.locality.is_not(None),
-                    TwilioGeo.locality != "",
+                    TwilioAvailableNumber.provider_id == provider_id,
+                    TwilioAvailableNumber.locality.is_not(None),
+                    TwilioAvailableNumber.locality != "",
                 )
                 .distinct()
                 .subquery()

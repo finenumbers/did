@@ -46,6 +46,7 @@ Types come only from keys that actually appear on the country. Official HTML doc
 - Repeat the same `%xx%` while the page has ≥ 30 and fewer than two consecutive responses with no new region / city / E.164. `< 30` or two empty-of-new loads → next `%x%`.
 - US/CA `local`: fan-out `InRegion` over US states+DC and 13 CA provinces. PR is not in the list. Other US/CA types and other ISO: one country-level cell.
 - `InRegion` / `AreaCode` apply only to US/CA (NANP) in `available_search_params`. Do not send them for other ISO codes.
+- UI «Регион» for US/CA shows the full state/province name; the search key remains the two-letter code. GB/DE/FR keep-lists classify already-returned strings only — they are not `InRegion` dictionaries.
 - Do not pass `Beta` (vendor default `true` includes beta numbers).
 - Official `Contains` wildcards: `*` = one character, `%` = a sequence (docs example `%979%`). Grid uses `contains_region_patterns()`.
 

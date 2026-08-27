@@ -321,7 +321,46 @@ def test_ingest_keeps_catalog_iso_when_payload_is_us():
     assert params.get("country_iso") == "AR"
     assert params.get("country_name") == "Argentina"
     assert params.get("number_type") == "toll_free"
+    assert "region_raw" in params or "region_raw" in str(numbers)
     assert "US" not in {params.get("country_iso"), params.get("country_name")}
+
+
+def test_ingest_classifies_gb_town_out_of_region():
+    from sqlalchemy.dialects import postgresql
+
+    from app.modules.twilio.persist import ingest_available_batch
+
+    captured: list[object] = []
+
+    class _Capture:
+        def execute(self, stmt):
+            captured.append(stmt)
+
+    ingest_available_batch(
+        _Capture(),
+        provider_id="11111111-1111-1111-1111-111111111111",
+        job_id="22222222-2222-2222-2222-222222222222",
+        country_iso="GB",
+        country_name="United Kingdom",
+        number_type="local",
+        region_filter="",
+        items=[
+            {
+                "phone_number": "+441134670001",
+                "iso_country": "GB",
+                "region": "Sanday",
+                "locality": "",
+            }
+        ],
+        source=contract.NUMBER_SOURCE_NUMBERS,
+    )
+    compiled = [stmt.compile(dialect=postgresql.dialect()) for stmt in captured]
+    numbers = next(item for item in compiled if "twilio_available_numbers" in str(item))
+    params = numbers.params
+    assert params.get("region_raw") == "Sanday"
+    assert params.get("locality_raw") in (None, "")
+    assert params.get("region") in (None, "")
+    assert params.get("locality") == "Sanday"
 
 
 def test_realign_sql_joins_catalog_name_and_type():

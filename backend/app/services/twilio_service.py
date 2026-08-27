@@ -164,6 +164,8 @@ class TwilioCatalogService:
         ).all()
         from app.modules.twilio.persist import (
             catalog_numbers_loaded,
+            finalize_all_geo,
+            needs_geo_finalize,
             number_counts_by_type,
             realign_available_number_iso,
         )
@@ -173,6 +175,14 @@ class TwilioCatalogService:
         )
         if provider_id:
             realign_available_number_iso(self.db, provider_id=provider_id)
+            if needs_geo_finalize(self.db, provider_id=provider_id):
+                finalize_all_geo(self.db, provider_id=provider_id)
+                self.db.flush()
+                rows = self.db.scalars(
+                    stmt.order_by(order, TwilioCatalog.number_type.asc(), TwilioCatalog.id.asc())
+                    .offset((page - 1) * page_size)
+                    .limit(page_size)
+                ).all()
         counts = number_counts_by_type(self.db, provider_id=provider_id) if provider_id else {}
         items = []
         for row in rows:
@@ -353,6 +363,14 @@ class TwilioNumbersService:
 
     parse_filters = staticmethod(TwilioCatalogService.parse_filters)
 
+    def _ensure_classified(self) -> None:
+        from app.modules.twilio.persist import finalize_all_geo, needs_geo_finalize
+
+        provider_id = self.db.scalar(select(TwilioAvailableNumber.provider_id).limit(1))
+        if provider_id and needs_geo_finalize(self.db, provider_id=provider_id):
+            finalize_all_geo(self.db, provider_id=provider_id)
+            self.db.flush()
+
     def _base(self) -> Select:
         return (
             select(TwilioAvailableNumber, TwilioCatalog.period_price, TwilioCatalog.price_unit)
@@ -454,6 +472,7 @@ class TwilioNumbersService:
         filters: dict[str, list[str]],
         q: str | None,
     ) -> Page[TwilioNumberItem]:
+        self._ensure_classified()
         stmt = self._apply_filters(self._base(), filters, q=q)
         total = self.db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
         col = self.SORTABLE.get(sort_by or "", TwilioAvailableNumber.country_name)
@@ -478,6 +497,7 @@ class TwilioNumbersService:
         filters: dict[str, list[str]],
         q: str | None,
     ):
+        self._ensure_classified()
         stmt = self._apply_filters(self._base(), filters, q=q)
         col = self.SORTABLE.get(sort_by or "", TwilioAvailableNumber.country_name)
         order = col.asc() if sort_dir != "desc" else col.desc()
@@ -505,6 +525,7 @@ class TwilioNumbersService:
     ) -> TwilioFacetResponse:
         if column not in self.FACET_COLUMNS:
             raise ValueError(f"Unknown facet column: {column}")
+        self._ensure_classified()
         stmt = self._apply_filters(self._base(), filters, q=q, exclude_column=column)
         base = (
             stmt.with_only_columns(
