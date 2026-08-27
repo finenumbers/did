@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import and_, delete, func, select, text
+from sqlalchemy import and_, delete, func, or_, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -375,6 +375,197 @@ def refresh_local_counts(
     return int(region_count), int(city_count)
 
 
+CLASSIFY_UPDATE_BATCH = 1000
+
+
+def classified_column_updates(rows: Any) -> list[dict[str, Any]]:
+    """Map raw geo tuples to classified region/locality. Same rules as ingest."""
+    updates: list[dict[str, Any]] = []
+    for row in rows:
+        mapping = getattr(row, "_mapping", None)
+        if mapping is not None:
+            id_ = mapping["id"]
+            iso = mapping["country_iso"]
+            name = mapping["country_name"]
+            region_raw = mapping["region_raw"]
+            locality_raw = mapping["locality_raw"]
+        else:
+            id_, iso, name, region_raw, locality_raw = row
+        region, locality = classify_geo(
+            country_iso=str(iso or "").strip().upper(),
+            country_name=name,
+            region_raw=region_raw,
+            locality_raw=locality_raw,
+        )
+        updates.append({"id": id_, "region": region, "locality": locality})
+    return updates
+
+
+def _flush_classified_updates(conn: Any, updates: list[dict[str, Any]]) -> None:
+    if not updates:
+        return
+    conn.execute(
+        text(
+            """
+            UPDATE twilio_available_numbers
+            SET region = :region,
+                locality = :locality
+            WHERE id = :id
+            """
+        ),
+        updates,
+    )
+
+
+def backfill_classified_geo(conn: Any) -> dict[str, int]:
+    """One-shot classify + geo rebuild. Idempotent. No ORM identity map."""
+    raw_filled = conn.execute(
+        text(
+            """
+            UPDATE twilio_available_numbers
+            SET region_raw = region,
+                locality_raw = locality
+            WHERE region_raw IS NULL AND locality_raw IS NULL
+            """
+        )
+    )
+    rows = conn.execute(
+        text(
+            """
+            SELECT id, country_iso, country_name, region_raw, locality_raw
+            FROM twilio_available_numbers
+            """
+        )
+    )
+    updated = 0
+    batch: list[dict[str, Any]] = []
+    for row in rows:
+        batch.extend(classified_column_updates([row]))
+        if len(batch) >= CLASSIFY_UPDATE_BATCH:
+            _flush_classified_updates(conn, batch)
+            updated += len(batch)
+            batch = []
+    if batch:
+        _flush_classified_updates(conn, batch)
+        updated += len(batch)
+
+    conn.execute(text("DELETE FROM twilio_geo WHERE region_filter = ''"))
+    geo_inserted = conn.execute(
+        text(
+            """
+            INSERT INTO twilio_geo (
+                id, provider_id, country_iso, number_type, region_filter,
+                region, region_norm, locality, locality_norm, last_sync_job_id
+            )
+            SELECT
+                gen_random_uuid(),
+                n.provider_id,
+                n.country_iso,
+                n.number_type,
+                '',
+                n.region,
+                lower(btrim(coalesce(n.region, ''))),
+                n.locality,
+                lower(btrim(coalesce(n.locality, ''))),
+                (
+                    SELECT n2.last_sync_job_id
+                    FROM twilio_available_numbers AS n2
+                    WHERE n2.provider_id = n.provider_id
+                      AND n2.country_iso = n.country_iso
+                      AND n2.number_type = n.number_type
+                      AND n2.last_sync_job_id IS NOT NULL
+                    LIMIT 1
+                )
+            FROM (
+                SELECT DISTINCT provider_id, country_iso, number_type, region, locality
+                FROM twilio_available_numbers
+                WHERE country_iso IS NOT NULL
+                  AND btrim(country_iso) <> ''
+                  AND number_type IS NOT NULL
+                  AND btrim(number_type) <> ''
+                  AND (
+                      coalesce(btrim(region), '') <> ''
+                      OR coalesce(btrim(locality), '') <> ''
+                  )
+            ) AS n
+            ON CONFLICT ON CONSTRAINT uq_twilio_geo_cell
+            DO UPDATE SET
+                region = EXCLUDED.region,
+                locality = EXCLUDED.locality,
+                updated_at = NOW()
+            """
+        )
+    )
+
+    nanp_rows = conn.execute(
+        text(
+            """
+            SELECT id, country_iso, region_filter
+            FROM twilio_geo
+            WHERE region_filter <> ''
+              AND country_iso IN ('US', 'CA')
+            """
+        )
+    )
+    nanp_updated = 0
+    for row in nanp_rows:
+        mapping = row._mapping
+        display, _city = classify_geo(
+            country_iso=str(mapping["country_iso"] or "").strip().upper(),
+            country_name=None,
+            region_raw=mapping["region_filter"],
+            locality_raw=None,
+        )
+        if not display:
+            continue
+        conn.execute(
+            text(
+                """
+                UPDATE twilio_geo
+                SET region = :region,
+                    region_norm = :region_norm
+                WHERE id = :id
+                """
+            ),
+            {
+                "id": mapping["id"],
+                "region": display,
+                "region_norm": region_norm(display),
+            },
+        )
+        nanp_updated += 1
+
+    conn.execute(text("UPDATE twilio_catalog SET region_count = 0, city_count = 0"))
+    conn.execute(
+        text(
+            """
+            UPDATE twilio_catalog AS c
+            SET region_count = sub.rc,
+                city_count = sub.cc
+            FROM (
+                SELECT
+                    provider_id,
+                    country_iso,
+                    number_type,
+                    COUNT(DISTINCT NULLIF(btrim(region), '')) AS rc,
+                    COUNT(DISTINCT NULLIF(btrim(locality), '')) AS cc
+                FROM twilio_available_numbers
+                GROUP BY provider_id, country_iso, number_type
+            ) AS sub
+            WHERE c.provider_id = sub.provider_id
+              AND c.country_iso = sub.country_iso
+              AND c.number_type = sub.number_type
+            """
+        )
+    )
+    return {
+        "raw_filled": int(raw_filled.rowcount or 0),
+        "numbers_updated": updated,
+        "geo_inserted": int(geo_inserted.rowcount or 0),
+        "nanp_geo_updated": nanp_updated,
+    }
+
+
 def finalize_coverage_geo(
     db: Session,
     *,
@@ -504,27 +695,25 @@ def finalize_all_geo(db: Session, *, provider_id: uuid.UUID) -> int:
 
 
 def needs_geo_finalize(db: Session, *, provider_id: uuid.UUID) -> bool:
-    rows = db.execute(
-        select(
-            TwilioAvailableNumber.country_iso,
-            TwilioAvailableNumber.region,
-        ).where(
-            TwilioAvailableNumber.provider_id == provider_id,
-            TwilioAvailableNumber.country_iso.in_(sorted(KEEP_COUNTRIES)),
-            TwilioAvailableNumber.region.is_not(None),
-            TwilioAvailableNumber.region != "",
+    preds = []
+    for iso in sorted(KEEP_COUNTRIES):
+        allowed = [name.lower() for name in keep_region_displays(iso)]
+        preds.append(
+            and_(
+                TwilioAvailableNumber.country_iso == iso,
+                TwilioAvailableNumber.region.is_not(None),
+                TwilioAvailableNumber.region != "",
+                func.lower(func.btrim(TwilioAvailableNumber.region)).notin_(allowed),
+            )
         )
-    ).all()
-    allowed: dict[str, set[str]] = {}
-    for iso, region in rows:
-        country = str(iso or "").strip().upper()
-        value = str(region or "").strip()
-        if not country or not value:
-            continue
-        names = allowed.setdefault(country, {item.casefold() for item in keep_region_displays(country)})
-        if value.casefold() not in names:
-            return True
-    return False
+    if not preds:
+        return False
+    found = db.scalar(
+        select(TwilioAvailableNumber.id)
+        .where(TwilioAvailableNumber.provider_id == provider_id, or_(*preds))
+        .limit(1)
+    )
+    return found is not None
 
 
 def cutover_geo_snapshot(

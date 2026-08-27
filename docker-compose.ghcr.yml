@@ -54,7 +54,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
-      start_period: 40s
+      start_period: 180s
 
   frontend:
     image: ghcr.io/finenumbers/did-frontend:${DID_IMAGE_TAG:-latest}

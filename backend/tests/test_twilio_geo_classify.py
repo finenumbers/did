@@ -1,6 +1,11 @@
 """Twilio region/city classification — no live API, no invented inventory."""
 
+import inspect
+import uuid
+
 from app.modules.twilio.geo_classify import classify_geo
+from app.modules.twilio.persist import classified_column_updates, needs_geo_finalize
+from app.services.twilio_service import TwilioCatalogService, TwilioNumbersService
 
 
 def _gb(**kwargs):
@@ -132,3 +137,54 @@ def test_other_country_trusts_pair_and_moves_lone_region():
         region_raw="Italy",
         locality_raw="Rome",
     ) == (None, "Rome")
+
+
+def test_classified_column_updates_match_classify_geo():
+    sanday_id = uuid.uuid4()
+    england_id = uuid.uuid4()
+    us_id = uuid.uuid4()
+    yorks_id = uuid.uuid4()
+    updates = classified_column_updates(
+        [
+            (sanday_id, "GB", "United Kingdom", "Sanday", None),
+            (england_id, "GB", "United Kingdom", "England", "Leeds"),
+            (us_id, "US", "United States", "CA", "Hilo"),
+            (yorks_id, "GB", "United Kingdom", "West Yorkshire", "Leeds"),
+        ]
+    )
+    by_id = {row["id"]: row for row in updates}
+    assert by_id[sanday_id] == {"id": sanday_id, "region": None, "locality": "Sanday"}
+    assert by_id[england_id] == {"id": england_id, "region": "England", "locality": "Leeds"}
+    assert by_id[us_id] == {"id": us_id, "region": "California", "locality": "Hilo"}
+    assert by_id[yorks_id] == {"id": yorks_id, "region": None, "locality": "Leeds"}
+    again = classified_column_updates([(sanday_id, "GB", "United Kingdom", "Sanday", None)])
+    assert again == [{"id": sanday_id, "region": None, "locality": "Sanday"}]
+
+
+def test_list_getters_do_not_rewrite_geo():
+    for method in (
+        TwilioNumbersService.list_numbers,
+        TwilioNumbersService.list_facets,
+        TwilioNumbersService.iter_numbers,
+        TwilioCatalogService.list_coverage,
+    ):
+        src = inspect.getsource(method)
+        assert "finalize_all_geo" not in src
+        assert "needs_geo_finalize" not in src
+        assert "_ensure_classified" not in src
+        assert "realign_available_number_iso" not in src
+    assert not hasattr(TwilioNumbersService, "_ensure_classified")
+
+
+def test_needs_geo_finalize_is_limit_one():
+    captured: list[object] = []
+
+    class _Db:
+        def scalar(self, stmt):
+            captured.append(stmt)
+            return None
+
+    assert needs_geo_finalize(_Db(), provider_id=uuid.uuid4()) is False
+    compiled = str(captured[0].compile(compile_kwargs={"literal_binds": False})).lower()
+    assert "limit" in compiled
+    assert "twilio_available_numbers" in compiled
