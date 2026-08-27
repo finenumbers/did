@@ -143,6 +143,17 @@ def test_other_country_trusts_pair_and_moves_lone_region():
     ) == (None, "Rome")
 
 
+def test_alembic_revision_ids_fit_version_num():
+    from pathlib import Path
+
+    versions = Path(__file__).resolve().parents[1] / "alembic" / "versions"
+    for path in sorted(versions.glob("*.py")):
+        for line in path.read_text().splitlines():
+            if line.startswith("revision:"):
+                ident = line.split("=", 1)[1].strip().strip("\"'")
+                assert len(ident) <= 32, f"{path.name}: {ident!r} is {len(ident)} chars"
+
+
 def test_geo_rebuild_dedupes_null_and_blank_on_norm_key():
     sql = " ".join(GEO_REBUILD_FROM_NUMBERS_SQL.lower().split())
     assert "distinct on" in sql
