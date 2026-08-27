@@ -377,6 +377,65 @@ def refresh_local_counts(
 
 CLASSIFY_UPDATE_BATCH = 1000
 
+# One row per unique geo cell. DISTINCT on raw region/locality is not enough:
+# NULL and "" collapse to the same region_norm/locality_norm and trip
+# "ON CONFLICT DO UPDATE cannot affect row a second time".
+GEO_REBUILD_FROM_NUMBERS_SQL = """
+INSERT INTO twilio_geo (
+    id, provider_id, country_iso, number_type, region_filter,
+    region, region_norm, locality, locality_norm, last_sync_job_id
+)
+SELECT
+    gen_random_uuid(),
+    n.provider_id,
+    n.country_iso,
+    n.number_type,
+    '',
+    n.region,
+    n.region_norm,
+    n.locality,
+    n.locality_norm,
+    NULL
+FROM (
+    SELECT DISTINCT ON (
+        provider_id,
+        country_iso,
+        number_type,
+        lower(btrim(coalesce(region, ''))),
+        lower(btrim(coalesce(locality, '')))
+    )
+        provider_id,
+        country_iso,
+        number_type,
+        NULLIF(btrim(region), '') AS region,
+        lower(btrim(coalesce(region, ''))) AS region_norm,
+        NULLIF(btrim(locality), '') AS locality,
+        lower(btrim(coalesce(locality, ''))) AS locality_norm
+    FROM twilio_available_numbers
+    WHERE country_iso IS NOT NULL
+      AND btrim(country_iso) <> ''
+      AND number_type IS NOT NULL
+      AND btrim(number_type) <> ''
+      AND (
+          coalesce(btrim(region), '') <> ''
+          OR coalesce(btrim(locality), '') <> ''
+      )
+    ORDER BY
+        provider_id,
+        country_iso,
+        number_type,
+        lower(btrim(coalesce(region, ''))),
+        lower(btrim(coalesce(locality, ''))),
+        region DESC NULLS LAST,
+        locality DESC NULLS LAST
+) AS n
+ON CONFLICT ON CONSTRAINT uq_twilio_geo_cell
+DO UPDATE SET
+    region = EXCLUDED.region,
+    locality = EXCLUDED.locality,
+    updated_at = NOW()
+"""
+
 
 def classified_column_updates(rows: Any) -> list[dict[str, Any]]:
     """Map raw geo tuples to classified region/locality. Same rules as ingest."""
@@ -453,44 +512,7 @@ def backfill_classified_geo(conn: Any) -> dict[str, int]:
         logger.info("Twilio geo backfill classified %s numbers", updated)
 
     conn.execute(text("DELETE FROM twilio_geo WHERE region_filter = ''"))
-    geo_inserted = conn.execute(
-        text(
-            """
-            INSERT INTO twilio_geo (
-                id, provider_id, country_iso, number_type, region_filter,
-                region, region_norm, locality, locality_norm, last_sync_job_id
-            )
-            SELECT
-                gen_random_uuid(),
-                n.provider_id,
-                n.country_iso,
-                n.number_type,
-                '',
-                n.region,
-                lower(btrim(coalesce(n.region, ''))),
-                n.locality,
-                lower(btrim(coalesce(n.locality, ''))),
-                NULL
-            FROM (
-                SELECT DISTINCT provider_id, country_iso, number_type, region, locality
-                FROM twilio_available_numbers
-                WHERE country_iso IS NOT NULL
-                  AND btrim(country_iso) <> ''
-                  AND number_type IS NOT NULL
-                  AND btrim(number_type) <> ''
-                  AND (
-                      coalesce(btrim(region), '') <> ''
-                      OR coalesce(btrim(locality), '') <> ''
-                  )
-            ) AS n
-            ON CONFLICT ON CONSTRAINT uq_twilio_geo_cell
-            DO UPDATE SET
-                region = EXCLUDED.region,
-                locality = EXCLUDED.locality,
-                updated_at = NOW()
-            """
-        )
-    )
+    geo_inserted = conn.execute(text(GEO_REBUILD_FROM_NUMBERS_SQL))
 
     nanp_rows = conn.execute(
         text(

@@ -4,7 +4,11 @@ import inspect
 import uuid
 
 from app.modules.twilio.geo_classify import classify_geo
-from app.modules.twilio.persist import classified_column_updates, needs_geo_finalize
+from app.modules.twilio.persist import (
+    GEO_REBUILD_FROM_NUMBERS_SQL,
+    classified_column_updates,
+    needs_geo_finalize,
+)
 from app.services.twilio_service import TwilioCatalogService, TwilioNumbersService
 
 
@@ -137,6 +141,13 @@ def test_other_country_trusts_pair_and_moves_lone_region():
         region_raw="Italy",
         locality_raw="Rome",
     ) == (None, "Rome")
+
+
+def test_geo_rebuild_dedupes_null_and_blank_on_norm_key():
+    sql = " ".join(GEO_REBUILD_FROM_NUMBERS_SQL.lower().split())
+    assert "distinct on" in sql
+    assert "lower(btrim(coalesce(region, '')))" in sql
+    assert "lower(btrim(coalesce(locality, '')))" in sql
 
 
 def test_classified_column_updates_match_classify_geo():
