@@ -362,6 +362,14 @@ class TwilioNumbersService:
             )
         )
 
+    def _has_price_filter(self, filters: dict[str, list[str]]) -> bool:
+        return bool(filters.get("period_price"))
+
+    def _count_source(self, filters: dict[str, list[str]], q: str | None) -> Select:
+        if self._has_price_filter(filters):
+            return self._apply_filters(self._base(), filters, q=q)
+        return self._apply_filters(select(TwilioAvailableNumber.id), filters, q=q)
+
     def _empty_pred(self, col: ColumnElement[Any]) -> ColumnElement[Any]:
         return or_(col.is_(None), cast(col, String) == "")
 
@@ -449,7 +457,7 @@ class TwilioNumbersService:
         q: str | None,
     ) -> Page[TwilioNumberItem]:
         stmt = self._apply_filters(self._base(), filters, q=q)
-        total = self.db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+        total = self.db.scalar(select(func.count()).select_from(self._count_source(filters, q).subquery())) or 0
         col = self.SORTABLE.get(sort_by or "", TwilioAvailableNumber.country_name)
         order = col.asc() if sort_dir != "desc" else col.desc()
         rows = self.db.execute(

@@ -198,6 +198,47 @@ def test_list_getters_do_not_rewrite_geo():
     assert not hasattr(TwilioNumbersService, "_ensure_classified")
 
 
+def _list_numbers_count_sql(filters: dict[str, list[str]], q: str | None = None) -> str:
+    from sqlalchemy.dialects import postgresql
+
+    captured: list[object] = []
+
+    class _Db:
+        def scalar(self, stmt):
+            captured.append(stmt)
+            return 0
+
+        def execute(self, stmt):
+            class _Rows:
+                def all(self):
+                    return []
+
+            return _Rows()
+
+    TwilioNumbersService(_Db()).list_numbers(
+        page=1,
+        page_size=100,
+        sort_by="country_name",
+        sort_dir="asc",
+        filters=filters,
+        q=q,
+    )
+    assert captured
+    return str(captured[0].compile(dialect=postgresql.dialect())).lower()
+
+
+def test_list_numbers_count_skips_catalog_without_price_filter():
+    sql = _list_numbers_count_sql({})
+    assert "twilio_available_numbers" in sql
+    assert "twilio_catalog" not in sql
+
+
+def test_list_numbers_count_joins_catalog_with_price_filter():
+    sql = _list_numbers_count_sql({"period_price": ["1.00"]})
+    assert "twilio_available_numbers" in sql
+    assert "twilio_catalog" in sql
+
+
 def test_bootstrap_health_listens_before_uvicorn():
     import urllib.error
     import urllib.request

@@ -160,6 +160,7 @@ export function TwilioTable() {
     useInfinitePage<TwilioNumberItem>({
       getPath,
       deps: [filtersKey, searchQ, sortBy, sortDir, reloadTick],
+      keepPreviousOnReset: true,
     });
 
   const facetLoader = useCallback(

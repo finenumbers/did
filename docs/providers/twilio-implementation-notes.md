@@ -68,6 +68,8 @@ Per cell:
 
 Writes go live via `ingest_available_batch` (`source=number_sync`). E.164 ownership is the catalog pair we searched (`coverage_owner`); payload `iso_country` does not change `country_iso`. Sync «Номера» counts `GROUP BY country_name, number_type` (same grain as the table filter, no join+btrim on GET). Alembic `0038` and numbers ingest realign leaked ISO by trimmed `country_name` + type. GET coverage does not write. The row is marked loaded even if every cell was empty. A row error in the chain marks that row failed and continues; auth / missing catalog fail the job.
 
+`GET /numbers` counts without joining `twilio_catalog` unless the price facet is set. Alembic `0039` indexes `(country_name, phone_number, id)` for the default sort. The table keeps the previous page on screen until the next page 1 arrives.
+
 ## Wipe
 
 `POST /api/v1/twilio/wipe` deletes catalog, geo, numbers, raw countries/pricing. 409 if a job actually holds the lock.

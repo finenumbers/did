@@ -12,12 +12,15 @@ type UseInfinitePageOptions = {
   /** When these change, list resets and page 1 is loaded again. */
   deps: ReadonlyArray<unknown>;
   enabled?: boolean;
+  /** Keep current rows on screen until page 1 arrives (Twilio list refresh). */
+  keepPreviousOnReset?: boolean;
 };
 
 export function useInfinitePage<T>({
   getPath,
   deps,
   enabled = true,
+  keepPreviousOnReset = false,
 }: UseInfinitePageOptions) {
   const [items, setItems] = useState<T[]>([]);
   const [total, setTotal] = useState(0);
@@ -104,11 +107,11 @@ export function useInfinitePage<T>({
     }
     pageRef.current = 0;
     hasMoreRef.current = false;
-    setItems([]);
+    if (!keepPreviousOnReset) setItems([]);
     setHasMore(false);
     void fetchPage(1, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset keyed by depsKey
-  }, [depsKey, enabled, fetchPage]);
+  }, [depsKey, enabled, fetchPage, keepPreviousOnReset]);
 
   const loadMore = useCallback(() => {
     if (!enabled || !hasMoreRef.current || loadingRef.current) return;
