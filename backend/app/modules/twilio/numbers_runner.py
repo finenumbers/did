@@ -32,6 +32,7 @@ from app.modules.twilio.persist import (
     load_row_known,
     mark_numbers_synced,
     number_count_for_row,
+    realign_available_number_iso,
     refresh_local_counts,
 )
 from app.modules.twilio.runner import (
@@ -427,6 +428,8 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
             name=f"twilio-numbers-lock-{job_id}",
         )
         client = TwilioClient(twilio_connection_config(provider))
+        realign_available_number_iso(db, provider_id=provider.id)
+        db.commit()
         tracker = _Progress(db, job)
         row_errors = 0
         last_view: dict[str, Any] | None = None

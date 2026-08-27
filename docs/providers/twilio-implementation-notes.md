@@ -66,7 +66,7 @@ Per cell:
 3. Repeat the same `%xx%` while the page has ≥ 30 **and** fewer than two consecutive responses with no new region / city / E.164 (novelty is vs already stored facts for the row).
 4. `< 30` or two empty-of-new loads → next `%x%`, not the end of the grid.
 
-Writes go live via `ingest_available_batch` (`source=number_sync`). The row is marked loaded even if every cell was empty. A row error in the chain marks that row failed and continues; auth / missing catalog fail the job.
+Writes go live via `ingest_available_batch` (`source=number_sync`). E.164 ownership is the catalog pair we searched (`coverage_owner`); payload `iso_country` does not change `country_iso`. Opening coverage realigns leaked ISO by `country_name` + type so cutover cannot delete another country's rows. The row is marked loaded even if every cell was empty. A row error in the chain marks that row failed and continues; auth / missing catalog fail the job.
 
 ## Wipe
 

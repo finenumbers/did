@@ -48,7 +48,7 @@ Empty locality is not a city. US/CA region count = distinct nonempty `region_fil
 | API source | Column | UI |
 |---|---|---|
 | `phone_number` | `phone_number` | Номер |
-| `iso_country` / country name | `country_iso` / `country_name` | Страна |
+| searched catalog country (not payload `iso_country`) | `country_iso` / `country_name` | Страна |
 | searched type | `number_type` | Тип |
 | `region` / `locality` | `region` / `locality` | Регион / Город |
 | catalog JOIN `period_price` | — | Абонплата |

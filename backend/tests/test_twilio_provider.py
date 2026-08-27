@@ -278,6 +278,90 @@ def test_country_cell_search_omits_inregion_and_inlocality():
     ) == {"InRegion": "AL", "InLocality": "Birmingham", "Contains": "%00%"}
 
 
+def test_coverage_owner_uses_catalog_not_payload():
+    from app.providers.twilio.parser import coverage_owner
+
+    assert coverage_owner(country_iso="ar", country_name=" Argentina ", number_type="toll_free") == (
+        "AR",
+        "Argentina",
+        "toll_free",
+    )
+    assert coverage_owner(country_iso="US", country_name="", number_type=" local ") == (
+        "US",
+        None,
+        "local",
+    )
+
+
+def test_ingest_keeps_catalog_iso_when_payload_is_us():
+    from sqlalchemy.dialects import postgresql
+
+    from app.modules.twilio.persist import ingest_available_batch
+
+    captured: list[object] = []
+
+    class _Capture:
+        def execute(self, stmt):
+            captured.append(stmt)
+
+    ingest_available_batch(
+        _Capture(),
+        provider_id="11111111-1111-1111-1111-111111111111",
+        job_id="22222222-2222-2222-2222-222222222222",
+        country_iso="AR",
+        country_name="Argentina",
+        number_type="toll_free",
+        region_filter="",
+        items=[{"phone_number": "+18005550100", "iso_country": "US"}],
+        source=contract.NUMBER_SOURCE_NUMBERS,
+    )
+    compiled = [stmt.compile(dialect=postgresql.dialect()) for stmt in captured]
+    numbers = next(item for item in compiled if "twilio_available_numbers" in str(item))
+    params = numbers.params
+    assert params.get("country_iso") == "AR"
+    assert params.get("country_name") == "Argentina"
+    assert params.get("number_type") == "toll_free"
+    assert "US" not in {params.get("country_iso"), params.get("country_name")}
+
+
+def test_realign_sql_joins_catalog_name_and_type():
+    from sqlalchemy.dialects import postgresql
+
+    from app.modules.twilio.persist import realign_available_number_iso
+
+    captured: list[object] = []
+
+    class _Capture:
+        def execute(self, stmt, params=None):
+            captured.append((stmt, params))
+
+            class _Result:
+                rowcount = 4
+
+            return _Result()
+
+        def flush(self):
+            return None
+
+    out = realign_available_number_iso(
+        _Capture(),
+        provider_id="11111111-1111-1111-1111-111111111111",
+    )
+    assert out["realigned"] == 4
+    stmt, params = captured[0]
+    sql = str(stmt).lower()
+    compiled = stmt.compile(dialect=postgresql.dialect()) if hasattr(stmt, "compile") else None
+    text_sql = str(compiled) if compiled is not None else sql
+    lowered = text_sql.lower()
+    assert "twilio_catalog" in lowered
+    assert "country_name" in lowered
+    assert "number_type" in lowered
+    assert "is distinct from" in lowered
+    assert params is None or params.get("provider_id") or getattr(compiled, "params", {}).get(
+        "provider_id"
+    )
+
+
 def test_ingest_upsert_does_not_steal_other_country_type():
     from sqlalchemy.dialects import postgresql
 

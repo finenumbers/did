@@ -27,7 +27,7 @@ Never call: `POST/PATCH/DELETE IncomingPhoneNumbers`, ActiveNumbers, Global Cata
 
 Coverage row (`twilio_catalog`) = **country + type** from live `subresource_uris` keys.
 
-Main UI row (`twilio_available_numbers`) = **E.164** from AvailablePhoneNumbers search. This is a **sample**, not a full inventory dump.
+Main UI row (`twilio_available_numbers`) = **E.164** from AvailablePhoneNumbers search. This is a **sample**, not a full inventory dump. `country_iso` / `country_name` are the catalog row we searched, not payload `iso_country`.
 
 Types come only from keys that actually appear on the country. Official HTML documents Local / TollFree / Mobile; OpenAPI also has National / Voip / SharedCost / MachineToMachine. Countries-load samples every type once; `%x%` enrichment uses `InRegion` only for US/CA `local`.
 

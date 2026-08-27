@@ -162,9 +162,17 @@ class TwilioCatalogService:
             .offset((page - 1) * page_size)
             .limit(page_size)
         ).all()
-        from app.modules.twilio.persist import catalog_numbers_loaded, number_counts_by_type
+        from app.modules.twilio.persist import (
+            catalog_numbers_loaded,
+            number_counts_by_type,
+            realign_available_number_iso,
+        )
 
-        provider_id = rows[0].provider_id if rows else None
+        provider_id = rows[0].provider_id if rows else self.db.scalar(
+            select(TwilioCatalog.provider_id).limit(1)
+        )
+        if provider_id:
+            realign_available_number_iso(self.db, provider_id=provider_id)
         counts = number_counts_by_type(self.db, provider_id=provider_id) if provider_id else {}
         items = []
         for row in rows:

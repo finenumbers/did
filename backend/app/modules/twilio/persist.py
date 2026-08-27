@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.models.twilio import TwilioAvailableNumber, TwilioCatalog, TwilioCountryRaw, TwilioGeo, TwilioPricingRaw
 from app.modules.sync_engine.hashing import payload_hash
 from app.providers.twilio import contract
-from app.providers.twilio.parser import CatalogRow, catalog_key, parse_available_number
+from app.providers.twilio.parser import CatalogRow, catalog_key, coverage_owner, parse_available_number
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +171,11 @@ def ingest_available_batch(
     source: str = contract.NUMBER_SOURCE_GEO,
 ) -> dict[str, Any]:
     loaded = datetime.now(timezone.utc)
+    iso, name, ntype = coverage_owner(
+        country_iso=country_iso,
+        country_name=country_name,
+        number_type=number_type,
+    )
     filter_key = (region_filter or "").strip().upper()
     phones: set[str] = set()
     cities: set[tuple[str, str]] = set()
@@ -199,8 +204,8 @@ def ingest_available_batch(
             geo_stmt = pg_insert(TwilioGeo).values(
                 id=uuid.uuid4(),
                 provider_id=provider_id,
-                country_iso=country_iso,
-                number_type=number_type,
+                country_iso=iso,
+                number_type=ntype,
                 region_filter=filter_key,
                 region=region,
                 locality=locality,
@@ -222,9 +227,9 @@ def ingest_available_batch(
             id=uuid.uuid4(),
             provider_id=provider_id,
             phone_number=phone,
-            country_iso=parsed["country_iso"] or country_iso,
-            country_name=country_name,
-            number_type=number_type,
+            country_iso=iso,
+            country_name=name,
+            number_type=ntype,
             region=region,
             locality=locality,
             address_requirements=parsed["address_requirements"],
@@ -255,8 +260,8 @@ def ingest_available_batch(
                 "last_seen_at": number_stmt.excluded.last_seen_at,
             },
             where=and_(
-                TwilioAvailableNumber.country_iso == country_iso,
-                TwilioAvailableNumber.number_type == number_type,
+                TwilioAvailableNumber.country_iso == iso,
+                TwilioAvailableNumber.number_type == ntype,
             ),
         )
         db.execute(number_stmt)
@@ -416,6 +421,38 @@ def number_counts_by_type(db: Session, *, provider_id: uuid.UUID) -> dict[tuple[
         (str(iso or "").strip().upper(), str(typ or "").strip()): int(cnt)
         for iso, typ, cnt in rows
     }
+
+
+def realign_available_number_iso(db: Session, *, provider_id: uuid.UUID) -> dict[str, int]:
+    """Move leaked E.164 back to the catalog pair that owns country_name + type."""
+    result = db.execute(
+        text(
+            """
+            UPDATE twilio_available_numbers AS n
+            SET country_iso = c.country_iso,
+                updated_at = NOW()
+            FROM twilio_catalog AS c
+            WHERE n.provider_id = :provider_id
+              AND c.provider_id = n.provider_id
+              AND c.is_currently_present IS TRUE
+              AND n.country_name IS NOT NULL
+              AND btrim(n.country_name) <> ''
+              AND n.country_name = c.country_name
+              AND n.number_type = c.number_type
+              AND n.country_iso IS DISTINCT FROM c.country_iso
+            """
+        ),
+        {"provider_id": provider_id},
+    )
+    db.flush()
+    updated = int(result.rowcount or 0)
+    if updated:
+        logger.info(
+            "Twilio realigned country_iso on %s available numbers provider_id=%s",
+            updated,
+            provider_id,
+        )
+    return {"realigned": updated}
 
 
 def number_count_for_row(

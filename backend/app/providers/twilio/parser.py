@@ -121,6 +121,19 @@ def catalog_key(country_iso: str, number_type: str) -> str:
     return f"{country_iso}:{number_type}"
 
 
+def coverage_owner(
+    *,
+    country_iso: str,
+    country_name: str | None,
+    number_type: str,
+) -> tuple[str, str | None, str]:
+    """Catalog pair we searched — never Twilio payload iso_country."""
+    iso = (country_iso or "").strip().upper()
+    ntype = (number_type or "").strip()
+    name = (country_name or "").strip() or None
+    return iso, name, ntype
+
+
 def _capability(caps: dict[str, Any], *names: str) -> bool | None:
     for name in names:
         if name in caps:
