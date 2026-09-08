@@ -22,6 +22,9 @@ class TwilioCoverageItem(BaseModel):
     number_count: int = 0
     numbers_synced_at: datetime | None = None
     numbers_loaded: bool = False
+    load_state: str = "idle"
+    numbers_last_error: str | None = None
+    numbers_checkpoint: dict[str, Any] | None = None
 
 
 class TwilioNumberItem(BaseModel):
@@ -75,6 +78,7 @@ class TwilioSyncJobOut(BaseModel):
     stages: list[TwilioSyncStageOut] = Field(default_factory=list)
     last_success_at: datetime | None = None
     has_catalog: bool = False
+    has_open_numbers_ingest: bool = False
 
 
 class TwilioNumbersSyncIn(BaseModel):

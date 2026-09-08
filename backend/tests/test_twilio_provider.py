@@ -318,11 +318,13 @@ def test_ingest_keeps_catalog_iso_when_payload_is_us():
     compiled = [stmt.compile(dialect=postgresql.dialect()) for stmt in captured]
     numbers = next(item for item in compiled if "twilio_available_numbers" in str(item))
     params = numbers.params
-    assert params.get("country_iso") == "AR"
-    assert params.get("country_name") == "Argentina"
-    assert params.get("number_type") == "toll_free"
+    values = set(params.values())
+    assert "AR" in values
+    assert "Argentina" in values
+    assert "toll_free" in values
     assert "region_raw" in params or "region_raw" in str(numbers)
-    assert "US" not in {params.get("country_iso"), params.get("country_name")}
+    assert params.get("country_iso_m0") == "AR" or params.get("country_iso") == "AR"
+    assert "US" not in {params.get("country_iso"), params.get("country_iso_m0"), params.get("country_name"), params.get("country_name_m0")}
 
 
 def test_ingest_classifies_gb_town_out_of_region():
@@ -357,10 +359,10 @@ def test_ingest_classifies_gb_town_out_of_region():
     compiled = [stmt.compile(dialect=postgresql.dialect()) for stmt in captured]
     numbers = next(item for item in compiled if "twilio_available_numbers" in str(item))
     params = numbers.params
-    assert params.get("region_raw") == "Sanday"
-    assert params.get("locality_raw") in (None, "")
-    assert params.get("region") in (None, "")
-    assert params.get("locality") == "Sanday"
+    assert params.get("region_raw_m0", params.get("region_raw")) == "Sanday"
+    assert params.get("locality_raw_m0", params.get("locality_raw")) in (None, "")
+    assert params.get("region_m0", params.get("region")) in (None, "")
+    assert params.get("locality_m0", params.get("locality")) == "Sanday"
 
 
 def test_number_counts_group_by_name_without_join_btrim():
@@ -440,7 +442,7 @@ def test_ingest_upsert_does_not_steal_other_country_type():
     captured: list[object] = []
 
     class _Capture:
-        def execute(self, stmt):
+        def execute(self, stmt, _params=None):
             captured.append(stmt)
 
     ingest_available_batch(
@@ -662,11 +664,13 @@ def test_numbers_status_detail_uses_pattern_repeat_cell_and_region():
     from app.modules.twilio.numbers_runner import _numbers_detail
 
     country = NumberCell(region_filter="", locality=None, label="")
-    assert _numbers_detail(3, 2, 1, 1, country, "%02%", 4) == "3 / 2 - %02%"
-    assert _numbers_detail(0, 1, 1, 1, country, None, 0) == "0 / 1"
+    assert _numbers_detail(3, 2, 1, 1, country, "%02%", 4, requests=12) == (
+        "штат 1/1 · — · %02% · повтор 2 · запросы 12"
+    )
+    assert _numbers_detail(0, 1, 1, 1, country, None, 0) == "штат 1/1 · — · probe · повтор 1"
     region = NumberCell(region_filter="TX", locality="Austin", label="TX")
-    assert _numbers_detail(3, 2, 15, 98, region, "%02%", 4) == "3 / 2 - %02% - TX"
-    assert _numbers_detail(0, 1, 15, 98, region, None, 4) == "0 / 1 - TX"
+    assert _numbers_detail(3, 2, 15, 98, region, "%02%", 4) == "штат 15/98 · TX · %02% · повтор 2"
+    assert _numbers_detail(0, 1, 15, 98, region, None, 4) == "штат 15/98 · TX · probe · повтор 1"
 
 
 def test_reclaim_stale_jobs_only_when_lock_free():
@@ -708,6 +712,13 @@ def test_reclaim_stale_jobs_only_when_lock_free():
     assert stale_running.status == SyncJobStatus.failed
     assert stale_running.error_summary == STALE_JOB_MESSAGE
     assert free.committed is True
+
+    fresh = _Job(SyncJobStatus.running)
+    fresh.stats = {"progress": {"heartbeat_at": now.isoformat()}}
+    fresh_session = _Session([fresh])
+    assert reclaim_stale_twilio_jobs(fresh_session, lock_free=True) == 0
+    assert fresh.status == SyncJobStatus.running
+    assert fresh_session.committed is False
 
     young = _Job(SyncJobStatus.pending, created_at=now - timedelta(seconds=5))
     young_session = _Session([young])
@@ -752,8 +763,21 @@ def test_search_or_empty_raises_429_treats_404_as_empty():
         )
         assert rows == []
 
+    async def _run_400_strict():
+        try:
+            await _search_or_empty(
+                _Client(ProviderError("bad", details={"status": 400})),
+                country_iso="US",
+                number_type="local",
+                strict=True,
+            )
+            raise AssertionError("expected 400 to propagate in strict mode")
+        except ProviderError as exc:
+            assert (exc.details or {}).get("status") == 400
+
     asyncio.run(_run_429())
     asyncio.run(_run_404())
+    asyncio.run(_run_400_strict())
 
 
 def test_fetch_pricing_reraises_auth():
@@ -850,3 +874,141 @@ def test_runner_stages_are_sample_not_geo_grid():
     from app.modules.twilio.runner import STAGES
 
     assert [sid for sid, _label in STAGES] == ["countries", "pricing", "sample", "cutover"]
+
+
+def test_adopt_row_ingest_restamps_pair():
+    from app.modules.twilio.persist import adopt_row_ingest
+
+    captured: list[tuple[str, dict]] = []
+
+    class _Cap:
+        def execute(self, stmt, params=None):
+            captured.append((str(stmt), params or {}))
+
+            class _Result:
+                rowcount = 5
+
+            return _Result()
+
+    out = adopt_row_ingest(
+        _Cap(),
+        provider_id="11111111-1111-1111-1111-111111111111",
+        country_iso="us",
+        number_type="local",
+        job_id="22222222-2222-2222-2222-222222222222",
+    )
+    assert out["numbers"] == 5
+    assert out["geo"] == 5
+    assert "twilio_available_numbers" in captured[0][0].lower()
+    assert captured[0][1]["country_iso"] == "US"
+    assert captured[0][1]["number_type"] == "local"
+    assert "twilio_geo" in captured[1][0].lower()
+
+
+def test_catalog_row_load_state_interrupted():
+    from types import SimpleNamespace
+    from uuid import uuid4
+
+    from app.modules.twilio.persist import catalog_row_load_state
+
+    geo = uuid4()
+    loaded = SimpleNamespace(
+        numbers_sync_geo_job_id=geo,
+        last_sync_job_id=geo,
+        numbers_checkpoint=None,
+        numbers_last_error=None,
+        numbers_sync_job_id=None,
+        numbers_synced_at=None,
+    )
+    assert catalog_row_load_state(loaded) == "loaded"
+    assert (
+        catalog_row_load_state(
+            SimpleNamespace(
+                numbers_sync_geo_job_id=None,
+                last_sync_job_id=geo,
+                numbers_checkpoint={"completed_cells": ["AL"]},
+                numbers_last_error=None,
+                numbers_sync_job_id=None,
+                numbers_synced_at=None,
+            )
+        )
+        == "interrupted"
+    )
+    assert (
+        catalog_row_load_state(
+            SimpleNamespace(
+                numbers_sync_geo_job_id=None,
+                last_sync_job_id=geo,
+                numbers_checkpoint=None,
+                numbers_last_error=None,
+                numbers_sync_job_id=None,
+                numbers_synced_at=None,
+            ),
+            has_number_sync=True,
+        )
+        == "interrupted"
+    )
+    assert (
+        catalog_row_load_state(
+            SimpleNamespace(
+                numbers_sync_geo_job_id=None,
+                last_sync_job_id=geo,
+                numbers_checkpoint=None,
+                numbers_last_error=None,
+                numbers_sync_job_id=None,
+                numbers_synced_at=None,
+            )
+        )
+        == "idle"
+    )
+
+
+def test_finalize_coverage_geo_is_sql_batched():
+    import inspect
+
+    from app.modules.twilio.persist import finalize_coverage_geo
+
+    src = inspect.getsource(finalize_coverage_geo)
+    assert "select(TwilioAvailableNumber).where" not in src
+    assert "FINALIZE_GEO_FROM_NUMBERS_SQL" in src
+    assert "CLASSIFY_UPDATE_BATCH" in src
+
+
+def test_reopen_numbers_job_sets_pending():
+    from types import SimpleNamespace
+
+    from app.models.enums import SyncJobStatus
+    from app.modules.twilio.numbers_runner import _reopen_numbers_job
+
+    job = SimpleNamespace(
+        status=SyncJobStatus.running,
+        finished_at="x",
+        error_summary="прервано",
+        stats={"progress": {}},
+    )
+    _reopen_numbers_job(job)
+    assert job.status == SyncJobStatus.pending
+    assert job.finished_at is None
+    assert job.error_summary is None
+    assert "heartbeat_at" in job.stats["progress"]
+
+
+def test_checkpoint_from_catalog_normalizes():
+    from types import SimpleNamespace
+
+    from app.modules.twilio.numbers_runner import _checkpoint_from_catalog
+
+    empty = _checkpoint_from_catalog(SimpleNamespace(numbers_checkpoint=None))
+    assert empty["completed_cells"] == []
+    parsed = _checkpoint_from_catalog(
+        SimpleNamespace(
+            numbers_checkpoint={
+                "completed_cells": ["al", " AK "],
+                "current_cell": "az",
+                "last_completed_pattern_index": 7,
+            }
+        )
+    )
+    assert parsed["completed_cells"] == ["AL", "AK"]
+    assert parsed["current_cell"] == "AZ"
+    assert parsed["last_completed_pattern_index"] == 7

@@ -61,6 +61,9 @@ class TwilioCatalog(Base):
     numbers_sync_geo_job_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("sync_jobs.id"), nullable=True
     )
+    numbers_checkpoint: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    numbers_last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    numbers_heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     is_currently_present: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

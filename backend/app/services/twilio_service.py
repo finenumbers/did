@@ -162,15 +162,24 @@ class TwilioCatalogService:
             .offset((page - 1) * page_size)
             .limit(page_size)
         ).all()
-        from app.modules.twilio.persist import catalog_numbers_loaded, number_counts_by_type
+        from app.modules.twilio.persist import (
+            catalog_numbers_loaded,
+            catalog_row_load_state,
+            number_counts_by_type,
+            number_sync_pairs,
+        )
 
         provider_id = rows[0].provider_id if rows else self.db.scalar(
             select(TwilioCatalog.provider_id).limit(1)
         )
         counts = number_counts_by_type(self.db, provider_id=provider_id) if provider_id else {}
+        sync_pairs = number_sync_pairs(self.db, provider_id=provider_id) if provider_id else set()
         items = []
         for row in rows:
             loaded = catalog_numbers_loaded(row)
+            iso = (row.country_iso or "").strip().upper()
+            ntype = (row.number_type or "").strip()
+            has_sync = (iso, ntype) in sync_pairs
             items.append(
                 TwilioCoverageItem(
                     id=row.id,
@@ -183,12 +192,12 @@ class TwilioCatalogService:
                     country_beta=row.country_beta,
                     region_count=row.region_count,
                     city_count=row.city_count,
-                    number_count=counts.get(
-                        ((row.country_iso or "").strip().upper(), (row.number_type or "").strip()),
-                        0,
-                    ),
+                    number_count=counts.get((iso, ntype), 0),
                     numbers_synced_at=row.numbers_synced_at,
                     numbers_loaded=loaded,
+                    load_state=catalog_row_load_state(row, has_number_sync=has_sync),
+                    numbers_last_error=row.numbers_last_error,
+                    numbers_checkpoint=row.numbers_checkpoint,
                 )
             )
         return Page.of(items, page=page, page_size=page_size, total=int(total))

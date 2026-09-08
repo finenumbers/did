@@ -54,6 +54,11 @@ STAGES = (
 
 STALE_JOB_MESSAGE = "прервано, процесс перезапущен"
 RECLAIM_PENDING_GRACE = timedelta(seconds=60)
+HEARTBEAT_STALE = timedelta(minutes=5)
+COUNTRIES_BLOCKED_BY_NUMBERS = (
+    "Сначала завершите загрузку номеров (есть незакрытый прогон). "
+    "«Загрузка стран» сотрёт уже скачанные номера."
+)
 
 
 def _now() -> datetime:
@@ -169,10 +174,28 @@ def _ping_lock_gated(lock_conn: Connection, gate: threading.Lock) -> None:
         ping_lock_conn(lock_conn)
 
 
+def _job_heartbeat_at(job: SyncJob) -> datetime | None:
+    raw = ((getattr(job, "stats", None) or {}).get("progress") or {}).get("heartbeat_at")
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return _aware(parsed)
+
+
+def touch_job_heartbeat(job: SyncJob) -> None:
+    progress = _ensure_progress(job)
+    progress["heartbeat_at"] = _now().isoformat()
+    if getattr(job, "_sa_instance_state", None) is not None:
+        flag_modified(job, "stats")
+
+
 async def _lock_keepalive(
-    lock_conn: Connection,
-    gate: threading.Lock,
+    lock_box: dict[str, Any],
     stop: asyncio.Event,
+    lock_key: int = TWILIO_LOCK_KEY,
 ) -> None:
     while not stop.is_set():
         try:
@@ -180,10 +203,34 @@ async def _lock_keepalive(
             return
         except asyncio.TimeoutError:
             pass
+        conn = lock_box.get("conn")
+        gate = lock_box.get("gate")
+        if conn is None or gate is None:
+            return
         try:
-            await asyncio.to_thread(_ping_lock_gated, lock_conn, gate)
+            await asyncio.to_thread(_ping_lock_gated, conn, gate)
+            continue
         except Exception:
-            logger.exception("Twilio lock keepalive failed; lock session may be dead")
+            logger.exception("Twilio lock keepalive ping failed; trying to reacquire")
+        try:
+            new_conn = lock_engine.connect()
+            if try_advisory_lock_conn(new_conn, lock_key):
+                old = lock_box.get("conn")
+                lock_box["conn"] = new_conn
+                if old is not None:
+                    try:
+                        old.close()
+                    except Exception:
+                        logger.exception("Failed to close dead Twilio lock connection")
+                continue
+            try:
+                new_conn.close()
+            except Exception:
+                logger.exception("Failed to close unused Twilio lock reconnect")
+            logger.error("Twilio lock lost and could not be reacquired")
+            return
+        except Exception:
+            logger.exception("Twilio lock reacquire failed")
             return
 
 
@@ -249,6 +296,9 @@ def _aware(dt: datetime | None) -> datetime | None:
 
 
 def _should_reclaim_job(job: SyncJob, now: datetime) -> bool:
+    heartbeat = _job_heartbeat_at(job)
+    if heartbeat is not None and now - heartbeat < HEARTBEAT_STALE:
+        return False
     if job.status == SyncJobStatus.running:
         return True
     if job.status != SyncJobStatus.pending:
@@ -304,8 +354,12 @@ def wipe_twilio_locked(db: Session) -> dict[str, int]:
 
 
 def create_twilio_job(db: Session, *, triggered_by: str = "api") -> SyncJob:
+    from app.modules.twilio.persist import catalog_has_open_numbers_ingest
+
     provider = get_twilio_provider(db)
     reclaim_stale_twilio_jobs(db)
+    if catalog_has_open_numbers_ingest(db, provider_id=provider.id):
+        raise ProviderError(COUNTRIES_BLOCKED_BY_NUMBERS)
     if get_active_twilio_job(db):
         raise ProviderError("Синхронизация Twilio уже выполняется")
     job = SyncJob(
@@ -393,6 +447,7 @@ class _Progress:
             "cities_total": len(self.cities),
             "numbers_unique": len(self.phones),
         }
+        progress["heartbeat_at"] = _now().isoformat()
         if current is not None:
             progress["current"] = current
         if rows is not None:
@@ -415,6 +470,7 @@ async def _search_or_empty(
     in_region: str | None = None,
     in_locality: str | None = None,
     contains: str | None = None,
+    strict: bool = False,
 ) -> list[dict[str, Any]]:
     try:
         return await client.search_available(
@@ -430,7 +486,16 @@ async def _search_or_empty(
         status = (exc.details or {}).get("status")
         if isinstance(status, int) and status == 429:
             raise
-        if isinstance(status, int) and 400 <= status < 500:
+        if isinstance(status, int) and status == 404:
+            logger.warning(
+                "Twilio search %s %s in_region=%s contains=%s HTTP 404; treat as empty",
+                country_iso,
+                number_type,
+                in_region,
+                contains,
+            )
+            return []
+        if isinstance(status, int) and 400 <= status < 500 and not strict:
             logger.warning(
                 "Twilio search %s %s in_region=%s contains=%s HTTP %s; treat as empty",
                 country_iso,
@@ -448,10 +513,12 @@ async def _execute(job_id: uuid.UUID) -> None:
     lock_conn = None
     client: TwilioClient | None = None
     lock_gate = threading.Lock()
+    lock_box: dict[str, Any] = {"conn": None, "gate": lock_gate}
     stop_keepalive = asyncio.Event()
     keepalive_task: asyncio.Task[None] | None = None
     try:
         lock_conn = lock_engine.connect()
+        lock_box["conn"] = lock_conn
         if not try_advisory_lock_conn(lock_conn, TWILIO_LOCK_KEY):
             job = db.get(SyncJob, job_id)
             if job and job.status == SyncJobStatus.pending:
@@ -483,7 +550,7 @@ async def _execute(job_id: uuid.UUID) -> None:
 
         _ping_lock_gated(lock_conn, lock_gate)
         keepalive_task = asyncio.create_task(
-            _lock_keepalive(lock_conn, lock_gate, stop_keepalive),
+            _lock_keepalive(lock_box, stop_keepalive),
             name=f"twilio-lock-keepalive-{job_id}",
         )
         client = TwilioClient(twilio_connection_config(provider))
@@ -590,7 +657,7 @@ async def _execute(job_id: uuid.UUID) -> None:
 
         _set_stage(job, "cutover", "running")
         db.commit()
-        _ping_lock_gated(lock_conn, lock_gate)
+        _ping_lock_gated(lock_box.get("conn") or lock_conn, lock_gate)
         counts = persist_twilio_coverage(
             db,
             provider_id=provider.id,
@@ -667,13 +734,14 @@ async def _execute(job_id: uuid.UUID) -> None:
                 await client.aclose()
             except Exception:
                 logger.exception("Failed to close Twilio client")
-        if lock_conn is not None:
+        held = lock_box.get("conn") or lock_conn
+        if held is not None:
             try:
-                advisory_unlock_conn(lock_conn, TWILIO_LOCK_KEY)
+                advisory_unlock_conn(held, TWILIO_LOCK_KEY)
             except Exception:
                 logger.exception("Failed to unlock Twilio lock")
             try:
-                lock_conn.close()
+                held.close()
             except Exception:
                 logger.exception("Failed to close Twilio lock connection")
         try:

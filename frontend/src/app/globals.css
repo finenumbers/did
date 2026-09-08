@@ -227,6 +227,11 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   border-color: var(--ok);
   color: #fff;
 }
+.twilio-load-btn.amber {
+  background: var(--warn);
+  border-color: var(--warn);
+  color: #fff;
+}
 .twilio-load-pending {
   color: var(--warn);
   font-size: 12px;

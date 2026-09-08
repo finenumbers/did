@@ -88,7 +88,8 @@ function sameCoverageRow(
 
 function rowStatusText(row: TwilioCoverageRow, jobActive: boolean): string {
   if (row.status === "running") return row.detail || "0 / 1";
-  if (row.status === "failed") return row.detail || "ошибка";
+  if (row.status === "failed") return row.detail || row.numbers_last_error || "ошибка";
+  if (row.load_state === "interrupted") return row.numbers_last_error || row.detail || "прервано";
   if (!jobActive) return row.detail || "";
   if (row.status === "success") return row.detail || "готово";
   return "ожидание";
@@ -360,6 +361,8 @@ export function TwilioTable() {
       number_count: live?.number_count ?? row.number_count,
       region_count: live?.region_count ?? row.region_count,
       city_count: live?.city_count ?? row.city_count,
+      load_state: live?.load_state || row.load_state,
+      numbers_last_error: live?.numbers_last_error ?? row.numbers_last_error,
     };
   });
 
@@ -497,7 +500,21 @@ export function TwilioTable() {
             <div className="filters" style={{ justifyContent: "space-between" }}>
               <strong>Синхронизация</strong>
               <div className="filters" style={{ marginBottom: 0 }}>
-                <button type="button" disabled={starting || twilioBusy} onClick={() => void startCountries()}>
+                <button
+                  type="button"
+                  disabled={
+                    starting ||
+                    twilioBusy ||
+                    Boolean(displayJob?.has_open_numbers_ingest) ||
+                    tableRows.some((row) => row.load_state === "interrupted")
+                  }
+                  title={
+                    displayJob?.has_open_numbers_ingest || tableRows.some((row) => row.load_state === "interrupted")
+                      ? "Сначала завершите загрузку номеров. «Загрузка стран» сотрёт уже скачанные номера."
+                      : undefined
+                  }
+                  onClick={() => void startCountries()}
+                >
                   {syncActive ? "Загрузка стран…" : "Загрузка стран"}
                 </button>
                 <button
@@ -575,7 +592,7 @@ export function TwilioTable() {
                         <td>
                           {isRunning ? (
                             <span className="twilio-load-pending">в процессе</span>
-                          ) : row.numbers_loaded ? (
+                          ) : row.numbers_loaded || row.load_state === "loaded" ? (
                             <button
                               type="button"
                               className="twilio-load-btn green"
@@ -583,6 +600,16 @@ export function TwilioTable() {
                               onClick={() => void startNumbers(row)}
                             >
                               {formatLoadDate(row.numbers_synced_at)}
+                            </button>
+                          ) : row.load_state === "interrupted" ? (
+                            <button
+                              type="button"
+                              className="twilio-load-btn amber"
+                              disabled={startingNumbers || twilioBusy || !hasCatalog}
+                              title={row.numbers_last_error || "Продолжить с checkpoint"}
+                              onClick={() => void startNumbers(row)}
+                            >
+                              Продолжить
                             </button>
                           ) : (
                             <button

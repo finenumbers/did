@@ -169,6 +169,13 @@ export interface TwilioCoverageRow {
   price_unit?: string | null;
   numbers_synced_at?: string | null;
   numbers_loaded?: boolean;
+  load_state?: "idle" | "interrupted" | "loaded" | string;
+  numbers_last_error?: string | null;
+  numbers_checkpoint?: {
+    completed_cells?: string[];
+    current_cell?: string | null;
+    last_completed_pattern_index?: number;
+  } | null;
 }
 
 export interface TwilioNumberItem {
@@ -220,6 +227,7 @@ export interface TwilioSyncJob {
   stages: SyncStage[];
   last_success_at?: string | null;
   has_catalog?: boolean;
+  has_open_numbers_ingest?: boolean;
 }
 
 export interface RegionCityItem {

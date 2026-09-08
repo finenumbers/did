@@ -204,8 +204,8 @@ def test_numbers_commit_batch_does_not_finalize_geo():
     src = inspect.getsource(_enrich_catalog_row)
     commit = src[src.index("async def _commit_batch") : src.index("for cell_index")]
     assert "finalize_coverage_geo" not in commit
-    assert "refresh_local_counts" in commit
-    assert 'if result.get("phones")' in commit
+    assert "refresh_local_counts" not in commit
+    assert "ingest_available_batch" in commit
     assert src.count("finalize_coverage_geo") == 1
 
 

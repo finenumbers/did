@@ -35,7 +35,7 @@ Inside the window: summary, then **«Загрузка стран»**, **«Заг
 
 - While a countries job is running, the table is `job.progress.rows`.
 - Otherwise rows come from `GET /coverage` (page_size up to 2000) with a live overlay on the current numbers-job target.
-- «Загрузка» is red until that row is enriched for the current countries snapshot (`numbers_sync_geo_job_id == last_sync_job_id`); green shows the last load date.
+- «Загрузка» is red until that row is enriched for the current countries snapshot (`numbers_sync_geo_job_id == last_sync_job_id`); green shows the last load date. Interrupted partial ingest (`number_sync` without mark, checkpoint, or last error) is amber **«Продолжить»**.
 - «Стереть данные» asks for confirm, then `POST /wipe`.
 
 ## Загрузка стран (`POST /api/v1/twilio/sync`)
@@ -76,4 +76,15 @@ Writes go live via `ingest_available_batch` (`source=number_sync`). E.164 owners
 
 ## Process caveat
 
-Jobs run in a `daemon=True` thread. Uvicorn `--reload` or a backend restart kills them; stale recovery unblocks the next start. A full US `local` chain is long (51 probes + up to 100 patterns each). Do not start it from the agent.
+Jobs run in a `daemon=True` thread. A backend restart kills the thread; heartbeat + boot respawn continue the **same** ingest (adopt `last_sync_job_id`, checkpoint skip). Reclaim only if heartbeat is older than 5 minutes **and** the advisory lock is free. A full US `local` chain is long (51 probes + `%00%`…`%99%` + novelty repeats). Do not start it from the agent.
+
+Interrupted rows show **«Продолжить»**. That reopens the failed job or adopts existing `number_sync` rows onto a new job id so cutover does not wipe the partial dump. «Загрузка стран» is blocked while any row has an open numbers ingest (`source=number_sync` without `numbers_loaded`, or a checkpoint / last error).
+
+### Portainer runbook (US Local)
+
+1. Do not redeploy the stack while US/CA `local` is running unless necessary; if you must, the next backend boot respawns the job.
+2. Do not click «Загрузка стран» until the row is green — countries cutover deletes all numbers whose `last_sync_job_id` is not the countries job.
+3. After deploy: open Синхронизация. Interrupted US Local should say «Продолжить» (or already be «в процессе» after respawn). One click continues; it does not start from a wipe.
+4. If the UI stays «в процессе» with frozen counters and a new job cannot start: lock session may be stuck. Restart `did-backend` (or `pg_terminate_backend` on the lock connection), then wait for respawn / click Продолжить.
+5. Diagnose on the live DB (read-only): `sync_jobs` `twilio_numbers` target US/local (`status`, `error_summary`, `progress.current`, `heartbeat_at`); `twilio_catalog` US/local flags; `GROUP BY region` on `twilio_available_numbers`.
+6. Watch disk / autovacuum on `twilio_available_numbers` as the table grows past a million rows.

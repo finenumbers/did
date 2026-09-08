@@ -163,6 +163,9 @@ async def lifespan(_app: FastAPI):
     seed_pstn_inn_cache_operators()
     seed_mask_types()
     mark_interrupted_runs()
+    from app.modules.twilio import respawn_interrupted_twilio_on_boot
+
+    respawn_interrupted_twilio_on_boot()
     schedule_task = asyncio.create_task(sync_schedule_loop())
     try:
         yield

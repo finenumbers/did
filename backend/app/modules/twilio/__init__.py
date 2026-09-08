@@ -1,6 +1,7 @@
 from app.modules.twilio.numbers_runner import (
     create_twilio_numbers_job,
     get_latest_twilio_numbers_job,
+    respawn_interrupted_twilio_on_boot,
     spawn_twilio_numbers_job,
 )
 from app.modules.twilio.persist import wipe_twilio_data
@@ -25,6 +26,7 @@ __all__ = [
     "get_latest_twilio_numbers_job",
     "get_twilio_provider",
     "reclaim_stale_twilio_jobs",
+    "respawn_interrupted_twilio_on_boot",
     "spawn_twilio_job",
     "spawn_twilio_numbers_job",
     "twilio_connection_config",
