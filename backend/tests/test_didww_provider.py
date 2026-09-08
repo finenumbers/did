@@ -460,10 +460,17 @@ def test_catalog_queries_compile_and_facets_exclude_their_own_column():
         sort_by="country_name",
         sort_dir="asc",
         filters=filters,
-        q="lond",
+        q="4420",
     )
+    groups_sql = db.sql[0].lower()
+    assert "didww_catalog.country_prefix" in groups_sql
+    assert "didww_catalog.area_prefix" in groups_sql
+    assert "concat(" in groups_sql
+    assert "country_name ilike" not in groups_sql
+    assert "city_name ilike" not in groups_sql
+    assert "region_name ilike" not in groups_sql
     for column in ("country_name", "buy_price", "number_select", "channels_included", "voice_in"):
-        service.list_facets(column=column, filters=filters, q="lond", value_q="lo")
+        service.list_facets(column=column, filters=filters, q="4420", value_q="lo")
 
     country_facet_sql = db.sql[2]
     assert "didww_catalog.country_iso IN ('GB')" in country_facet_sql
@@ -477,6 +484,28 @@ def test_catalog_queries_compile_and_facets_exclude_their_own_column():
 
     with pytest.raises(ValueError):
         service.list_facets(column="skus_json", filters={}, q=None)
+
+
+def test_catalog_q_does_not_search_place_names():
+    from app.services.didww_service import DidwwCatalogService
+
+    db = _CompilingSession()
+    DidwwCatalogService(db).list_groups(
+        page=1,
+        page_size=50,
+        sort_by="country_name",
+        sort_dir="asc",
+        filters={},
+        q="London",
+    )
+    sql = db.sql[0].lower()
+    assert "concat(" in sql
+    assert "country_prefix" in sql
+    assert "area_prefix" in sql
+    assert "country_name ilike" not in sql
+    assert "city_name ilike" not in sql
+    assert "region_name ilike" not in sql
+    assert "country_iso ilike" not in sql
 
 
 def test_didww_prices_keep_their_decimals():

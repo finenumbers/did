@@ -390,18 +390,9 @@ class TwilioNumbersService:
         q: str | None = None,
         exclude_column: str | None = None,
     ) -> Select:
-        if q:
-            like = f"%{q.strip()}%"
-            stmt = stmt.where(
-                or_(
-                    TwilioAvailableNumber.country_name.ilike(like),
-                    TwilioAvailableNumber.country_iso.ilike(like),
-                    TwilioAvailableNumber.phone_number.ilike(like),
-                    TwilioAvailableNumber.number_type.ilike(like),
-                    TwilioAvailableNumber.region.ilike(like),
-                    TwilioAvailableNumber.locality.ilike(like),
-                )
-            )
+        needle = (q or "").strip()
+        if needle:
+            stmt = stmt.where(TwilioAvailableNumber.phone_number.ilike(f"%{needle}%"))
         for field, values in filters.items():
             if field == exclude_column or field not in self.FACET_COLUMNS or not values:
                 continue

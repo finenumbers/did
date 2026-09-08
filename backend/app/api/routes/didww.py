@@ -86,7 +86,10 @@ def list_groups(
     sort_by: str | None = Query("country_name"),
     sort_dir: str = Query("asc", pattern="^(asc|desc)$"),
     filters: str | None = Query(None, description='JSON object: {"country_iso":["GB"]}'),
-    q: str | None = Query(None, description="Search by country / region / city / prefix"),
+    q: str | None = Query(
+        None,
+        description="Search by country prefix, area prefix, or their concatenation",
+    ),
     db: Session = Depends(get_db),
 ) -> Page[DidwwGroupItem]:
     return DidwwCatalogService(db).list_groups(
@@ -135,7 +138,10 @@ def export_xlsx(
     sort_by: str | None = Query("country_name"),
     sort_dir: str = Query("asc", pattern="^(asc|desc)$"),
     filters: str | None = Query(None),
-    q: str | None = Query(None),
+    q: str | None = Query(
+        None,
+        description="Search by country prefix, area prefix, or their concatenation",
+    ),
     db: Session = Depends(get_db),
 ) -> FileResponse:
     tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActiveFiltersBar } from "@/components/numbers/ActiveFiltersBar";
+import { HighlightRange } from "@/components/numbers/HighlightText";
+import { concatHighlightRanges } from "@/components/numbers/prefixHighlight";
 import { ColumnFilterDropdown } from "@/components/numbers/ColumnFilterDropdown";
 import { InfiniteScrollSentinel } from "@/components/table/InfiniteScrollSentinel";
 import { apiDownload, apiFetch } from "@/lib/api/client";
@@ -263,8 +265,8 @@ export function DidwwTable() {
           className="filters-phone-search"
           type="search"
           value={searchInput}
-          placeholder="Страна, регион, город, префикс"
-          aria-label="Поиск покрытия DIDWW"
+          placeholder="Номер телефона"
+          aria-label="Номер телефона"
           onChange={(e) => setSearchInput(e.target.value)}
         />
         <button
@@ -297,7 +299,6 @@ export function DidwwTable() {
         filters={filters}
         headers={HEADER_MAP}
         numberLocalQ={searchQ}
-        searchChipLabel="Поиск"
         onRemoveFacet={removeFacetValue}
         onClearNumberLocalQ={() => {
           setSearchInput("");
@@ -332,13 +333,35 @@ export function DidwwTable() {
             </tr>
           </thead>
           <tbody>
-            {items.map((row) => (
-              <tr key={row.id}>
-                {DIDWW_COLUMNS.map((col) => (
-                  <td key={col.key}>{cellText(col.value(row))}</td>
-                ))}
-              </tr>
-            ))}
+            {items.map((row) => {
+              const prefixSpans = concatHighlightRanges(
+                row.country_prefix || "",
+                row.area_prefix || "",
+                searchQ,
+              );
+              return (
+                <tr key={row.id}>
+                  {DIDWW_COLUMNS.map((col) => {
+                    const text = cellText(col.value(row));
+                    if (col.key === "country_prefix") {
+                      return (
+                        <td key={col.key}>
+                          <HighlightRange text={text} span={prefixSpans.country} />
+                        </td>
+                      );
+                    }
+                    if (col.key === "area_prefix") {
+                      return (
+                        <td key={col.key}>
+                          <HighlightRange text={text} span={prefixSpans.area} />
+                        </td>
+                      );
+                    }
+                    return <td key={col.key}>{text}</td>;
+                  })}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {loading && items.length === 0 && <div className="state">Загрузка…</div>}

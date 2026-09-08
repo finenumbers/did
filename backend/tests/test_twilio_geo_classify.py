@@ -250,6 +250,35 @@ def test_list_numbers_count_joins_catalog_with_price_filter():
     assert "twilio_catalog" in sql
 
 
+def test_list_numbers_q_searches_phone_only():
+    sql = _list_numbers_count_sql({}, q="United")
+    assert "phone_number" in sql
+    assert "ilike" in sql
+    where_sql = sql.split("where", 1)[-1]
+    assert "country_name" not in where_sql
+    assert "country_iso" not in where_sql
+    assert "number_type" not in where_sql
+    assert "locality" not in where_sql
+    assert "region" not in where_sql
+
+
+def test_coverage_q_still_searches_country_name():
+    from sqlalchemy import select
+    from sqlalchemy.dialects import postgresql
+
+    from app.models.twilio import TwilioCatalog
+
+    stmt = TwilioCatalogService(None)._apply_filters(  # type: ignore[arg-type]
+        select(TwilioCatalog.id), {}, q="United"
+    )
+    sql = str(
+        stmt.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True})
+    ).lower()
+    assert "country_name" in sql
+    assert "%united%" in sql
+    assert "phone_number" not in sql
+
+
 def test_bootstrap_health_listens_before_uvicorn():
     import urllib.error
     import urllib.request

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActiveFiltersBar } from "@/components/numbers/ActiveFiltersBar";
+import { HighlightText } from "@/components/numbers/HighlightText";
 import { ColumnFilterDropdown } from "@/components/numbers/ColumnFilterDropdown";
 import { InfiniteScrollSentinel } from "@/components/table/InfiniteScrollSentinel";
 import { apiDownload, apiFetch } from "@/lib/api/client";
@@ -376,8 +377,8 @@ export function TwilioTable() {
           className="filters-phone-search"
           type="search"
           value={searchInput}
-          placeholder="Страна, номер, регион, город"
-          aria-label="Поиск номеров Twilio"
+          placeholder="Номер телефона"
+          aria-label="Номер телефона"
           onChange={(e) => setSearchInput(e.target.value)}
         />
         <button
@@ -417,7 +418,6 @@ export function TwilioTable() {
         filters={filters}
         headers={HEADER_MAP}
         numberLocalQ={searchQ}
-        searchChipLabel="Поиск"
         onRemoveFacet={removeFacetValue}
         onClearNumberLocalQ={() => {
           setSearchInput("");
@@ -453,7 +453,12 @@ export function TwilioTable() {
             {items.map((row) => (
               <tr key={row.id}>
                 {TWILIO_COLUMNS.map((col) => (
-                  <td key={col.key}>{cellText(col.value(row))}</td>
+                  <td key={col.key}>
+                    <HighlightText
+                      text={cellText(col.value(row))}
+                      query={col.key === "phone_number" ? searchQ : undefined}
+                    />
+                  </td>
                 ))}
               </tr>
             ))}

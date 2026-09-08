@@ -1,3 +1,5 @@
+import type { HighlightSpan } from "@/components/numbers/prefixHighlight";
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -30,6 +32,30 @@ export function HighlightText({
           <span key={i}>{part}</span>
         ),
       )}
+    </>
+  );
+}
+
+export function HighlightRange({
+  text,
+  span,
+}: {
+  text: string;
+  span: HighlightSpan | null;
+}) {
+  if (!span || text === "—" || span.start >= span.end) {
+    return <>{text}</>;
+  }
+  const start = Math.max(0, span.start);
+  const end = Math.min(text.length, span.end);
+  if (start >= end) {
+    return <>{text}</>;
+  }
+  return (
+    <>
+      {text.slice(0, start)}
+      <mark className="search-hit">{text.slice(start, end)}</mark>
+      {text.slice(end)}
     </>
   );
 }

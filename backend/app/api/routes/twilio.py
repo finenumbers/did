@@ -164,7 +164,7 @@ def list_numbers(
     sort_by: str | None = Query("country_name"),
     sort_dir: str = Query("asc", pattern="^(asc|desc)$"),
     filters: str | None = Query(None),
-    q: str | None = Query(None),
+    q: str | None = Query(None, description="Search by phone number"),
     db: Session = Depends(get_db),
 ) -> Page[TwilioNumberItem]:
     return TwilioNumbersService(db).list_numbers(
@@ -181,7 +181,7 @@ def list_numbers(
 def list_facets(
     column: str = Query(...),
     filters: str | None = Query(None),
-    q: str | None = Query(None),
+    q: str | None = Query(None, description="Search by phone number"),
     value_q: str | None = Query(None),
     limit: int = Query(200, ge=1, le=1000),
     offset: int = Query(0, ge=0),
@@ -205,7 +205,7 @@ def export_xlsx(
     sort_by: str | None = Query("country_name"),
     sort_dir: str = Query("asc", pattern="^(asc|desc)$"),
     filters: str | None = Query(None),
-    q: str | None = Query(None),
+    q: str | None = Query(None, description="Search by phone number"),
     db: Session = Depends(get_db),
 ) -> FileResponse:
     tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)

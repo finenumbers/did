@@ -180,15 +180,18 @@ class DidwwCatalogService:
         q: str | None = None,
         exclude_column: str | None = None,
     ) -> Select:
-        if q:
-            like = f"%{q.strip()}%"
+        needle = (q or "").strip()
+        if needle:
+            like = f"%{needle}%"
+            prefix_concat = func.concat(
+                func.coalesce(DidwwCatalog.country_prefix, ""),
+                func.coalesce(DidwwCatalog.area_prefix, ""),
+            )
             stmt = stmt.where(
                 or_(
-                    DidwwCatalog.country_name.ilike(like),
-                    DidwwCatalog.country_iso.ilike(like),
-                    DidwwCatalog.city_name.ilike(like),
-                    DidwwCatalog.region_name.ilike(like),
+                    DidwwCatalog.country_prefix.ilike(like),
                     DidwwCatalog.area_prefix.ilike(like),
+                    prefix_concat.ilike(like),
                 )
             )
         for field, values in filters.items():
