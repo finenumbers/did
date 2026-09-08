@@ -87,13 +87,32 @@ function sameCoverageRow(
   );
 }
 
-function rowStatusText(row: TwilioCoverageRow, jobActive: boolean): string {
+function rowStatusText(
+  row: TwilioCoverageRow,
+  opts: { jobActive: boolean; isTarget: boolean },
+): string {
   if (row.status === "running") return row.detail || "0 / 1";
   if (row.status === "failed") return row.detail || row.numbers_last_error || "ошибка";
+  if (row.numbers_loaded || row.load_state === "loaded") return "";
   if (row.load_state === "interrupted") return row.numbers_last_error || row.detail || "прервано";
-  if (!jobActive) return row.detail || "";
+  if (!opts.jobActive) return row.detail || "";
   if (row.status === "success") return row.detail || "готово";
+  if (opts.isTarget) return row.detail || "0 / 1";
   return "ожидание";
+}
+
+function continueTitle(row: TwilioCoverageRow): string {
+  const err = (row.numbers_last_error || "").trim();
+  const checkpoint = row.numbers_checkpoint;
+  const done = checkpoint?.completed_cells?.filter((item) => String(item || "").trim()).length ?? 0;
+  const current = (checkpoint?.current_cell || "").trim();
+  const closed = Number(checkpoint?.last_completed_pattern_index || 0);
+  const parts = [`Продолжить: готово ячеек ${done}`];
+  if (current) parts.push(`сейчас ${current}`);
+  if (closed > 0) parts.push(`закрыто масок ${closed}/100`);
+  const hint = parts.join(", ");
+  if (err) return `${err}. ${hint}`;
+  return hint;
 }
 
 function requestsText(summary: TwilioSyncJob["progress"]["summary"] | undefined): string {
@@ -364,12 +383,23 @@ export function TwilioTable() {
       status: "running",
       detail: live?.detail || row.detail,
       number_count: live?.number_count ?? row.number_count,
-      region_count: live?.region_count ?? row.region_count,
-      city_count: live?.city_count ?? row.city_count,
       load_state: live?.load_state || row.load_state,
       numbers_last_error: live?.numbers_last_error ?? row.numbers_last_error,
     };
   });
+  const runningRow = tableRows.find((row) => numbersActive && sameCoverageRow(row, numbersTarget));
+  const isNumbersDisplay =
+    numbersActive ||
+    displayJob?.progress?.current_stage_id === "numbers" ||
+    Boolean(displayJob?.progress?.target?.country_iso);
+  const targetName = runningRow?.country_name || numbersTarget?.country_iso || "";
+  const targetType = formatTwilioNumberType(numbersTarget?.number_type);
+  const targetLine =
+    numbersActive && numbersTarget?.country_iso
+      ? numbersJob?.progress?.mode === "all"
+        ? `цепочка · сейчас ${targetName} · ${targetType}`
+        : `${targetName} · ${targetType}`
+      : null;
 
   return (
     <div className="panel numbers-panel">
@@ -559,12 +589,19 @@ export function TwilioTable() {
               </div>
             </div>
             <div className="notice" role="status">
-              <div>Статус: {jobStatusLabel(displayJob)}</div>
+              <div>
+                Статус: {jobStatusLabel(displayJob)}
+                {targetLine ? ` · ${targetLine}` : ""}
+              </div>
               <div>Начало: {formatWhen(displayJob?.started_at)}</div>
               <div>Окончание: {formatWhen(displayJob?.finished_at)}</div>
               <div>Запросы: {requestsText(summary)}</div>
-              <div>Города: {formatCount(summary?.cities_total ?? 0)}</div>
-              <div>Уникальные номера: {formatCount(summary?.numbers_unique ?? 0)}</div>
+              {!isNumbersDisplay && <div>Города: {formatCount(summary?.cities_total ?? 0)}</div>}
+              <div>
+                {numbersActive && runningRow?.number_count != null
+                  ? `Номера категории: ${formatCount(runningRow.number_count)}`
+                  : `Уникальные номера: ${formatCount(summary?.numbers_unique ?? 0)}`}
+              </div>
               {displayJob?.error_summary && <div>Ошибка: {displayJob.error_summary}</div>}
             </div>
             {syncError && <div className="state error">{syncError}</div>}
@@ -615,7 +652,7 @@ export function TwilioTable() {
                               type="button"
                               className="twilio-load-btn amber"
                               disabled={startingNumbers || twilioBusy || !hasCatalog}
-                              title={row.numbers_last_error || "Продолжить с checkpoint"}
+                              title={continueTitle(row)}
                               onClick={() => void startNumbers(row)}
                             >
                               Продолжить
@@ -631,7 +668,9 @@ export function TwilioTable() {
                             </button>
                           )}
                         </td>
-                        <td>{rowStatusText(row, twilioBusy) || "—"}</td>
+                        <td>
+                          {rowStatusText(row, { jobActive: twilioBusy, isTarget: isRunning }) || "—"}
+                        </td>
                       </tr>
                     );
                   })}

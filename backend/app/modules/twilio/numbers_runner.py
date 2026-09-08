@@ -182,14 +182,17 @@ def _numbers_detail(
     contains: str | None,
     returned: int,
     requests: int | None = None,
+    skipped: int = 0,
 ) -> str:
     del returned
     label = cell.region_filter or cell.label or "—"
-    parts = [f"штат {cell_index}/{cell_total}", label]
+    parts = [f"ячейка {cell_index}/{cell_total}", label]
     if contains:
-        parts.append(contains)
+        parts.append(f"маска {contains}")
     elif pattern_index == 0:
         parts.append("probe")
+    if skipped > 0:
+        parts.append(f"пропуск {skipped}")
     parts.append(f"повтор {repeat}")
     if requests is not None:
         parts.append(f"запросы {requests}")
@@ -324,7 +327,7 @@ async def _enrich_catalog_row(
         country_name=catalog.country_name,
         number_type=number_type,
         status="running",
-        detail=f"штат 0/{len(cells)}",
+        detail=f"ячейка 0/{len(cells)}",
         number_count=len(known_phones),
         region_count=len(known_regions),
         city_count=len(known_cities),
@@ -388,6 +391,7 @@ async def _enrich_catalog_row(
             contains,
             len(batch),
             requests=tracker.requests,
+            skipped=len(completed_cells),
         )
         tracker.apply(
             current={

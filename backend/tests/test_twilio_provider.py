@@ -665,12 +665,14 @@ def test_numbers_status_detail_uses_pattern_repeat_cell_and_region():
 
     country = NumberCell(region_filter="", locality=None, label="")
     assert _numbers_detail(3, 2, 1, 1, country, "%02%", 4, requests=12) == (
-        "штат 1/1 · — · %02% · повтор 2 · запросы 12"
+        "ячейка 1/1 · — · маска %02% · повтор 2 · запросы 12"
     )
-    assert _numbers_detail(0, 1, 1, 1, country, None, 0) == "штат 1/1 · — · probe · повтор 1"
+    assert _numbers_detail(0, 1, 1, 1, country, None, 0) == "ячейка 1/1 · — · probe · повтор 1"
     region = NumberCell(region_filter="TX", locality="Austin", label="TX")
-    assert _numbers_detail(3, 2, 15, 98, region, "%02%", 4) == "штат 15/98 · TX · %02% · повтор 2"
-    assert _numbers_detail(0, 1, 15, 98, region, None, 4) == "штат 15/98 · TX · probe · повтор 1"
+    assert _numbers_detail(3, 2, 15, 98, region, "%02%", 4, skipped=28) == (
+        "ячейка 15/98 · TX · маска %02% · пропуск 28 · повтор 2"
+    )
+    assert _numbers_detail(0, 1, 15, 98, region, None, 4) == "ячейка 15/98 · TX · probe · повтор 1"
 
 
 def test_reclaim_stale_jobs_only_when_lock_free():

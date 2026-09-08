@@ -206,6 +206,7 @@ export interface TwilioSyncJob {
   counts: Record<string, number>;
   progress: {
     current_stage_id?: string | null;
+    mode?: string;
     stages?: SyncStage[];
     summary?: {
       requests?: number;
