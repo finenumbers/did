@@ -1085,6 +1085,81 @@ def test_create_numbers_job_busy_when_active_exists(monkeypatch):
     assert reopened == []
 
 
+def test_boot_resumable_prefers_interrupted_row_not_latest_success(monkeypatch):
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    from app.models.enums import SyncJobStatus
+    from app.modules.twilio import numbers_runner as nr
+
+    us_local = SimpleNamespace(
+        country_iso="US",
+        number_type="local",
+        numbers_heartbeat_at=datetime(2026, 9, 8, tzinfo=timezone.utc),
+    )
+    failed = SimpleNamespace(
+        id="old-us-local",
+        status=SyncJobStatus.failed,
+        error_summary="прервано, процесс перезапущен",
+    )
+    monkeypatch.setattr(nr, "get_twilio_provider", lambda _db: SimpleNamespace(id="p"))
+    monkeypatch.setattr(nr, "number_sync_pairs", lambda _db, provider_id=None: {("US", "local")})
+    monkeypatch.setattr(nr, "list_catalog_rows", lambda _db, provider_id=None: [us_local])
+    monkeypatch.setattr(nr, "catalog_numbers_loaded", lambda _row: False)
+    monkeypatch.setattr(nr, "catalog_row_load_state", lambda _row, has_number_sync=False: "interrupted")
+    monkeypatch.setattr(
+        nr,
+        "find_resumable_numbers_job",
+        lambda _db, country_iso, number_type: failed if country_iso == "US" and number_type == "local" else None,
+    )
+    assert nr._boot_resumable_numbers_job(SimpleNamespace()) is failed
+
+
+def test_boot_resumable_skips_loaded_and_auth(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.models.enums import SyncJobStatus
+    from app.modules.twilio import numbers_runner as nr
+
+    loaded = SimpleNamespace(country_iso="US", number_type="toll_free", numbers_heartbeat_at=None)
+    auth_row = SimpleNamespace(country_iso="US", number_type="local", numbers_heartbeat_at=None)
+    auth_job = SimpleNamespace(status=SyncJobStatus.failed, error_summary="TWILIO_AUTH_MISSING")
+    monkeypatch.setattr(nr, "get_twilio_provider", lambda _db: SimpleNamespace(id="p"))
+    monkeypatch.setattr(nr, "number_sync_pairs", lambda _db, provider_id=None: set())
+    monkeypatch.setattr(nr, "list_catalog_rows", lambda _db, provider_id=None: [loaded, auth_row])
+    monkeypatch.setattr(
+        nr,
+        "catalog_numbers_loaded",
+        lambda row: row.number_type == "toll_free",
+    )
+    monkeypatch.setattr(nr, "catalog_row_load_state", lambda _row, has_number_sync=False: "interrupted")
+    monkeypatch.setattr(
+        nr,
+        "find_resumable_numbers_job",
+        lambda _db, country_iso, number_type: auth_job if number_type == "local" else None,
+    )
+    assert nr._boot_resumable_numbers_job(SimpleNamespace()) is None
+
+
+def test_boot_resumable_none_without_interrupted_rows(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.modules.twilio import numbers_runner as nr
+
+    idle = SimpleNamespace(country_iso="GB", number_type="local", numbers_heartbeat_at=None)
+    monkeypatch.setattr(nr, "get_twilio_provider", lambda _db: SimpleNamespace(id="p"))
+    monkeypatch.setattr(nr, "number_sync_pairs", lambda _db, provider_id=None: set())
+    monkeypatch.setattr(nr, "list_catalog_rows", lambda _db, provider_id=None: [idle])
+    monkeypatch.setattr(nr, "catalog_numbers_loaded", lambda _row: False)
+    monkeypatch.setattr(nr, "catalog_row_load_state", lambda _row, has_number_sync=False: "idle")
+    monkeypatch.setattr(
+        nr,
+        "find_resumable_numbers_job",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not look up jobs")),
+    )
+    assert nr._boot_resumable_numbers_job(SimpleNamespace()) is None
+
+
 def test_reopen_numbers_job_sets_pending():
     from types import SimpleNamespace
 

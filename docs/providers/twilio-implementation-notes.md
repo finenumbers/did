@@ -78,15 +78,15 @@ Writes go live via `ingest_available_batch` (`source=number_sync`). E.164 owners
 
 ## Process caveat
 
-Jobs run in a `daemon=True` thread. A backend restart kills the thread; heartbeat + boot respawn continue the **same** ingest (adopt `last_sync_job_id`, checkpoint skip). Reclaim only if heartbeat is older than 5 minutes **and** the advisory lock is free. A full US `local` chain is long (51 probes + `%00%`…`%99%` + novelty repeats). Do not start it from the agent.
+Jobs run in a `daemon=True` thread. A backend restart kills the thread; heartbeat + boot respawn continue the **same** ingest (adopt `last_sync_job_id`, checkpoint skip). Boot looks up an **interrupted catalog row** (checkpoint / open `number_sync`) and reopens that row’s failed/pending job — not the newest-by-`created_at` numbers job (a later Toll-free Success must not hide US Local). It does not create a new job id. Reclaim only if heartbeat is older than 5 minutes **and** the advisory lock is free. A full US `local` chain is long (51 probes + `%00%`…`%99%` + novelty repeats). Do not start it from the agent.
 
 Interrupted rows show **«Продолжить»**. That reopens the failed job or adopts existing `number_sync` rows onto a new job id so cutover does not wipe the partial dump. «Загрузка стран» is blocked while any row has an open numbers ingest (`source=number_sync` without `numbers_loaded`, or a checkpoint / last error).
 
 ### Portainer runbook (US Local)
 
-1. Do not redeploy the stack while US/CA `local` is running unless necessary; if you must, the next backend boot respawns the job.
+1. Do not redeploy the stack while US/CA `local` is running unless necessary. Redeploy kills the daemon thread; the in-progress `%xx%` restarts from repeat 1. Boot should reopen the interrupted row’s job even if a newer Toll-free Success exists.
 2. Do not click «Загрузка стран» until the row is green — countries cutover deletes all numbers whose `last_sync_job_id` is not the countries job.
-3. After deploy: open Синхронизация. If a numbers job is already running (even an older US Local resume), the header is «Идёт» and the row says «в процессе» — do not click «Продолжить». Otherwise interrupted US Local says «Продолжить»; one click continues and does not wipe.
+3. After deploy: open Синхронизация. If the header is «Идёт» and US Local says «в процессе» — do not click «Продолжить». If the row is «прервано» after boot (auth error, or no matching job), one «Продолжить» continues the same ingest and does not wipe.
 4. If the UI stays «в процессе» with frozen counters and a new job cannot start: lock session may be stuck. Restart `did-backend` (or `pg_terminate_backend` on the lock connection), then wait for respawn / click Продолжить.
 5. Diagnose on the live DB (read-only): `sync_jobs` `twilio_numbers` target US/local (`status`, `error_summary`, `progress.current`, `heartbeat_at`); `twilio_catalog` US/local flags; `GROUP BY region` on `twilio_available_numbers`.
 6. Watch disk / autovacuum on `twilio_available_numbers` as the table grows past a million rows.

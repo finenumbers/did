@@ -27,6 +27,7 @@ from app.modules.twilio.persist import (
     adopt_row_ingest,
     catalog_has_rows,
     catalog_numbers_loaded,
+    catalog_row_load_state,
     cutover_numbers_row,
     empty_numbers_checkpoint,
     get_catalog_row,
@@ -36,6 +37,7 @@ from app.modules.twilio.persist import (
     load_row_known,
     mark_numbers_synced,
     number_count_for_row,
+    number_sync_pairs,
     realign_available_number_iso,
     refresh_local_counts,
     save_catalog_numbers_state,
@@ -707,24 +709,38 @@ async def _execute_numbers(job_id: uuid.UUID) -> None:
             logger.exception("Failed to close Twilio numbers db session")
 
 
-def _boot_resumable_numbers_job(db: Session) -> SyncJob | None:
-    job = get_latest_twilio_numbers_job(db)
-    if job is None or job.status != SyncJobStatus.failed:
-        return None
+def _boot_job_is_auth_failure(job: SyncJob) -> bool:
     summary = (job.error_summary or "").lower()
-    if "auth" in summary or "twilio_auth" in summary:
-        return None
-    progress = (job.stats or {}).get("progress") or {}
-    target = progress.get("target") or {}
-    iso = str(target.get("country_iso") or "").strip().upper()
-    ntype = str(target.get("number_type") or "").strip()
-    if not iso or not ntype:
-        return None
+    return "auth" in summary or "twilio_auth" in summary
+
+
+def _boot_resumable_numbers_job(db: Session) -> SyncJob | None:
     provider = get_twilio_provider(db)
-    row = get_catalog_row(db, provider_id=provider.id, country_iso=iso, number_type=ntype)
-    if row is None or catalog_numbers_loaded(row):
-        return None
-    return job
+    sync_pairs = number_sync_pairs(db, provider_id=provider.id)
+    interrupted: list[TwilioCatalog] = []
+    for row in list_catalog_rows(db, provider_id=provider.id):
+        if catalog_numbers_loaded(row):
+            continue
+        iso = (row.country_iso or "").strip().upper()
+        ntype = (row.number_type or "").strip()
+        has_sync = (iso, ntype) in sync_pairs
+        if catalog_row_load_state(row, has_number_sync=has_sync) != "interrupted":
+            continue
+        interrupted.append(row)
+    interrupted.sort(
+        key=lambda row: (row.numbers_heartbeat_at is not None, row.numbers_heartbeat_at),
+        reverse=True,
+    )
+    for row in interrupted:
+        iso = (row.country_iso or "").strip().upper()
+        ntype = (row.number_type or "").strip()
+        if not iso or not ntype:
+            continue
+        job = find_resumable_numbers_job(db, country_iso=iso, number_type=ntype)
+        if job is None or _boot_job_is_auth_failure(job):
+            continue
+        return job
+    return None
 
 
 def respawn_interrupted_twilio_on_boot() -> None:
