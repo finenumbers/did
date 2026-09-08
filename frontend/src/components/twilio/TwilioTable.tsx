@@ -255,6 +255,8 @@ export function TwilioTable() {
       setJob(started);
     } catch (e) {
       setSyncError(e instanceof Error ? e.message : "Не удалось запустить загрузку стран");
+      void loadJob().catch(() => undefined);
+      void loadNumbersJob().catch(() => undefined);
     } finally {
       setStarting(false);
     }
@@ -277,6 +279,8 @@ export function TwilioTable() {
       setNumbersJob(started);
     } catch (e) {
       setNumbersError(e instanceof Error ? e.message : "Не удалось запустить загрузку номеров");
+      void loadNumbersJob().catch(() => undefined);
+      void loadJob().catch(() => undefined);
     } finally {
       setStartingNumbers(false);
     }

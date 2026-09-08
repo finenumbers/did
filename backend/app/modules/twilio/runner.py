@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.orm.attributes import flag_modified
@@ -276,6 +276,40 @@ def list_active_twilio_jobs(db: Session) -> list[SyncJob]:
     )
 
 
+def twilio_lock_is_held() -> bool:
+    """True if session advisory lock is granted. Does not acquire the lock."""
+    lock_conn = lock_engine.connect()
+    try:
+        held = lock_conn.execute(
+            text(
+                """
+                SELECT 1
+                FROM pg_locks
+                WHERE locktype = 'advisory'
+                  AND classid = :classid
+                  AND objid = :objid
+                  AND granted
+                LIMIT 1
+                """
+            ),
+            {
+                "classid": TWILIO_LOCK_KEY >> 32,
+                "objid": TWILIO_LOCK_KEY & 0xFFFFFFFF,
+            },
+        ).scalar()
+        lock_conn.commit()
+        return bool(held)
+    except Exception:
+        logger.debug("pg_locks probe failed; falling back to try-lock", exc_info=True)
+        try:
+            lock_conn.rollback()
+        except Exception:
+            pass
+        return not twilio_lock_is_free()
+    finally:
+        lock_conn.close()
+
+
 def twilio_lock_is_free() -> bool:
     lock_conn = lock_engine.connect()
     try:
@@ -360,7 +394,7 @@ def create_twilio_job(db: Session, *, triggered_by: str = "api") -> SyncJob:
     reclaim_stale_twilio_jobs(db)
     if catalog_has_open_numbers_ingest(db, provider_id=provider.id):
         raise ProviderError(COUNTRIES_BLOCKED_BY_NUMBERS)
-    if get_active_twilio_job(db):
+    if get_active_twilio_job(db) or twilio_lock_is_held():
         raise ProviderError("Синхронизация Twilio уже выполняется")
     job = SyncJob(
         provider_id=provider.id,

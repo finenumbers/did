@@ -806,6 +806,47 @@ def test_fetch_pricing_reraises_auth():
     asyncio.run(_run())
 
 
+def test_twilio_lock_is_held_reads_pg_locks_then_falls_back(monkeypatch):
+    from app.modules.twilio import runner as twilio_runner
+
+    class _Result:
+        def __init__(self, value):
+            self._value = value
+
+        def scalar(self):
+            return self._value
+
+    class _Conn:
+        def __init__(self, *, execute):
+            self._execute = execute
+            self.closed = False
+            self.committed = False
+
+        def execute(self, *_args, **_kwargs):
+            return self._execute()
+
+        def commit(self):
+            self.committed = True
+
+        def rollback(self):
+            return None
+
+        def close(self):
+            self.closed = True
+
+    held_conn = _Conn(execute=lambda: _Result(1))
+    monkeypatch.setattr(twilio_runner.lock_engine, "connect", lambda: held_conn)
+    assert twilio_runner.twilio_lock_is_held() is True
+    assert held_conn.committed is True
+    assert held_conn.closed is True
+
+    missing_conn = _Conn(execute=lambda: (_ for _ in ()).throw(RuntimeError("no pg_locks")))
+    monkeypatch.setattr(twilio_runner.lock_engine, "connect", lambda: missing_conn)
+    monkeypatch.setattr(twilio_runner, "twilio_lock_is_free", lambda: False)
+    assert twilio_runner.twilio_lock_is_held() is True
+    assert missing_conn.closed is True
+
+
 def test_wipe_twilio_locked_busy_and_self_held(monkeypatch):
     from types import SimpleNamespace
 
@@ -972,6 +1013,76 @@ def test_finalize_coverage_geo_is_sql_batched():
     assert "select(TwilioAvailableNumber).where" not in src
     assert "FINALIZE_GEO_FROM_NUMBERS_SQL" in src
     assert "CLASSIFY_UPDATE_BATCH" in src
+
+
+def test_get_latest_twilio_numbers_job_prefers_active(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.models.enums import SyncJobStatus
+    from app.modules.twilio import numbers_runner as nr
+
+    running = SimpleNamespace(id="old-us-local", status=SyncJobStatus.running)
+    monkeypatch.setattr(nr, "get_active_twilio_numbers_job", lambda _db: running)
+    assert nr.get_latest_twilio_numbers_job(SimpleNamespace()) is running
+
+
+def test_get_latest_twilio_numbers_job_falls_back_when_idle(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.models.enums import SyncJobStatus
+    from app.modules.twilio import numbers_runner as nr
+
+    success = SimpleNamespace(id="new-toll-free", status=SyncJobStatus.success)
+    monkeypatch.setattr(nr, "get_active_twilio_numbers_job", lambda _db: None)
+    db = SimpleNamespace(scalar=lambda _stmt: success)
+    assert nr.get_latest_twilio_numbers_job(db) is success
+
+
+def test_create_numbers_job_busy_when_lock_held(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.modules.twilio import numbers_runner as nr
+    from app.providers.errors import ProviderError
+
+    monkeypatch.setattr(nr, "get_twilio_provider", lambda _db: SimpleNamespace(id="p"))
+    monkeypatch.setattr(nr, "reclaim_stale_twilio_jobs", lambda _db: 0)
+    monkeypatch.setattr(nr, "catalog_has_rows", lambda _db, provider_id=None: True)
+    monkeypatch.setattr(nr, "get_active_twilio_job", lambda _db: None)
+    monkeypatch.setattr(nr, "twilio_lock_is_held", lambda: True)
+    reopened: list[object] = []
+    monkeypatch.setattr(nr, "_reopen_numbers_job", lambda job: reopened.append(job))
+
+    try:
+        nr.create_twilio_numbers_job(SimpleNamespace(), country_iso="US", number_type="local")
+        raise AssertionError("expected ProviderError")
+    except ProviderError as exc:
+        assert "уже выполняется" in str(exc)
+    assert reopened == []
+
+
+def test_create_numbers_job_busy_when_active_exists(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.models.enums import SyncJobStatus
+    from app.modules.twilio import numbers_runner as nr
+    from app.providers.errors import ProviderError
+
+    running = SimpleNamespace(status=SyncJobStatus.running, finished_at=None)
+    monkeypatch.setattr(nr, "get_twilio_provider", lambda _db: SimpleNamespace(id="p"))
+    monkeypatch.setattr(nr, "reclaim_stale_twilio_jobs", lambda _db: 0)
+    monkeypatch.setattr(nr, "catalog_has_rows", lambda _db, provider_id=None: True)
+    monkeypatch.setattr(nr, "get_active_twilio_job", lambda _db: running)
+    monkeypatch.setattr(nr, "twilio_lock_is_held", lambda: False)
+    reopened: list[object] = []
+    monkeypatch.setattr(nr, "_reopen_numbers_job", lambda job: reopened.append(job))
+
+    try:
+        nr.create_twilio_numbers_job(SimpleNamespace(), country_iso="US", number_type="local")
+        raise AssertionError("expected ProviderError")
+    except ProviderError as exc:
+        assert "уже выполняется" in str(exc)
+    assert running.status == SyncJobStatus.running
+    assert reopened == []
 
 
 def test_reopen_numbers_job_sets_pending():

@@ -25,6 +25,8 @@ Nav: [`twilio/SOURCE.md`](twilio/SOURCE.md) · [`twilio-contract.md`](twilio-con
 - Own lock `TWILIO_LOCK_KEY = 88221004` shared by countries and numbers jobs.
 - `get_active_twilio_job` treats `SyncJobType.twilio` and `twilio_numbers` as one busy flag.
 - If a job is `pending`/`running` but the lock is free (process restart), it is marked failed (`прервано, процесс перезапущен`) before a new start.
+- `GET /numbers/sync/latest` prefers any `pending`/`running` numbers job over the newest-by-`created_at` (an older US Local resume must not be hidden by a later Toll-free success).
+- Start/resume returns 409 without reopening a job if another Twilio job is active **or** lock `88221004` is held.
 - RU catalog sync methods return `SyncLimitation`.
 
 ## UI
@@ -84,7 +86,7 @@ Interrupted rows show **«Продолжить»**. That reopens the failed job 
 
 1. Do not redeploy the stack while US/CA `local` is running unless necessary; if you must, the next backend boot respawns the job.
 2. Do not click «Загрузка стран» until the row is green — countries cutover deletes all numbers whose `last_sync_job_id` is not the countries job.
-3. After deploy: open Синхронизация. Interrupted US Local should say «Продолжить» (or already be «в процессе» after respawn). One click continues; it does not start from a wipe.
+3. After deploy: open Синхронизация. If a numbers job is already running (even an older US Local resume), the header is «Идёт» and the row says «в процессе» — do not click «Продолжить». Otherwise interrupted US Local says «Продолжить»; one click continues and does not wipe.
 4. If the UI stays «в процессе» with frozen counters and a new job cannot start: lock session may be stuck. Restart `did-backend` (or `pg_terminate_backend` on the lock connection), then wait for respawn / click Продолжить.
 5. Diagnose on the live DB (read-only): `sync_jobs` `twilio_numbers` target US/local (`status`, `error_summary`, `progress.current`, `heartbeat_at`); `twilio_catalog` US/local flags; `GROUP BY region` on `twilio_available_numbers`.
 6. Watch disk / autovacuum on `twilio_available_numbers` as the table grows past a million rows.

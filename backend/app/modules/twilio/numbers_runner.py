@@ -52,6 +52,7 @@ from app.modules.twilio.runner import (
     reclaim_stale_twilio_jobs,
     touch_job_heartbeat,
     twilio_connection_config,
+    twilio_lock_is_held,
 )
 from app.providers.errors import ProviderAuthError, ProviderError
 from app.providers.twilio import contract
@@ -102,7 +103,7 @@ def create_twilio_numbers_job(
     reclaim_stale_twilio_jobs(db)
     if not catalog_has_rows(db, provider_id=provider.id):
         raise ProviderError("Сначала выполните «Загрузка стран»")
-    if get_active_twilio_job(db):
+    if get_active_twilio_job(db) or twilio_lock_is_held():
         raise ProviderError("Синхронизация Twilio уже выполняется")
     iso = (country_iso or "").strip().upper() or None
     ntype = (number_type or "").strip() or None
@@ -136,7 +137,22 @@ def create_twilio_numbers_job(
     return job
 
 
+def get_active_twilio_numbers_job(db: Session) -> SyncJob | None:
+    return db.scalar(
+        select(SyncJob)
+        .where(
+            SyncJob.job_type == SyncJobType.twilio_numbers,
+            SyncJob.status.in_((SyncJobStatus.pending, SyncJobStatus.running)),
+        )
+        .order_by(SyncJob.started_at.desc().nulls_last(), SyncJob.created_at.desc())
+        .limit(1)
+    )
+
+
 def get_latest_twilio_numbers_job(db: Session) -> SyncJob | None:
+    active = get_active_twilio_numbers_job(db)
+    if active is not None:
+        return active
     return db.scalar(
         select(SyncJob)
         .where(SyncJob.job_type == SyncJobType.twilio_numbers)
