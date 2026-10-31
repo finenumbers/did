@@ -34,7 +34,7 @@ Sources: [`aurora/SOURCE.md`](aurora/SOURCE.md) and [`aurora/raw/sample.csv`](au
 |---|---|---|
 | 0 | Phone (display-formatted) | `+7 (3652) 777007` |
 | 1 | Beauty / tariff type (after optional status drop) | `ПЛАТИНОВЫЙ`, `ПРОСТОЙ`, … |
-| 2 | Period fee text | `75990 Руб.` or `ДОГОВОРНАЯ` |
+| 2 | Incoming purchase fee text | `75990 Руб.` or `ДОГОВОРНАЯ` |
 | 3 | Geo text | `г. Симферополь\|Республика Крым` or `г. Москва` or `Российская Федерация` |
 | 4 | Display mask description | `[ AAA-XXX - 3 одинаковых в начале ] …` |
 

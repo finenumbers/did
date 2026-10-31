@@ -48,6 +48,8 @@ ADMIN_SESSION_SECRET=...
 
 UI: http://localhost:3000/login → session Bearer token for `/api/v1`.
 
+A trusted internal system reads the same API with `ADMIN_API_TOKEN`. The call path, the read contract, and the fact that this token is full admin access are in [`docs/external-consumers.md`](docs/external-consumers.md).
+
 ## Local run (Docker)
 
 ```bash

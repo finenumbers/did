@@ -65,7 +65,9 @@ With `DID_REQUIRE_AUTH=1`, OpenAPI (`/docs`) is disabled on the backend.
 
 ## 4. Optional: separate API host
 
-Prefer UI-only NPM. Direct API host is discouraged; with require-auth, `/docs` is off. If you still expose the API:
+Prefer UI-only NPM. A trusted internal system reads the catalog through the UI host already published above: `https://<ui-host>/api/backend/api/v1/...` with `Authorization: Bearer <ADMIN_API_TOKEN>`. The Next proxy forwards that header. Do not publish `did-backend` for this. Contract and token scope: [`docs/external-consumers.md`](../docs/external-consumers.md).
+
+Direct API host is discouraged; with require-auth, `/docs` is off. If you still expose the API:
 
 | Field | Value |
 |-------|--------|

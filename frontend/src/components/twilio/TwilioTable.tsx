@@ -404,9 +404,6 @@ export function TwilioTable() {
   return (
     <div className="panel numbers-panel">
       <div className="filters">
-        <button type="button" className="secondary" disabled={!hasActiveFilters} onClick={clearAll}>
-          Сбросить фильтры
-        </button>
         <input
           className="filters-phone-search"
           type="search"
@@ -415,6 +412,9 @@ export function TwilioTable() {
           aria-label="Номер телефона"
           onChange={(e) => setSearchInput(e.target.value)}
         />
+        <button type="button" className="secondary" disabled={!hasActiveFilters} onClick={clearAll}>
+          Сбросить фильтры
+        </button>
         <button
           type="button"
           onClick={() => {

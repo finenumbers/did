@@ -56,11 +56,11 @@ def test_normalize_phone():
     assert parser.normalize_phone("749512") is None
 
 
-def test_parse_period_price():
-    assert parser.parse_period_price("75990 Руб.") == Decimal("75990")
-    assert parser.parse_period_price("990 Руб.") == Decimal("990")
-    assert parser.parse_period_price("ДОГОВОРНАЯ") is None
-    assert parser.parse_period_price("") is None
+def test_parse_fee_amount():
+    assert parser.parse_fee_amount("75990 Руб.") == Decimal("75990")
+    assert parser.parse_fee_amount("990 Руб.") == Decimal("990")
+    assert parser.parse_fee_amount("ДОГОВОРНАЯ") is None
+    assert parser.parse_fee_amount("") is None
 
 
 def test_parse_region_pipe():
@@ -91,7 +91,8 @@ def test_parse_row_and_map():
     assert parsed is not None
     assert parsed.msisdn == "73652777007"
     assert parsed.number_type == "ПЛАТИНОВЫЙ"
-    assert parsed.period_price == Decimal("75990")
+    assert parsed.buy_price == Decimal("75990")
+    assert parsed.period_price is None
     assert parsed.city_name == "г. Симферополь"
     assert parsed.region_name == "Республика Крым"
     assert parsed.display_mask and "AAA-XXX" in parsed.display_mask
@@ -100,7 +101,8 @@ def test_parse_row_and_map():
     assert mapped is not None
     assert mapped.inventory_kind == InventoryKind.free
     assert mapped.provider_number_key == "73652777007"
-    assert mapped.period_price == Decimal("75990")
+    assert mapped.buy_price == Decimal("75990")
+    assert mapped.period_price is None
     assert mapped.number_type == "ПЛАТИНОВЫЙ"
     assert mapped.display_mask == parsed.display_mask
     assert mapped.abc_code is not None
@@ -143,7 +145,8 @@ def test_status_column_flag_drops_sixth():
     item = items[0]
     assert item.msisdn == "74952360003"
     assert item.number_type == "ЗОЛОТОЙ"
-    assert item.period_price == Decimal("15990")
+    assert item.buy_price == Decimal("15990")
+    assert item.period_price is None
     assert item.city_name == "г. Москва"
     assert item.raw_payload.get("dropped_status_column") is True
     assert item.raw_payload.get("column_count") == 6
@@ -312,7 +315,8 @@ def test_sync_keeps_cross_file_duplicates_for_engine(monkeypatch):
     assert dropped[0].provider_number_key == "74952222222"
     # last-wins keeps the later file's fee
     kept_dup = next(n for n in kept if n.provider_number_key == "74952222222")
-    assert kept_dup.period_price == Decimal("200")
+    assert kept_dup.buy_price == Decimal("200")
+    assert kept_dup.period_price is None
 
 
 def test_sync_fail_closed_on_one_file(monkeypatch):

@@ -46,7 +46,7 @@ UI (Next.js)
 - Primary UI/API path: `POST /api/v1/sync/start` (unified only). DIDWW is the one exception: `POST /api/v1/didww/sync` runs a separate job (`sync_job_type = didww`, lock `88221003`) and is not part of `PROVIDER_ORDER` or the finalize stages.
 - Modes: `full` (dictionaries + free + purchased; most providers including Finenumbers) and `free_only` (Aurora free CSV inventory).
 - Production reload: stage into durable **UNLOGGED** tables (not TEMP — unsafe with connection pooling), then atomic wipe+cutover per `(provider, inventory_kind)`. `reload_allowed` refuses **empty** wipe only (size may shrink or grow); per-provider pagination/completeness gates apply where documented (UIS/Vox/MCN/…); there is no global ~90% size-ratio wipe-guard.
-- Auth: `ADMIN_USERNAME` + `ADMIN_PASSWORD` enable UI login. Optional `ADMIN_API_TOKEN` on **backend** is additive for machine/CI. `DID_REQUIRE_AUTH=1` refuses boot without login credentials. UI uses Next `/api/backend` proxy with the browser session token only — frontend must not receive/inject the machine token.
+- Auth: `ADMIN_USERNAME` + `ADMIN_PASSWORD` enable UI login. Optional `ADMIN_API_TOKEN` on **backend** is additive for machine/CI and is full admin access, not a scoped read key. The supported external read path is `https://<ui-host>/api/backend/api/v1/...` with that Bearer; see [`docs/external-consumers.md`](docs/external-consumers.md). `DID_REQUIRE_AUTH=1` refuses boot without login credentials. UI uses Next `/api/backend` proxy with the browser session token only — frontend must not receive/inject the machine token.
 
 ## Adding a provider
 

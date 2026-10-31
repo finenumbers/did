@@ -24,8 +24,11 @@ def _as_text(value: Any) -> str | None:
     return s or None
 
 
-def parse_period_price(value: Any) -> Decimal | None:
-    """Extract Decimal from texts like '75990 Руб.'; ДОГОВОРНАЯ → None."""
+def parse_fee_amount(value: Any) -> Decimal | None:
+    """Extract Decimal from texts like '75990 Руб.'; ДОГОВОРНАЯ → None.
+
+    The amount is the incoming purchase price (catalog buy_price), not the subscription.
+    """
     text = _as_text(value)
     if not text:
         return None
@@ -180,7 +183,7 @@ def parse_row(
         msisdn=msisdn,
         city_name=city_name if isinstance(city_name, str) else None,
         region_name=region_name if isinstance(region_name, str) else None,
-        period_price=parse_period_price(payload["period_price_raw"]),
+        buy_price=parse_fee_amount(payload["period_price_raw"]),
         number_type=_as_text(payload["number_type"]),
         display_mask=_as_text(payload["display_mask"]),
     )
