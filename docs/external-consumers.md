@@ -35,7 +35,7 @@ Unknown `sort_by` on the free and purchased lists falls back to `abc_code`. Defa
 
 | Call | Page size | Search |
 |---|---|---|
-| `GET /api/v1/numbers/free` and `/purchased` | 1–200 | UI phone box is `number_local_q`. Also `msisdn_q`, `provider_number_key_q`, and `q` (local, msisdn, and provider key together) |
+| `GET /api/v1/numbers/free` and `/purchased` | 1–500 | UI phone box is `number_local_q`. Also `msisdn_q`, `provider_number_key_q`, and `q` (local, msisdn, and provider key together) |
 | `GET /api/v1/numbers/free/facets` and `/purchased/facets` | `limit` 1–1000 | `column` is a facet column. `msisdn` and `provider_number_key` are not facets |
 | `GET /api/v1/didww/groups` and `/didww/facets` | 1–200 | `q` searches country prefix, area prefix, or their concatenation. A row is a DID group, not an E.164 number |
 | `GET /api/v1/twilio/numbers` and `/twilio/facets` | 1–200 | `q` searches the phone number |

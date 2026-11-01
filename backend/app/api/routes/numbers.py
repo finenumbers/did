@@ -105,7 +105,7 @@ def _facets(
 )
 def list_free(
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=200),
+    page_size: int = Query(50, ge=1, le=500),
     sort_by: str | None = Query("abc_code"),
     sort_dir: str = Query("asc", pattern="^(asc|desc)$"),
     filters: str | None = Query(None, description='JSON object: {"region_name":["Москва"]}'),
@@ -148,7 +148,7 @@ def list_free(
 )
 def list_purchased(
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=200),
+    page_size: int = Query(50, ge=1, le=500),
     sort_by: str | None = Query("abc_code"),
     sort_dir: str = Query("asc", pattern="^(asc|desc)$"),
     filters: str | None = Query(None, description='JSON object: {"region_name":["Москва"]}'),
