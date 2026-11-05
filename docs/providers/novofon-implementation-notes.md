@@ -32,7 +32,7 @@ Order in the RU run: immediately after UIS and before Finenumbers, so purchased 
 7. `limit_exceeded`: one retry when minute reset is 1–120 seconds. Day limit fails the stage before cutover.
 8. Blank `base_url` falls back to `https://dataapi-jsonrpc.novofon.ru/v2.0`.
 9. Phone normalize: strip non-digits; `8XXXXXXXXXX` → `7…`; 10-digit national → prefix `7`. Anything else is unmapped.
-10. Empty mapped fetch must not wipe.
+10. Empty mapped fetch must not wipe. A confirmed empty slice (`total_items=0`, catalog slice already empty, no warnings) ends that stage and does not cancel the other method. An incomplete fetch or a non-empty catalog is not wiped and does not cancel the other method either; that slice stays failed.
 11. `build_city_lookup("novofon")` is empty. Do not fall through to Runexis cities.
 12. PSTN min cache includes ООО «НОВОФОН-ОС» (`9703126821`). After deploy, load the cache before the next 00:00 Europe/Moscow sync. Zero ranges for this INN block every provider, not only Novofon.
 

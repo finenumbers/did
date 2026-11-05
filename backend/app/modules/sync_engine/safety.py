@@ -51,6 +51,41 @@ def reload_allowed(*, previous: int, incoming: int, kind: str) -> tuple[bool, st
     return True, None
 
 
+def confirmed_empty_slice(
+    *,
+    previous: int,
+    incoming: int,
+    fetched: int,
+    warnings: list[str] | None = None,
+    integrity: dict[str, Any] | None = None,
+) -> bool:
+    """True when the API reported an empty slice and the catalog slice is already empty.
+
+    A missing total, a total mismatch, warnings, or raw rows that did not map are not
+    a confirmed empty. ``reload_allowed`` stays strict; callers use this only to avoid
+    aborting the sibling inventory kind.
+    """
+    if previous != 0 or incoming != 0 or fetched != 0:
+        return False
+    if warnings:
+        return False
+    if integrity is None:
+        return True
+    if integrity.get("total_items_mismatch"):
+        return False
+    return integrity.get("total_items") == 0
+
+
+def record_slice_error(stats: dict[str, Any], message: str) -> str:
+    """Remember a slice refusal without dropping an earlier slice error."""
+    errors = list(stats.get("_slice_errors") or [])
+    errors.append(message)
+    stats["_slice_errors"] = errors
+    joined = "; ".join(errors)
+    stats["_fatal_error"] = joined
+    return joined
+
+
 def build_inventory_summary(category_stats: dict[str, Any]) -> list[dict[str, Any]]:
     """Flatten per-provider free/purchased reload stats into was/became rows."""
     rows: list[dict[str, Any]] = []

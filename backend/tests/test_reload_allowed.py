@@ -4,7 +4,9 @@ from app.models.enums import InventoryKind, MappingConfidence
 from app.modules.sync_engine.safety import (
     build_catalog_checksum,
     build_inventory_summary,
+    confirmed_empty_slice,
     count_unique_provider_keys,
+    record_slice_error,
     reload_allowed,
 )
 from app.providers.dto.numbers import NormalizedNumber
@@ -37,6 +39,53 @@ def test_empty_incoming_with_existing_refuses():
 def test_empty_incoming_and_empty_catalog_refuses():
     ok, reason = reload_allowed(previous=0, incoming=0, kind="free")
     assert ok is False
+    assert reason is not None
+
+
+def test_confirmed_empty_slice_matches_novofon_zero_total():
+    assert confirmed_empty_slice(
+        previous=0,
+        incoming=0,
+        fetched=0,
+        warnings=[],
+        integrity={"total_items": 0, "total_items_mismatch": False},
+    )
+
+
+def test_confirmed_empty_without_integrity_when_fetch_is_empty():
+    assert confirmed_empty_slice(previous=0, incoming=0, fetched=0, warnings=[])
+
+
+def test_confirmed_empty_rejects_existing_catalog_mismatch_and_unmapped():
+    assert not confirmed_empty_slice(previous=4, incoming=0, fetched=0)
+    assert not confirmed_empty_slice(previous=0, incoming=0, fetched=3)
+    assert not confirmed_empty_slice(
+        previous=0,
+        incoming=0,
+        fetched=0,
+        integrity={"total_items": 5, "total_items_mismatch": True},
+    )
+    assert not confirmed_empty_slice(
+        previous=0,
+        incoming=0,
+        fetched=0,
+        warnings=["Novofon total_items mismatch"],
+        integrity={"total_items": 0, "total_items_mismatch": False},
+    )
+    assert not confirmed_empty_slice(
+        previous=0,
+        incoming=0,
+        fetched=0,
+        integrity={"total_items": None},
+    )
+
+
+def test_record_slice_error_keeps_earlier_slice():
+    stats: dict = {}
+    record_slice_error(stats, "free refused")
+    joined = record_slice_error(stats, "purchased refused")
+    assert joined == "free refused; purchased refused"
+    assert stats["_fatal_error"] == joined
 
 
 def test_first_load_allows_any_positive():
