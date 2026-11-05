@@ -29,6 +29,20 @@ Catalog columns are the shared free/purchased table. Novofon does not add column
 
 Purchased responses have no prices. `buy_price` and `period_price` stay empty. Оператор is filled later from the PSTN INN cache (Contour B), which includes ИНН `9703126821`. Тип / Премиум / Покупка come from mask rules. Клиент and «Подключено в РТУ» come from REG when the same number is there.
 
+## Free order shop (`GET /v1/direct_numbers/available/<DIRECTION_ID>/`)
+
+Union with the Data API pool on `provider_number_key`. The Data API row is kept when both have the same number.
+
+| User API field | Catalog / behavior |
+|---|---|
+| `numbers[].number` | Normalize to `7XXXXXXXXXX` → `msisdn`, `provider_number_key` |
+| `numbers[].id` | `raw_payload.user_api_number_id` only |
+| direction `name` | raw `location_name` only. Catalog Город/Регион stay on GAR |
+| `connect_fee` | `buy_price` when currency is `RUB`, including `0`. Number value wins over the direction |
+| `monthly_fee` | `period_price` on the same rule |
+| `currency` | raw only when it is not `RUB`; prices stay empty |
+| `areaCode` | raw `area_code` only |
+
 ## Not mapped
 
 - No regions/cities dictionary endpoints.

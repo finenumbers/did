@@ -36,6 +36,7 @@ type Draft = {
   numberingBaseUrl: string;
   accessToken: string;
   userId: string;
+  userApiSecret: string;
   credentialsJson: string;
   accountSid: string;
   authToken: string;
@@ -59,6 +60,7 @@ const EMPTY_DRAFT: Draft = {
   numberingBaseUrl: "",
   accessToken: "",
   userId: "",
+  userApiSecret: "",
   credentialsJson: "",
   accountSid: "",
   authToken: "",
@@ -239,6 +241,8 @@ export default function SettingsPage() {
     } else if (code === "novofon") {
       const next: Record<string, string> = { user_id: d.userId.trim() };
       if (d.accessToken) next.access_token = d.accessToken;
+      if (d.apiKey) next.api_key = d.apiKey;
+      if (d.userApiSecret) next.api_secret = d.userApiSecret;
       auth_settings = next;
     } else if (code === "aurora") {
       auth_settings = undefined;
@@ -839,10 +843,38 @@ export default function SettingsPage() {
                         placeholder={
                           d.settings?.auth_settings_masked?.access_token
                             ? `текущее: ${String(d.settings.auth_settings_masked.access_token)}`
-                            : "Постоянный API-ключ из ЛК Novofon"
+                            : "Secret с вкладки API. Он же access_token Data API"
                         }
                         value={d.accessToken}
                         onChange={(e) => setDraft(code, { accessToken: e.target.value })}
+                        style={{ width: "100%" }}
+                      />
+                    </label>
+                    <label>
+                      Key
+                      <input
+                        type="password"
+                        placeholder={
+                          d.settings?.auth_settings_masked?.api_key
+                            ? `текущее: ${String(d.settings.auth_settings_masked.api_key)}`
+                            : "Key с той же вкладки API. Нужен для витрины заказа"
+                        }
+                        value={d.apiKey}
+                        onChange={(e) => setDraft(code, { apiKey: e.target.value })}
+                        style={{ width: "100%" }}
+                      />
+                    </label>
+                    <label>
+                      Secret User API
+                      <input
+                        type="password"
+                        placeholder={
+                          d.settings?.auth_settings_masked?.api_secret
+                            ? `текущее: ${String(d.settings.auth_settings_masked.api_secret)}`
+                            : "Пусто — для подписи берётся Access token"
+                        }
+                        value={d.userApiSecret}
+                        onChange={(e) => setDraft(code, { userApiSecret: e.target.value })}
                         style={{ width: "100%" }}
                       />
                     </label>

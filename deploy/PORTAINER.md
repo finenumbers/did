@@ -99,7 +99,7 @@ UIS requires the server egress IP in the personal account API allowlist before s
 
 ## 7a. Novofon Data API egress IP
 
-Novofon uses the same JSON-RPC family as UIS on a different host (`dataapi-jsonrpc.novofon.ru`) and its own allowlist. Add the Docker host public IP in Novofon ЛК → API security before sync or connection test. Credentials (`access_token`, optional agent `user_id`) are entered in Settings → Novofon. Without `access_token` the provider is skipped and the RU run stays successful. After this release, load the PSTN cache so ИНН `9703126821` (ООО «НОВОФОН-ОС») has ranges before the next 00:00 Europe/Moscow sync; a missing required operator blocks every provider.
+Novofon uses the same JSON-RPC family as UIS on a different host (`dataapi-jsonrpc.novofon.ru`) and its own allowlist. Add the Docker host public IP in Novofon ЛК → API security before sync or connection test. Credentials (`access_token`, optional agent `user_id`) are entered in Settings → Novofon. Without `access_token` the provider is skipped and the RU run stays successful. The order shop is a second host, `api.novofon.com`, and needs Key from the same API tab (`api_key`). Until Key is saved, the Novofon free stage fails and the RU run stays partial; purchased Novofon and the other providers still run. After this release, load the PSTN cache so ИНН `9703126821` (ООО «НОВОФОН-ОС») has ranges before the next 00:00 Europe/Moscow sync; a missing required operator blocks every provider.
 
 ## 7b. Aurora Telecom CSV egress
 

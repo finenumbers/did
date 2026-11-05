@@ -6,6 +6,7 @@
 - Auth session (documented, unused): [login.user](https://novofon.github.io/data_api/authentication/login_user/)
 - Client account: [get.account](https://novofon.github.io/data_api/account/get_account/)
 - Agent customer users: [get.customer_users](https://novofon.github.io/data_api/partner/get_customer_users/)
+- Order shop (classic User API, not Data API): [novofon/user-api-v1](https://github.com/novofon/user-api-v1) `GET /v1/direct_numbers/countries/`, `/country/`, `/available/<DIRECTION_ID>/` on `https://api.novofon.com`
 
 ## Artifacts
 
@@ -28,4 +29,4 @@
 
 ## Rule
 
-Saved HTML under `novofon/raw/` is the method source of truth for Novofon. Derived contract/mapping must not invent methods or fields. Integration is **read-only**: `get.customer_users` and `get.account` classify the token, then `get.available_virtual_numbers` and `get.virtual_numbers`. `login.user` is documented but unused.
+Saved HTML under `novofon/raw/` is the method source of truth for the Data API. The order shop is the classic User API above; example payloads in the contract are field sketches, not inventory. Integration is **read-only**: classify the token, read `get.available_virtual_numbers` and `get.virtual_numbers`, then GET the three `direct_numbers` methods. `login.user`, `order`, and `prolong` are not called.

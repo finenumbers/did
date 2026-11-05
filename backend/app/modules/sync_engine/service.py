@@ -51,17 +51,37 @@ from app.services.providers_service import persist_auth_settings
 
 
 def _empty_stage_detail(base: str, result: Any) -> str:
-    """Append the Novofon account summary without turning the slice into a warning."""
+    """Append account and shop notes without turning the slice into a warning."""
     extra = getattr(result, "extra_stats", None)
     if not isinstance(extra, dict):
         return base
+    text = base
     principal = extra.get("principal")
-    if not isinstance(principal, dict):
-        return base
-    summary = principal.get("summary")
-    if not isinstance(summary, str) or not summary.strip():
-        return base
-    return f"{base}. {summary.strip()}"
+    if isinstance(principal, dict):
+        summary = principal.get("summary")
+        if isinstance(summary, str) and summary.strip():
+            text = f"{text}. {summary.strip()}"
+    suffix = extra.get("empty_suffix")
+    if isinstance(suffix, str) and suffix.strip():
+        text = f"{text}. {suffix.strip()}"
+    return text
+
+
+def refuse_slice_detail(result: Any, *, reason: str | None, incoming: int) -> str:
+    """Stage text when wipe is refused. A provider refusal_detail replaces the generic reason."""
+    extra = getattr(result, "extra_stats", None)
+    if isinstance(extra, dict):
+        custom = extra.get("refusal_detail")
+        if isinstance(custom, str) and custom.strip():
+            return custom.strip()
+    detail = reason or "refused wipe"
+    fetched = int(getattr(result, "fetched", 0) or 0)
+    if fetched > incoming:
+        detail = f"{detail}; fetched={fetched} mapped={incoming}"
+    integrity = extra.get("integrity") if isinstance(extra, dict) else None
+    if isinstance(integrity, dict) and integrity.get("total_items_mismatch"):
+        detail = f"{detail}; total_items={integrity.get('total_items')}"
+    return detail
 
 
 def _exc_summary(exc: BaseException, *, limit: int = 2000) -> str:
@@ -324,14 +344,7 @@ class SyncService:
             )
 
         def _refuse_detail(result: Any, *, reason: str | None, incoming: int) -> str:
-            detail = reason or "refused wipe"
-            fetched = int(result.fetched or 0)
-            if fetched > incoming:
-                detail = f"{detail}; fetched={fetched} mapped={incoming}"
-            integrity = _slice_integrity(result)
-            if integrity and integrity.get("total_items_mismatch"):
-                detail = f"{detail}; total_items={integrity.get('total_items')}"
-            return detail
+            return refuse_slice_detail(result, reason=reason, incoming=incoming)
 
         limitations: list[dict[str, Any]] = []
         city_lookup = build_city_lookup(self.db, provider.code.value)

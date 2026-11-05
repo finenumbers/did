@@ -129,6 +129,45 @@ Before either number method, one classification per provider job:
 | `get.campaign_available_phone_numbers` | Campaign setup, not stock. |
 | `get.available_phone_prefixes` | Site-monitoring report (`prefix`, `prefix_name`). Not linked to VN methods. Example response field is `prefixe`. Not in the permissions table. |
 
+`get.available_virtual_numbers` is the connect-pool (numbers waiting for `enable.virtual_numbers`). A client with nothing waiting receives `total_items=0`. That is not the personal-account order catalog.
+
+## User API order shop — documentation-derived
+
+The LK screen «номера для заказа» is the classic User API, the same family as the official client [novofon/user-api-v1](https://github.com/novofon/user-api-v1). Method shapes follow that client's GET calls. Example JSON below is a field sketch, not inventory.
+
+Host is the constant `https://api.novofon.com`. Sync `base_url` stays the Data API host and is not used for these calls. The sandbox URL from the PHP client is not used. TLS verification stays on.
+
+| Call | Role |
+|---|---|
+| `GET /v1/direct_numbers/countries/?language=ru` | Country list. `info[].countryCodeIso` is required. |
+| `GET /v1/direct_numbers/country/?country=<iso>&language=ru` | Directions in that country. |
+| `GET /v1/direct_numbers/available/<DIRECTION_ID>/` | Numbers available for order. No `offset` / `limit`. `mask` is not sent. |
+
+`country` is the `countryCodeIso` string from the countries payload whose case-insensitive value is `ru` (sent unchanged). No Russia row means the shop is empty, not a parse error. A missing `countryCodeIso`, a missing `numbers` key, a non-array `numbers`, or `status` other than `success` is an error. `numbers: []` on a direction is a successful empty page and the walk continues.
+
+`DIRECTION_ID` must match `^[A-Za-z0-9]+$`. Anything else cancels the free slice before that direction is requested.
+
+Auth header: `Authorization: {Key}:{base64(hex HMAC-SHA1)}`. The signed string is `method + query + md5(query)` with query keys sorted and encoded like PHP `http_build_query` (`PHP_QUERY_RFC1738`). `method` includes the `/v1/.../` path. `format` is not added. Key is settings `api_key`. The HMAC secret is `api_secret` when set, otherwise the Data API `access_token` (Novofon's CRM guide calls that Secret the Data API token; this is not a captured handshake). One attempt. A rejected signature does not try the other slot. `user_id` is not sent.
+
+The free slice is the Data API connect-pool union this shop, keyed by normalized `7XXXXXXXXXX`. Data API wins on a duplicate. Shop `buy_price` / `period_price` come from the number's `connect_fee` / `monthly_fee` when present, otherwise from the direction. `0` is a real price. Prices are stored only when `currency` is `RUB` (any case). Direction `name` is raw `location_name` only. The opaque number `id` stays in `raw_payload`.
+
+There is no documented page size. The catalog stores the returned `numbers` arrays and does not scan `mask`. If any direction fails, the free slice is refused and neither source is written. Until `api_key` is set, the free slice is refused the same way: a Data API pool is not saved as the whole free catalog. Purchased numbers stay on `get.virtual_numbers`.
+
+Not called: `POST /v1/direct_numbers/order/`, `POST /v1/direct_numbers/prolong/`, any PUT, `GET /v1/direct_numbers/` (already connected).
+
+Rate limit headers `X-RateLimit-Remaining` and `X-RateLimit-Reset` (unix time) are read the same way as the official client. Remaining `0` waits only when reset is inside 120 seconds. With no headers, `available` calls are spaced by 1.2 seconds. `429` and a connect/read timeout are retried once. Authorization and other HTTP errors are not retried. Connect timeout 10s, read timeout 30s.
+
+```json
+{
+  "status": "success",
+  "numbers": [
+    {"id": "1712p0D1643D0t42r198658", "direction_id": 13755, "number": "+74950000001"}
+  ]
+}
+```
+
+Direction fees (`connect_fee`, `monthly_fee`, `currency`) are on `GET /v1/direct_numbers/country/`, not on this number object, unless the number object itself carries them.
+
 ## Limits — partial
 
 `metadata.limits` (`day_limit`, `day_remaining`, `day_reset`, `minute_limit`, `minute_remaining`, `minute_reset`) and mnemonic `limit_exceeded` (`-32029`) are VERIFIED. The nav link «Лимиты и ограничения» has **no body** on the published index, so per-method point cost is UNVERIFIED.

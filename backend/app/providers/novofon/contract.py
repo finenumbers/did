@@ -12,6 +12,26 @@ USER_PREVIEW_LIMIT = 20
 
 AUTH_ACCESS_TOKEN = "access_token"
 AUTH_USER_ID = "user_id"
+# Classic User API. Key is required for the order shop. Secret falls back to access_token.
+AUTH_API_KEY = "api_key"
+AUTH_API_SECRET = "api_secret"
+
+# Order shop. Not the Data API host and not connection.base_url.
+USER_API_BASE_URL = "https://api.novofon.com"
+USER_API_COUNTRIES = "/v1/direct_numbers/countries/"
+USER_API_COUNTRY = "/v1/direct_numbers/country/"
+USER_API_AVAILABLE = "/v1/direct_numbers/available/"
+USER_API_LANGUAGE = "ru"
+USER_API_CONNECT_TIMEOUT = 10.0
+USER_API_READ_TIMEOUT = 30.0
+# Used only when the response has no X-RateLimit-* headers.
+USER_API_PACE_SECONDS = 1.2
+USER_API_RETRY_MAX_SECONDS = 120
+
+KEY_MISSING_MESSAGE = (
+    "Витрина заказа не запрашивалась: не задан Key. "
+    "Key — поле на вкладке API в ЛК Novofon, рядом с Secret."
+)
 
 # VERIFIED pagination. Product page sizes differ by method (operational).
 FREE_PAGE_LIMIT = 10_000

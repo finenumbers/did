@@ -6,8 +6,10 @@ Nav: [`novofon/SOURCE.md`](novofon/SOURCE.md) · [`novofon-contract.md`](novofon
 
 | Key | Purpose |
 |---|---|
-| `access_token` | Permanent API key from the Novofon personal account (required for sync) |
-| `user_id` | Agent customer user `id` from `get.customer_users`. Blank save deletes the stored value. Ignored on a client key |
+| `access_token` | Secret from the API tab. Data API token. Also the HMAC secret when `api_secret` is empty |
+| `api_key` | Key from the same API tab. Required to read the order shop. Blank save does not delete it |
+| `api_secret` | Optional User API HMAC secret. Blank save does not delete it. Blank value means `access_token` |
+| `user_id` | Agent customer user `id` from `get.customer_users`. Blank save deletes the stored value. Ignored on a client key and never sent to the User API |
 
 Product does **not** call `login.user`.
 
@@ -16,7 +18,7 @@ Product does **not** call `login.user`.
 | Stage id | Phase |
 |---|---|
 | `novofon_dictionaries` | skipped — no regions/cities dictionary |
-| `novofon_free` | `get.available_virtual_numbers` |
+| `novofon_free` | Data API connect-pool `get.available_virtual_numbers`, then User API order shop |
 | `novofon_purchased` | `get.virtual_numbers` |
 
 Order in the RU run: immediately after UIS and before Finenumbers, so purchased Novofon numbers participate in REG dedup.
@@ -36,9 +38,11 @@ Order in the RU run: immediately after UIS and before Finenumbers, so purchased 
 11. `build_city_lookup("novofon")` is empty. Do not fall through to Runexis cities.
 12. PSTN min cache includes ООО «НОВОФОН-ОС» (`9703126821`). After deploy, load the cache before the next 00:00 Europe/Moscow sync. Zero ranges for this INN block every provider, not only Novofon.
 13. Before number reads, classify the token once per job. `get.customer_users` with `total_items > 0` is an agent: send `user_id` only when filter `id =` finds the stored value, otherwise fail without calling number methods. Code `-32008` on that probe (live mnemonic `component_disabled`, component `dataapi_agent`) means the token is not an agent; number methods are still read without `user_id`. The same code on a number method fails that stage and keeps the server message. A client (`get.account.app_id`) is queried without `user_id`. The stored key is not removed. A confirmed zero stays successful and the stage names the account. An unclassified token is not reported as an empty warehouse.
+14. Free numbers are the Data API connect-pool plus the User API shop (`https://api.novofon.com`, not `base_url`). No `api_key`, a bad payload (`numbers` missing, `status` not `success`), or any unread direction refuses the free slice with `refusal_detail` and writes nothing, including a non-empty Data API pool. Purchased still runs. `numbers: []` is an empty direction, not a failure. No Russia in the country list is an empty shop. A real zero (both sources empty, no warnings) appends `empty_suffix` to the stage text. Shop prices are stored only for currency `RUB`; `0` is kept. The stage does not raise, so a shop refusal does not skip purchased.
 
 ## Test connection
 
 1. Require stored `access_token`.
 2. Classify the key the same way as sync. An agent key without a verified `user_id` fails here and does not call the number methods.
 3. For a client key, `get.virtual_numbers` and `get.available_virtual_numbers`, each with `limit=1`. An empty list is success. The message includes the account name and both `total_items`.
+4. Without `api_key` the check is unsuccessful and does not call the User API. With `api_key`, one `GET /v1/direct_numbers/countries/`. Directions and numbers are not walked. A countries error fails the check even after Data API succeeded.
