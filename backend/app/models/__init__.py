@@ -26,6 +26,7 @@ from app.models.exolve_raw import (
     ExolveRegionRaw,
 )
 from app.models.uis_raw import UisFreeNumberRaw, UisPurchasedNumberRaw
+from app.models.novofon_raw import NovofonFreeNumberRaw, NovofonPurchasedNumberRaw
 from app.models.voximplant_raw import (
     VoximplantCategoryRaw,
     VoximplantCityRaw,
@@ -99,4 +100,6 @@ __all__ = [
     "SystemSetting",
     "UisFreeNumberRaw",
     "UisPurchasedNumberRaw",
+    "NovofonFreeNumberRaw",
+    "NovofonPurchasedNumberRaw",
 ]

@@ -58,6 +58,7 @@ PROVIDER_ORDER = (
     ProviderCode.sipout,
     ProviderCode.runexis,
     ProviderCode.uis,
+    ProviderCode.novofon,
     ProviderCode.aurora,
     ProviderCode.exolve,
     ProviderCode.voximplant,
@@ -459,6 +460,25 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
                         run.id,
                         SyncLogLevel.info,
                         "Provider mcn: skipped (нет API-ключа)",
+                    )
+                    continue
+            if code == ProviderCode.novofon:
+                auth = (
+                    dict(provider.connection.auth_settings or {})
+                    if provider.connection is not None
+                    else {}
+                )
+                novofon_token = (auth.get("access_token") or "").strip()
+                if not novofon_token:
+                    for phase in ("dictionaries", "free", "purchased"):
+                        sid = stage_for_provider_phase(code.value, phase)
+                        if sid:
+                            tracker.skip(sid, "нет access_token Novofon")
+                    log_run(
+                        db,
+                        run.id,
+                        SyncLogLevel.info,
+                        "Provider novofon: skipped (нет access_token)",
                     )
                     continue
             ok = await _sync_provider(

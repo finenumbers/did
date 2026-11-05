@@ -10,6 +10,7 @@ _PROVIDER_LABELS: dict[str, str] = {
     "sipout": "SipOut",
     "runexis": "Runexis",
     "uis": "UIS",
+    "novofon": "Novofon",
     "aurora": "Aurora Telecom",
     "finenumbers": "Finenumbers",
     "exolve": "Exolve",

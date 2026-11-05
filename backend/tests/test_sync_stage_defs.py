@@ -8,6 +8,7 @@ _PROVIDERS = (
     "sipout",
     "runexis",
     "uis",
+    "novofon",
     "aurora",
     "exolve",
     "voximplant",

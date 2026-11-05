@@ -13,6 +13,7 @@ type ProviderCode =
   | "sipout"
   | "runexis"
   | "uis"
+  | "novofon"
   | "aurora"
   | "finenumbers"
   | "exolve"
@@ -34,6 +35,7 @@ type Draft = {
   numberingPassword: string;
   numberingBaseUrl: string;
   accessToken: string;
+  userId: string;
   credentialsJson: string;
   accountSid: string;
   authToken: string;
@@ -56,6 +58,7 @@ const EMPTY_DRAFT: Draft = {
   numberingPassword: "",
   numberingBaseUrl: "",
   accessToken: "",
+  userId: "",
   credentialsJson: "",
   accountSid: "",
   authToken: "",
@@ -71,6 +74,7 @@ const PROVIDERS: { code: ProviderCode; title: string }[] = [
   { code: "sipout", title: "SipOut" },
   { code: "runexis", title: "Runexis" },
   { code: "uis", title: "UIS" },
+  { code: "novofon", title: "Novofon" },
   { code: "aurora", title: "Aurora Telecom" },
   { code: "exolve", title: "Exolve" },
   { code: "voximplant", title: "Voximplant" },
@@ -109,6 +113,10 @@ function draftFromSettings(code: ProviderCode, s: ProviderSettings): Draft {
     numberingBaseUrl: typeof auth.numbering_base_url === "string" ? auth.numbering_base_url : "",
     csvFiles: code === "aurora" ? parseAuroraCsvFiles(s.extra_settings) : [],
     accountSid: typeof auth.account_sid === "string" ? auth.account_sid : "",
+    userId:
+      auth.user_id === undefined || auth.user_id === null || auth.user_id === ""
+        ? ""
+        : String(auth.user_id),
     settings: s,
   };
 }
@@ -118,6 +126,7 @@ export default function SettingsPage() {
     sipout: { ...EMPTY_DRAFT },
     runexis: { ...EMPTY_DRAFT },
     uis: { ...EMPTY_DRAFT },
+    novofon: { ...EMPTY_DRAFT },
     aurora: { ...EMPTY_DRAFT },
     exolve: { ...EMPTY_DRAFT },
     voximplant: { ...EMPTY_DRAFT },
@@ -166,6 +175,7 @@ export default function SettingsPage() {
       sipout: { ...EMPTY_DRAFT },
       runexis: { ...EMPTY_DRAFT },
       uis: { ...EMPTY_DRAFT },
+      novofon: { ...EMPTY_DRAFT },
       aurora: { ...EMPTY_DRAFT },
       exolve: { ...EMPTY_DRAFT },
       voximplant: { ...EMPTY_DRAFT },
@@ -226,6 +236,10 @@ export default function SettingsPage() {
         : undefined;
     } else if (code === "uis") {
       auth_settings = d.accessToken ? { access_token: d.accessToken } : undefined;
+    } else if (code === "novofon") {
+      const next: Record<string, string> = { user_id: d.userId.trim() };
+      if (d.accessToken) next.access_token = d.accessToken;
+      auth_settings = next;
     } else if (code === "aurora") {
       auth_settings = undefined;
       const csv_files = d.csvFiles
@@ -523,7 +537,7 @@ export default function SettingsPage() {
                       ? "(DIDAPI)"
                       : code === "finenumbers"
                         ? "(PSTN)"
-                        : code === "uis"
+                        : code === "uis" || code === "novofon"
                           ? "(Data API)"
                           : code === "exolve"
                             ? "(Numbering API)"
@@ -547,7 +561,9 @@ export default function SettingsPage() {
                             ? "https://pstn.finenumbers.com"
                             : code === "uis"
                               ? "https://dataapi.uiscom.ru/v2.0"
-                              : code === "exolve"
+                              : code === "novofon"
+                                ? "https://dataapi-jsonrpc.novofon.ru/v2.0"
+                                : code === "exolve"
                                 ? "https://api.exolve.ru"
                                 : code === "voximplant"
                                   ? "https://api.voximplant.com"
@@ -810,6 +826,37 @@ export default function SettingsPage() {
                         }
                         value={d.accessToken}
                         onChange={(e) => setDraft(code, { accessToken: e.target.value })}
+                        style={{ width: "100%" }}
+                      />
+                    </label>
+                  </>
+                ) : code === "novofon" ? (
+                  <>
+                    <label>
+                      Access token
+                      <input
+                        type="password"
+                        placeholder={
+                          d.settings?.auth_settings_masked?.access_token
+                            ? `текущее: ${String(d.settings.auth_settings_masked.access_token)}`
+                            : "Постоянный API-ключ из ЛК Novofon"
+                        }
+                        value={d.accessToken}
+                        onChange={(e) => setDraft(code, { accessToken: e.target.value })}
+                        style={{ width: "100%" }}
+                      />
+                    </label>
+                    <label>
+                      User ID
+                      <input
+                        inputMode="numeric"
+                        placeholder={
+                          d.settings?.auth_settings_masked?.user_id
+                            ? `текущее: ${String(d.settings.auth_settings_masked.user_id)}`
+                            : "Только для агентского аккаунта"
+                        }
+                        value={d.userId}
+                        onChange={(e) => setDraft(code, { userId: e.target.value })}
                         style={{ width: "100%" }}
                       />
                     </label>

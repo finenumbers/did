@@ -27,6 +27,7 @@ from app.providers.finenumbers import contract as finenumbers_contract
 from app.providers.runexis import contract as runexis_contract
 from app.providers.sipout import contract as sipout_contract
 from app.providers.uis import contract as uis_contract
+from app.providers.novofon import contract as novofon_contract
 
 
 def mark_interrupted_runs() -> None:
@@ -70,6 +71,7 @@ def seed_providers() -> None:
                 {},
             ),
             (ProviderCode.uis, "UIS", uis_contract.EXAMPLE_BASE_URL, {}, {}),
+            (ProviderCode.novofon, "Novofon", novofon_contract.EXAMPLE_BASE_URL, {}, {}),
             (
                 ProviderCode.aurora,
                 "Aurora Telecom",

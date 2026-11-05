@@ -1,6 +1,6 @@
 # DID — telecom numbering analytics
 
-Internal admin console for loading and analyzing phone number inventory from independent providers (**SipOut**, **Runexis**, **UIS**, **Aurora Telecom**, **Exolve**, **Voximplant**, **MCN Telecom**, **Finenumbers**), with PSTN-based operator enrichment.
+Internal admin console for loading and analyzing phone number inventory from independent providers (**SipOut**, **Runexis**, **UIS**, **Novofon**, **Aurora Telecom**, **Exolve**, **Voximplant**, **MCN Telecom**, **Finenumbers**), with PSTN-based operator enrichment.
 
 ## Stack
 
@@ -26,6 +26,7 @@ Index: [`docs/providers/README.md`](docs/providers/README.md)
 - SipOut: [`docs/providers/sipout/SOURCE.md`](docs/providers/sipout/SOURCE.md)
 - Runexis: [`docs/providers/runexis/SOURCE.md`](docs/providers/runexis/SOURCE.md)
 - UIS: [`docs/providers/uis/SOURCE.md`](docs/providers/uis/SOURCE.md)
+- Novofon: [`docs/providers/novofon/SOURCE.md`](docs/providers/novofon/SOURCE.md)
 - Aurora Telecom: [`docs/providers/aurora/SOURCE.md`](docs/providers/aurora/SOURCE.md)
 - Exolve: [`docs/providers/exolve/SOURCE.md`](docs/providers/exolve/SOURCE.md)
 - Voximplant: [`docs/providers/voximplant/SOURCE.md`](docs/providers/voximplant/SOURCE.md)
@@ -34,7 +35,7 @@ Index: [`docs/providers/README.md`](docs/providers/README.md)
 - Twilio: [`docs/providers/twilio/SOURCE.md`](docs/providers/twilio/SOURCE.md)
 - Finenumbers/PSTN: [`docs/providers/finenumbers-contract.md`](docs/providers/finenumbers-contract.md)
 
-**Locked product decisions:** provider APIs are read-only; wipe is per inventory slice (not full catalog purge); sync requires manually loaded min PSTN INN cache (СИПАУТНЭТ, ИНТЕРНОД, Фронтир Нетворк).
+**Locked product decisions:** provider APIs are read-only; wipe is per inventory slice (not full catalog purge); sync requires manually loaded min PSTN INN cache (СИПАУТНЭТ, ИНТЕРНОД, Фронтир Нетворк, НОВОФОН-ОС `9703126821`, and the rest of `REQUIRED_OPERATORS`).
 
 ## Admin login
 

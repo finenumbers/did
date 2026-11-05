@@ -80,6 +80,7 @@ Manual cache load must cover before unified sync starts. Source of truth: `REQUI
 | ООО «СВЯЗЬ» | `2209025699` |
 | ООО «СЕРВИС-КОММЮНИКЭЙШН» | `7707244004` |
 | ООО «КМВтелеком» | `2626045442` |
+| ООО «НОВОФОН-ОС» | `9703126821` |
 
 Sync does **not** auto-refresh Contour B. Cache refresh is manual from Settings.
 

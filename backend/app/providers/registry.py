@@ -11,12 +11,14 @@ from app.providers.sipout import SipOutProvider
 from app.providers.uis import UisProvider
 from app.providers.voximplant import VoximplantProvider
 from app.providers.mcn import McnProvider
+from app.providers.novofon import NovofonProvider
 
 PROVIDER_REGISTRY: dict[ProviderCode, type[AbstractProvider]] = {
     ProviderCode.runexis: RunexisProvider,
     ProviderCode.sipout: SipOutProvider,
     ProviderCode.finenumbers: FinenumbersProvider,
     ProviderCode.uis: UisProvider,
+    ProviderCode.novofon: NovofonProvider,
     ProviderCode.aurora: AuroraProvider,
     ProviderCode.exolve: ExolveProvider,
     ProviderCode.voximplant: VoximplantProvider,

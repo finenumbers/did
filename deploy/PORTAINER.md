@@ -97,6 +97,10 @@ Do **not** pin version tags for routine redeploys — keep `DID_IMAGE_TAG=latest
 
 UIS requires the server egress IP in the personal account API allowlist before sync/test work. Add the Docker host public IP (or `0.0.0.0/0` for lab) under UIS ЛК → API security. Credentials (`access_token`) are entered in Settings → UIS after deploy.
 
+## 7a. Novofon Data API egress IP
+
+Novofon uses the same JSON-RPC family as UIS on a different host (`dataapi-jsonrpc.novofon.ru`) and its own allowlist. Add the Docker host public IP in Novofon ЛК → API security before sync or connection test. Credentials (`access_token`, optional agent `user_id`) are entered in Settings → Novofon. Without `access_token` the provider is skipped and the RU run stays successful. After this release, load the PSTN cache so ИНН `9703126821` (ООО «НОВОФОН-ОС») has ranges before the next 00:00 Europe/Moscow sync; a missing required operator blocks every provider.
+
 ## 7b. Aurora Telecom CSV egress
 
 Aurora free numbers load via plain **HTTP** to `bill.auroratelecom.ru:8080` (public CSVs, no auth). File URLs are configured in Settings (`extra_settings.csv_files`); `all_free.csv` is forbidden. The backend container must be allowed outbound HTTP to that host/port. No credentials — optional per-file `has_status_column` for MSK-style 6-column rows.

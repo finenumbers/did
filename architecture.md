@@ -22,7 +22,7 @@ UI (Next.js)
 
 | Area | Path | Role |
 |---|---|---|
-| Providers | `backend/app/providers/` | Doc-driven adapters (SipOut, Runexis, UIS, Aurora, Exolve, Voximplant, MCN, Finenumbers, DIDWW) |
+| Providers | `backend/app/providers/` | Doc-driven adapters (SipOut, Runexis, UIS, Novofon, Aurora, Exolve, Voximplant, MCN, Finenumbers, DIDWW, Twilio) |
 | Sync | `backend/app/modules/sync_engine/` | Unified runs, jobs, wipe+reload, progress, schedule |
 | PSTN INN cache | `backend/app/modules/pstn_inn_cache/` | Contour B: ranges cache for `catalog.operator` only |
 | Settings | `provider_connections` + PSTN cache APIs | Credentials, test connection, cache refresh, schedule |

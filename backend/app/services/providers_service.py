@@ -95,6 +95,12 @@ class ProvidersService:
                 "UIS Data API: access_token (API key from ЛК). "
                 "IP whitelist required in UIS ЛК. See uis-contract.md. Read-only get.* only."
             )
+        elif code == ProviderCode.novofon.value:
+            notice = (
+                "Novofon Data API: access_token (API key from ЛК). "
+                "Optional user_id for an agent account. IP whitelist required in Novofon ЛК. "
+                "See novofon-contract.md. Read-only get.* only."
+            )
         elif code == ProviderCode.aurora.value:
             notice = (
                 "Aurora Telecom: public free CSV over HTTP (no auth). "
@@ -175,6 +181,11 @@ class ProvidersService:
                 and incoming.get("numbering_password") != merged.get("numbering_password")
             )
             merged.update(incoming)
+            if code == ProviderCode.novofon.value and payload.auth_settings.get("user_id") in (
+                None,
+                "",
+            ):
+                merged.pop("user_id", None)
             if code == ProviderCode.runexis.value and password_changed:
                 for key in _AUTH_TOKEN_KEYS:
                     merged.pop(key, None)

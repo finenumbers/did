@@ -4,13 +4,14 @@
 
 | Table | Purpose |
 |---|---|
-| `providers` | Independent sources registry (sipout, runexis, uis, aurora, exolve, voximplant, mcn, finenumbers, didww) |
+| `providers` | Independent sources registry (sipout, runexis, uis, novofon, aurora, exolve, voximplant, mcn, finenumbers, didww, twilio) |
 | `provider_connections` | Auth/base URL/test status |
 | `system_settings` | Key/value settings (`sync_schedule`, `pstn_inn_cache_refresh`, …) |
 | `sync_jobs` / `sync_job_logs` | Per-provider job audit (also used inside unified run) |
 | `sync_runs` / `sync_run_logs` | Unified multi-provider sync progress + logs |
 | `runexis_*_raw` / `sipout_*_raw` | Per-provider raw payloads (+ extracts) |
 | `uis_free_numbers_raw` / `uis_purchased_numbers_raw` | UIS Data API free/purchased raw |
+| `novofon_free_numbers_raw` / `novofon_purchased_numbers_raw` | Novofon Data API free/purchased raw |
 | `aurora_free_numbers_raw` | Aurora Telecom free CSV raw |
 | `exolve_*_raw` | Exolve GetList/GetFree raw |
 | `voximplant_*_raw` | Voximplant free/reference raw |

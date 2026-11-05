@@ -33,6 +33,7 @@ from app.modules.sync_engine.persist import (
     persist_runexis_numbers,
     persist_sipout_numbers,
     persist_uis_numbers,
+    persist_novofon_numbers,
     preserve_operators_on_numbers,
 )
 from app.modules.sync_engine.progress import SyncAborted, SyncProgressTracker, stage_for_provider_phase
@@ -530,6 +531,15 @@ class SyncService:
                         numbers=numbers,
                         on_progress=persist_progress,
                     )
+                elif provider.code == ProviderCode.novofon:
+                    persist_stats = persist_novofon_numbers(
+                        self.db,
+                        provider_id=provider.id,
+                        job_id=job.id,
+                        inventory_kind=InventoryKind.free,
+                        numbers=numbers,
+                        on_progress=persist_progress,
+                    )
                 elif provider.code == ProviderCode.aurora:
                     persist_stats = persist_aurora_numbers(
                         self.db,
@@ -790,6 +800,15 @@ class SyncService:
                         )
                     elif provider.code == ProviderCode.uis:
                         persist_stats = persist_uis_numbers(
+                            self.db,
+                            provider_id=provider.id,
+                            job_id=job.id,
+                            inventory_kind=InventoryKind.purchased,
+                            numbers=numbers,
+                            on_progress=persist_progress,
+                        )
+                    elif provider.code == ProviderCode.novofon:
+                        persist_stats = persist_novofon_numbers(
                             self.db,
                             provider_id=provider.id,
                             job_id=job.id,

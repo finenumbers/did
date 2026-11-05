@@ -36,6 +36,7 @@ from app.models.exolve_raw import (
     ExolveRegionRaw,
 )
 from app.models.uis_raw import UisFreeNumberRaw, UisPurchasedNumberRaw
+from app.models.novofon_raw import NovofonFreeNumberRaw, NovofonPurchasedNumberRaw
 from app.models.voximplant_raw import (
     VoximplantCategoryRaw,
     VoximplantCityRaw,
@@ -120,6 +121,13 @@ def wipe_provider_numbers(
             UisFreeNumberRaw
             if inventory_kind == InventoryKind.free
             else UisPurchasedNumberRaw
+        )
+        db.execute(delete(raw_cls))
+    elif provider_code == ProviderCode.novofon:
+        raw_cls = (
+            NovofonFreeNumberRaw
+            if inventory_kind == InventoryKind.free
+            else NovofonPurchasedNumberRaw
         )
         db.execute(delete(raw_cls))
     elif provider_code == ProviderCode.aurora:
@@ -990,6 +998,135 @@ def persist_uis_numbers(
     }
 
 
+def _raw_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def persist_novofon_numbers(
+    db: Session,
+    *,
+    provider_id: uuid.UUID,
+    job_id: uuid.UUID,
+    inventory_kind: InventoryKind,
+    numbers: list[NormalizedNumber],
+    on_progress: Callable[[str, int | None, int | None], Any] | None = None,
+) -> dict[str, int]:
+    """Stage into UNLOGGED tables, then atomic wipe+cutover."""
+    deduped: dict[str, NormalizedNumber] = {}
+    for num in numbers:
+        if num.provider_number_key:
+            deduped[num.provider_number_key] = num
+    numbers = list(deduped.values())
+
+    loaded = _now()
+    table_name = (
+        "novofon_free_numbers_raw"
+        if inventory_kind == InventoryKind.free
+        else "novofon_purchased_numbers_raw"
+    )
+    stg_raw_name = f"{table_name}_stg"
+    stg_cat_name = "numbers_catalog_normalized_stg"
+
+    stg_raw = ensure_temp_staging(db, live_table=table_name, stg_table=stg_raw_name)
+    stg_cat = ensure_temp_staging(
+        db, live_table="numbers_catalog_normalized", stg_table=stg_cat_name
+    )
+
+    raw_rows: list[dict[str, Any]] = []
+    cat_rows: list[dict[str, Any]] = []
+    for num in numbers:
+        raw_id = uuid.uuid4()
+        ph = payload_hash(num.raw_payload)
+        payload = num.raw_payload or {}
+        if inventory_kind == InventoryKind.free:
+            raw_rows.append(
+                {
+                    "id": raw_id,
+                    "sync_job_id": job_id,
+                    "source_loaded_at": loaded,
+                    "raw_payload": num.raw_payload,
+                    "payload_hash": ph,
+                    "external_key": num.provider_number_key,
+                    "phone": num.msisdn or num.provider_number_key,
+                    "location_name": _raw_text(payload.get("location_name")),
+                    "location_mnemonic": _raw_text(payload.get("location_mnemonic")),
+                    "created_at": loaded,
+                }
+            )
+        else:
+            ext = payload.get("id")
+            raw_rows.append(
+                {
+                    "id": raw_id,
+                    "sync_job_id": job_id,
+                    "source_loaded_at": loaded,
+                    "raw_payload": num.raw_payload,
+                    "payload_hash": ph,
+                    "external_key": num.provider_number_key,
+                    "phone": num.msisdn,
+                    "external_id": str(ext) if ext is not None else None,
+                    "status": num.status_raw,
+                    "created_at": loaded,
+                }
+            )
+        cat_rows.append(
+            _catalog_row(
+                num,
+                provider_id=provider_id,
+                job_id=job_id,
+                inventory_kind=inventory_kind,
+                table_name=table_name,
+                raw_id=raw_id,
+                loaded=loaded,
+            )
+        )
+
+    upserted = insert_staging_batches(
+        db,
+        stg_raw,
+        raw_rows,
+        on_progress=on_progress,
+        progress_label="Novofon staging raw",
+    )
+    insert_staging_batches(
+        db,
+        stg_cat,
+        cat_rows,
+        on_progress=on_progress,
+        progress_label="Novofon staging catalog",
+    )
+
+    def _wipe() -> None:
+        wipe_provider_numbers(
+            db,
+            provider_id=provider_id,
+            provider_code=ProviderCode.novofon,
+            inventory_kind=inventory_kind,
+        )
+
+    cutover_from_staging(
+        db,
+        wipe_fn=_wipe,
+        live_raw_table=table_name,
+        stg_raw=stg_raw,
+        live_catalog_table="numbers_catalog_normalized",
+        stg_catalog=stg_cat,
+    )
+    if on_progress:
+        try:
+            on_progress("cutover done", upserted, len(numbers))
+        except Exception:
+            logger.exception("persist on_progress failed")
+
+    return {
+        "upserted": upserted,
+        "deduped_input": len(deduped),
+    }
+
+
 def persist_aurora_numbers(
     db: Session,
     *,
@@ -1331,7 +1468,7 @@ def _decimal_or_none(value: Any) -> Decimal | None:
 def build_city_lookup(db: Session, provider_code: str) -> dict[str, tuple[str | None, str | None, str | None]]:
     """city_id -> (city_name, region_external_id, region_name)."""
     lookup: dict[str, tuple[str | None, str | None, str | None]] = {}
-    if provider_code in {"finenumbers", "uis", "aurora"}:
+    if provider_code in {"finenumbers", "uis", "aurora", "novofon"}:
         return lookup
     if provider_code == "sipout":
         cities = db.scalars(select(SipoutCityRaw)).all()

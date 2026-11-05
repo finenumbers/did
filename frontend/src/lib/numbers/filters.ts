@@ -15,6 +15,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   sipout: "SipOut",
   runexis: "Runexis",
   uis: "UIS",
+  novofon: "Novofon",
   aurora: "Aurora Telecom",
   finenumbers: "Finenumbers",
   exolve: "Exolve",

@@ -1,0 +1,958 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.2.2, mkdocs-material-7.2.4">
+    
+    
+      
+        <title>Получение списка подключенных виртуальных номеров - DATA API</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.f7f47774.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.3f5d1f46.min.css">
+        
+      
+    
+    
+    
+      
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,400i,700%7CRoboto+Mono&display=fallback">
+        <style>:root{--md-text-font-family:"Roboto";--md-code-font-family:"Roboto Mono"}</style>
+      
+    
+    
+    
+      <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.11.0/styles/default.min.css">
+    
+    
+      
+
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="" data-md-color-primary="none" data-md-color-accent="none">
+  
+    
+    <script>function __prefix(e){return new URL("../..",location).pathname+"."+e}function __get(e,t=localStorage){return JSON.parse(t.getItem(__prefix(e)))}</script>
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DATA API" class="md-header__button md-logo" aria-label="DATA API" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DATA API
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Получение списка подключенных виртуальных номеров
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
+      </label>
+      
+<div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" aria-label="Clear" tabindex="-1">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+  </nav>
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DATA API" class="md-nav__button md-logo" aria-label="DATA API" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54z"/></svg>
+
+    </a>
+    DATA API
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changelog/" class="md-nav__link">
+        Changelog
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        Общая информация
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/" class="md-nav__link">
+        Права и компоненты
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../account/get_account/" class="md-nav__link">
+        Аккаунт
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        Виртуальные номера
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sip/" class="md-nav__link">
+        SIP-линии
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scenario/get_scenarios/" class="md-nav__link">
+        Сценарии
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user_media/get_media_files/" class="md-nav__link">
+        Медиафайлы
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../campaigns/" class="md-nav__link">
+        Рекламные кампании
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sales_funnel_and_deals/" class="md-nav__link">
+        Воронки продаж и Сделки
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sites/" class="md-nav__link">
+        Сайты
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reports/" class="md-nav__link">
+        Отчёты
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tags/" class="md-nav__link">
+        Теги
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../employees/" class="md-nav__link">
+        Сотрудники
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contacts/" class="md-nav__link">
+        Адресная книга
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../blacklist/" class="md-nav__link">
+        Черный список
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../schedules/" class="md-nav__link">
+        Графики активности
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../report/get_campaign_daily_stat/" class="md-nav__link">
+        Получения статистики РК по дням
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../partners/" class="md-nav__link">
+        Клиенты агентов
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../communications/" class="md-nav__link">
+        Загрузка коммуникаций
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../persons/" class="md-nav__link">
+        Персона/Визитор
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    Параметры запроса
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    Параметры ответа
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#json" class="md-nav__link">
+    JSON структура запроса
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#json_1" class="md-nav__link">
+    JSON структура ответа
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    Список возвращаемых ошибок
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          <div class="md-content" data-md-component="content">
+            <article class="md-content__inner md-typeset">
+              
+                
+                
+                  <h1>Получение списка подключенных виртуальных номеров</h1>
+                
+                <nav>
+<a href="../../VirtualNumbers">Виртуальные номера </a> >
+Получение списка подключённых виртуальных номеров
+</nav>
+
+<table>
+<thead>
+<tr>
+<th align="left">Метод</th>
+<th align="left"><code>get.virtual_numbers</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left">Описание</td>
+<td align="left">Получение списка подключённых виртуальных номеров</td>
+</tr>
+<tr>
+<td align="left">Кому доступен</td>
+<td align="left">Агент, Клиент</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_1">Параметры запроса</h3>
+<table>
+<thead>
+<tr>
+<th align="left">Название</th>
+<th align="left">Тип</th>
+<th align="center">Обязательный</th>
+<th align="left">Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left"><code>access_token</code></td>
+<td align="left">string</td>
+<td align="center">да</td>
+<td align="left">Ключ сессии аутентификации</td>
+</tr>
+<tr>
+<td align="left"><code>user_id</code></td>
+<td align="left">number</td>
+<td align="center">нет</td>
+<td align="left">Уникальный идентификатор пользователя клиента агента от имени которого делается запрос <blockquote>Является обязательным для агента</blockquote> Для получения списка пользователей клиента необходимо использовать метод <a href="../Partners/#get_customer_user">"get.customer_users"</a></td>
+</tr>
+<tr>
+<td align="left"><code>limit</code></td>
+<td align="left">number</td>
+<td align="center">нет</td>
+<td align="left">Количество возвращаемых записей. См. раздел <a href="../..#_paging">"Постраничный вывод"</a></td>
+</tr>
+<tr>
+<td align="left"><code>offset</code></td>
+<td align="left">number</td>
+<td align="center">нет</td>
+<td align="left">Сдвиг, определяет с какого номера записи возвращать <code>"limit"</code> записей. По умолчанию "0". См. раздел <a href="../..#_paging">"Постраничный вывод"</a></td>
+</tr>
+<tr>
+<td align="left"><code>filter</code></td>
+<td align="left">object</td>
+<td align="center">нет</td>
+<td align="left">См. раздел <a href="../..#_filters">"Критерии фильтрации"</a></td>
+</tr>
+<tr>
+<td align="left"><code>fields</code></td>
+<td align="left">array</td>
+<td align="center">нет</td>
+<td align="left">См. раздел <a href="../..#_views">"Представление возвращаемых данных"</a></td>
+</tr>
+<tr>
+<td align="left"><code>sort</code></td>
+<td align="left">array</td>
+<td align="center">нет</td>
+<td align="left">См. раздел <a href="../..#_sort">"Сортировка данных"</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="_2">Параметры ответа</h3>
+<table>
+    <tbody>
+        <tr>
+            <th>Название</th>
+            <th>Тип</th>
+            <th>Допустимые значения</th>
+            <th>Фильтрация</th>
+            <th>Сортировка</th>
+            <th>Описание</th>
+        </tr>
+        <tr>
+            <td><code>id</code></td>
+            <td>number</td>
+            <td></td>
+            <td>да</td>
+            <td></td>
+            <td>Уникальный идентификатор виртуального номера</td>
+        </tr>
+        <tr>
+            <td><code>virtual_phone_number</code></td>
+            <td>string</td>
+            <td></td>
+            <td>да</td>
+            <td></td>
+            <td>Виртуальный номер</td>
+        </tr>
+        <tr>
+            <td><code>redirection_phone_number</code></td>
+            <td>string</td>
+            <td></td>
+            <td>да</td>
+            <td></td>
+            <td>
+                Связанный номер
+                <blockquote>
+                Часто используется для 800 номеров
+                </blockquote>
+            </td>
+        </tr>
+        <tr>
+            <td><code>activation_date</code></td>
+            <td>iso8601</td>
+            <td>
+            YYYY-MM-DD hh:mm:ss
+            </td>
+            <td>да</td>
+            <td></td>
+            <td>Дата активации номера</td>
+        </tr>
+        <tr>
+            <td><code>status</code></td>
+            <td>enum</td>
+            <td>
+                <ul>
+                <li>active</li>
+                <li>waiting</li>
+                <li>cleaning</li>
+                <li>prereserved</li>
+                <li>reserved</li>
+                <li>manual_lock</li>
+                <li>limit_lock</li>
+                </ul>
+            </td>
+            <td>да</td>
+            <td>да</td>
+            <td>Статус номера</td>
+        </tr>
+        <tr>
+            <td><code>category</code></td>
+            <td>enum</td>
+            <td>
+                <ul>
+                <li>usual</li>
+                <li>bronze</li>
+                <li>silver</li>
+                <li>gold</li>
+                <li>platinum</li>
+                </ul>
+            </td>
+            <td>да</td>
+            <td>да</td>
+            <td>Категория номера</td>
+        </tr>
+        <tr>
+            <td><code>type</code></td>
+            <td>enum</td>
+            <td>
+                <ul>
+                <li>va</li>
+                <li>call_tracking</li>
+                <li>dynamic_call_tracking</li>
+                </ul>
+            </td>
+            <td>да</td>
+            <td>да</td>
+            <td>Тип номера</td>
+        </tr>
+
+        <tr>
+            <td colspan="6">Рекламные кампании в которых используется виртуальный номер</td>
+        </tr>
+        <tr>
+            <td><code>campaigns</code></td>
+            <td>array</td>
+            <td></td>
+            <td>да</td>
+            <td></td>
+            <td>Список рекламных кампаний в которых используется виртуальный номер</td>
+        </tr>
+        <tr>
+            <td><code>campaign_id</code></td>
+            <td>number</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>Уникальный идентификатор рекламной кампании</td>
+        </tr>
+        <tr>
+            <td><code>campaign_name</code></td>
+            <td>string</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>Название рекламной кампании</td>
+        </tr>
+<tr>
+            <td><code>site_id</code></td>
+            <td>number</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>Уникальный идентификатор сайта с которым связана рекламная кампания</td>
+        </tr>
+        <tr>
+            <td><code>site_domain_name</code></td>
+            <td>string</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>Адрес сайта в интернете с которым связана рекламная кампания. Без указания протокола - "http://" или "https://"</td>
+        </tr>
+        <tr>
+            <td colspan="6">Блоки номеров рекламной кампании в которых используется номер</td>
+        </tr>
+        <tr>
+            <td><code>site_blocks</code></td>
+            <td>array</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>Список блоков номеров сайта, в которых используется виртуальный номер номер</td>
+        </tr>
+        <tr>
+            <td><code>site_block_id</code></td>
+            <td>number</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>Уникальный идентификатор блока номеров</td>
+        </tr>
+        <tr>
+            <td><code>site_block_name</code></td>
+            <td>string</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>Название блока номеров</td>
+        </tr>
+        <tr>
+            <td colspan="6">Сценарии</td>
+        </tr>
+        <tr>
+            <td><code>scenarios</code></td>
+            <td>array</td>
+            <td></td>
+            <td>да</td>
+            <td></td>
+            <td>Список сценариев, которые связанны с виртуальным номером</td>
+        </tr>
+        <tr>
+            <td><code>scenario_id</code></td>
+            <td>number</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>Уникальный идентификатор сценария
+            </td>
+        </tr>
+        <tr>
+            <td><code>scenario_name</code></td>
+            <td>string</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>Название сценария</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3 id="json">JSON структура запроса</h3>
+<pre><code class="language-json">{
+  &quot;jsonrpc&quot;:&quot;2.0&quot;,
+  &quot;id&quot;:&quot;number&quot;,
+  &quot;method&quot;:&quot;get.virtual_numbers&quot;,
+  &quot;params&quot;:{
+    &quot;access_token&quot;:&quot;string&quot;,
+    &quot;user_id&quot;:&quot;number&quot;,
+    &quot;offset&quot;:&quot;number&quot;,
+    &quot;limit&quot;:&quot;number&quot;,
+    &quot;filter&quot;:{
+
+    },
+    &quot;sort&quot;:[
+      {
+        &quot;field&quot;:&quot;string&quot;,
+        &quot;order&quot;:&quot;string&quot;
+      }
+    ],
+    &quot;fields&quot;:[
+      &quot;string&quot;
+    ]
+  }
+}
+</code></pre>
+<h3 id="json_1">JSON структура ответа</h3>
+<pre><code class="language-json">{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;id&quot;: &quot;number&quot;,
+  &quot;result&quot;: {
+    &quot;metadata&quot;: {
+
+    },
+    &quot;data&quot;: [
+      {
+        &quot;id&quot;: &quot;number&quot;,
+        &quot;virtual_phone_number&quot;: &quot;string&quot;,
+        &quot;redirection_phone_number&quot;: &quot;string&quot;,
+        &quot;activation_date&quot;: &quot;iso8601&quot;,
+        &quot;status&quot;: &quot;enum&quot;,
+        &quot;category&quot;: &quot;enum&quot;,
+        &quot;type&quot;: &quot;enum&quot;,
+        &quot;campaigns&quot;: [
+          {
+            &quot;campaign_id&quot;: &quot;number&quot;,
+            &quot;site_id&quot;: &quot;number&quot;,
+            &quot;site_domain_name&quot;: &quot;string&quot;,
+            &quot;campaign_name&quot;: &quot;string&quot;,
+            &quot;site_blocks&quot;: [
+              {
+                &quot;site_block_id&quot;: &quot;number&quot;,
+                &quot;site_block_name&quot;: &quot;string&quot;,
+                &quot;is_tracking&quot;: &quot;boolean&quot;
+              }
+            ]
+          }
+        ],
+        &quot;scenarios&quot;: [
+          {
+            &quot;scenario_id&quot;: &quot;number&quot;,
+            &quot;scenario_name&quot;: &quot;string&quot;
+          }
+        ]
+      }
+    ]
+  }
+}
+</code></pre>
+<h3 id="_3">Список возвращаемых ошибок</h3>
+<p>Смотрим раздел <a href="../..#_getErrors">"Список ошибок для методов с глаголом get"</a></p>
+                
+                  
+                
+              
+              
+                
+
+
+              
+            </article>
+          </div>
+        </div>
+        
+      </main>
+      
+        
+<footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-footer-copyright">
+        
+        Made with
+        <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+          Material for MkDocs
+        </a>
+        
+      </div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    <script id="__config" type="application/json">{"base": "../..", "features": [], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "../../assets/javascripts/workers/search.709b4209.min.js", "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.febc23d1.min.js"></script>
+      
+        <script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+      
+        <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.11.0/highlight.min.js"></script>
+      
+        <script src="../../js/init.js"></script>
+      
+    
+  </body>
+</html>
