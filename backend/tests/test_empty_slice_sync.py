@@ -124,6 +124,42 @@ def test_confirmed_empty_free_still_loads_purchased(monkeypatch):
     assert stats.get("_free_cutover_committed") is not True
 
 
+def test_confirmed_empty_appends_principal_summary(monkeypatch):
+    free = SyncResult(
+        fetched=0,
+        parsed=0,
+        items=[],
+        extra_stats={
+            "integrity": {"total_items": 0, "total_items_mismatch": False},
+            "principal": {"summary": "Клиент «Кабинет» app_id=15"},
+        },
+    )
+    purchased = SyncResult(
+        fetched=0,
+        parsed=0,
+        items=[],
+        extra_stats={
+            "integrity": {"total_items": 0, "total_items_mismatch": False},
+            "principal": {"summary": "Клиент «Кабинет» app_id=15"},
+        },
+    )
+    _stats, calls, events, persisted = _run(
+        monkeypatch, free=free, purchased=purchased, previous=[0, 0]
+    )
+    assert calls == ["free", "purchased"]
+    assert persisted == []
+    assert (
+        "free",
+        "end",
+        "API вернул 0 свободных номеров. Клиент «Кабинет» app_id=15",
+    ) in events
+    assert (
+        "purchased",
+        "end",
+        "API вернул 0 купленных номеров. Клиент «Кабинет» app_id=15",
+    ) in events
+
+
 def test_refused_free_wipe_still_loads_purchased(monkeypatch):
     free = SyncResult(
         fetched=0,

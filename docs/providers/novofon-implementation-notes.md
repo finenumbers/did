@@ -7,7 +7,7 @@ Nav: [`novofon/SOURCE.md`](novofon/SOURCE.md) · [`novofon-contract.md`](novofon
 | Key | Purpose |
 |---|---|
 | `access_token` | Permanent API key from the Novofon personal account (required for sync) |
-| `user_id` | Optional agent customer user id. Blank save deletes the stored value |
+| `user_id` | Agent customer user `id` from `get.customer_users`. Blank save deletes the stored value. Ignored on a client key |
 
 Product does **not** call `login.user`.
 
@@ -35,8 +35,10 @@ Order in the RU run: immediately after UIS and before Finenumbers, so purchased 
 10. Empty mapped fetch must not wipe. A confirmed empty slice (`total_items=0`, catalog slice already empty, no warnings) ends that stage and does not cancel the other method. An incomplete fetch or a non-empty catalog is not wiped and does not cancel the other method either; that slice stays failed.
 11. `build_city_lookup("novofon")` is empty. Do not fall through to Runexis cities.
 12. PSTN min cache includes ООО «НОВОФОН-ОС» (`9703126821`). After deploy, load the cache before the next 00:00 Europe/Moscow sync. Zero ranges for this INN block every provider, not only Novofon.
+13. Before number reads, classify the token once per job. `get.customer_users` with `total_items > 0` is an agent: send `user_id` only when filter `id =` finds the stored value, otherwise fail without calling number methods. A client (`get.account.app_id`) is queried without `user_id`. The stored key is not removed. A confirmed zero stays successful and the stage names the account. An unclassified token is not reported as an empty warehouse.
 
 ## Test connection
 
 1. Require stored `access_token`.
-2. `get.virtual_numbers` and `get.available_virtual_numbers`, each with `limit=1`. An empty list is success.
+2. Classify the key the same way as sync. An agent key without a verified `user_id` fails here and does not call the number methods.
+3. For a client key, `get.virtual_numbers` and `get.available_virtual_numbers`, each with `limit=1`. An empty list is success. The message includes the account name and both `total_items`.

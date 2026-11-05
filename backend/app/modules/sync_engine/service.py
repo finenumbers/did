@@ -50,6 +50,20 @@ from app.providers.registry import get_provider
 from app.services.providers_service import persist_auth_settings
 
 
+def _empty_stage_detail(base: str, result: Any) -> str:
+    """Append the Novofon account summary without turning the slice into a warning."""
+    extra = getattr(result, "extra_stats", None)
+    if not isinstance(extra, dict):
+        return base
+    principal = extra.get("principal")
+    if not isinstance(principal, dict):
+        return base
+    summary = principal.get("summary")
+    if not isinstance(summary, str) or not summary.strip():
+        return base
+    return f"{base}. {summary.strip()}"
+
+
 def _exc_summary(exc: BaseException, *, limit: int = 2000) -> str:
     """Include exception type so bare NoSuchTableError names are actionable in the UI."""
     return f"{type(exc).__name__}: {exc}"[:limit]
@@ -490,7 +504,9 @@ class SyncService:
                 )
                 if not ok:
                     if _confirmed_empty(result, previous=previous, incoming=unique_incoming):
-                        empty_detail = "API вернул 0 свободных номеров"
+                        empty_detail = _empty_stage_detail(
+                            "API вернул 0 свободных номеров", result
+                        )
                         stats["categories"]["free_numbers"] = {
                             "accepted_empty": True,
                             "previous": previous,
@@ -773,7 +789,9 @@ class SyncService:
                         if _confirmed_empty(
                             result, previous=previous, incoming=unique_incoming
                         ):
-                            empty_detail = "API вернул 0 купленных номеров"
+                            empty_detail = _empty_stage_detail(
+                                "API вернул 0 купленных номеров", result
+                            )
                             stats["categories"]["purchased_numbers"] = {
                                 "accepted_empty": True,
                                 "previous": previous,

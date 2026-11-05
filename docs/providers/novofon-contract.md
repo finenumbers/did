@@ -41,7 +41,7 @@ Product stores the key and does **not** call `login.user`. A temporary key that 
 
 ### Agent `user_id`
 
-Optional for a client token. Required when the token belongs to an agent acting as a customer user. Obtain users via `get.customer_users` (not called by DID).
+Optional in the settings form. A client token must be sent without `user_id` (a stored value is ignored and is not deleted). An agent token is recognized only when `get.customer_users` returns `total_items > 0`. Then `user_id` must be the `id` of a row from that method, checked with filter `id =`. The product does not pick a user automatically. An empty `get.customer_users` success is not treated as an agent.
 
 ### IP allowlist — VERIFIED
 
@@ -107,6 +107,16 @@ There is no country field and no regions/cities dictionary for this method.
 `is_tracking` inside `site_blocks` is EXAMPLE-CONFIRMED only. `name` and `comment` are not in the published response. No region, city, or price fields.
 
 All statuses are stored. The catalog UI has no status column.
+
+### Principal — VERIFIED methods, product rule
+
+Before either number method, one classification per provider job:
+
+1. `get.customer_users` (`limit=1`, no `user_id`). Audience: partner. `id` is the `user_id` for client methods. Non-empty `total_items` means an agent key.
+2. Otherwise `get.account` (no `user_id`). Audience: client. Response example uses `meta_data` and `data[0].app_id` / `name`.
+3. `forbidden` and `method_not_found` mean “not this audience”. `access_token_*` and `ip_not_whitelisted` stop classification. Both probes missing the audience, or an agent list with zero users while `get.account` is forbidden, fail the stage and do not call the number methods.
+4. Agent without a matching stored `user_id`: the stage lists at most 20 users and `total_items`. No number read.
+5. A confirmed empty number list is a success only after the client branch. The stage text includes the account name and `app_id`.
 
 ### Not used
 

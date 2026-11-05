@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
@@ -14,11 +15,16 @@ from app.providers.dto.common import (
     SyncResult,
 )
 from app.providers.novofon import contract, mapper, parser
-from app.providers.novofon.client import NovofonClient
+from app.providers.novofon.client import NovofonClient, NovofonPrincipal
+
+logger = logging.getLogger(__name__)
 
 
 class NovofonProvider(AbstractProvider):
     code = ProviderCode.novofon
+
+    def __init__(self) -> None:
+        self._principal: NovofonPrincipal | None = None
 
     def capabilities(self) -> dict[str, Any]:
         return {
@@ -47,25 +53,39 @@ class NovofonProvider(AbstractProvider):
     def _client(self, connection: ConnectionConfig) -> NovofonClient:
         return NovofonClient(connection)
 
-    async def test_connection(self, connection: ConnectionConfig) -> DiagnosticsResult:
+    async def _open(
+        self, connection: ConnectionConfig
+    ) -> tuple[NovofonClient, NovofonPrincipal]:
         client = self._client(connection)
+        if self._principal is None:
+            self._principal = await client.resolve_principal()
+        else:
+            client.adopt_principal(self._principal)
+        return client, self._principal
+
+    async def test_connection(self, connection: ConnectionConfig) -> DiagnosticsResult:
         checked = (
             contract.METHOD_VIRTUAL_NUMBERS,
             contract.METHOD_AVAILABLE_VIRTUAL_NUMBERS,
         )
         try:
-            client.require_access_token()
+            client, principal = await self._open(connection)
+            totals: dict[str, int | None] = {}
             for method in checked:
                 raw = await client.get_page(method, offset=0, limit=1)
-                parser.parse_list_page(raw)
+                _items, total = parser.parse_list_page(raw)
+                totals[method] = total
+            parts = [principal.summary]
+            parts.extend(f"{method} total_items={total}" for method, total in totals.items())
             return DiagnosticsResult(
                 ok=True,
-                message=(
-                    "Novofon get.virtual_numbers and "
-                    "get.available_virtual_numbers (limit=1) OK"
-                ),
+                message="; ".join(parts),
                 checked_at=datetime.now(UTC),
-                details={"methods": list(checked)},
+                details={
+                    "methods": list(checked),
+                    "principal": principal.as_dict(),
+                    "totals": totals,
+                },
             )
         except Exception as exc:  # noqa: BLE001 — surface any probe failure to UI
             return DiagnosticsResult(
@@ -101,9 +121,18 @@ class NovofonProvider(AbstractProvider):
     ) -> SyncResult:
         from app.providers.progress_emit import emit_progress
 
-        client = self._client(connection)
+        client, principal = await self._open(connection)
         items, _envelopes, page_integrity = await client.iter_all(
             method, on_progress=on_progress
+        )
+        limits = page_integrity.get("limits") if isinstance(page_integrity.get("limits"), dict) else {}
+        logger.info(
+            "Novofon %s %s total_items=%s minute_remaining=%s day_remaining=%s",
+            method,
+            principal.summary,
+            page_integrity.get("total_items"),
+            limits.get("minute_remaining"),
+            limits.get("day_remaining"),
         )
         await emit_progress(on_progress, "Novofon: разбор и маппинг", 0, len(items) or None)
         mapped = []
@@ -128,7 +157,7 @@ class NovofonProvider(AbstractProvider):
             items=mapped,
             unmapped_raw=unmapped_raw,
             warnings=warnings,
-            extra_stats={"integrity": page_integrity},
+            extra_stats={"integrity": page_integrity, "principal": principal.as_dict()},
         )
 
     async def sync_free_numbers(self, connection: ConnectionConfig, **kwargs: Any) -> SyncResult:

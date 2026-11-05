@@ -13,7 +13,7 @@ from app.modules.sync_engine.unified import PROVIDER_ORDER
 from app.providers.dto.common import ConnectionConfig, RawHttpResult
 from app.providers.errors import ProviderAuthError, ProviderError
 from app.providers.novofon import contract, mapper, parser
-from app.providers.novofon.client import NovofonClient
+from app.providers.novofon.client import NovofonClient, NovofonPrincipal
 from app.providers.novofon.provider import NovofonProvider
 from app.providers.retry import RetryPolicy
 
@@ -232,7 +232,7 @@ def test_null_category_filter_reaches_json_body(monkeypatch: pytest.MonkeyPatch)
 
     asyncio.run(_run())
     params = seen["json"]["params"]
-    assert params["user_id"] == 42
+    assert "user_id" not in params
     assert params["filter"] == {"field": "category", "operator": "=", "value": None}
 
 
@@ -381,3 +381,231 @@ def test_category_slice_over_window_raises():
     with pytest.raises(ProviderError) as exc:
         asyncio.run(client.iter_all(contract.METHOD_AVAILABLE_VIRTUAL_NUMBERS))
     assert exc.value.code == "NOVOFON_PAGINATION_TRUNCATED"
+
+
+def _rpc_error(mnemonic: str, code: int = -32003) -> RawHttpResult:
+    return _raw(
+        {
+            "jsonrpc": "2.0",
+            "id": "1",
+            "error": {"code": code, "message": mnemonic, "data": {"mnemonic": mnemonic}},
+        }
+    )
+
+
+def _account(app_id: int = 15, name: str = "Кабинет") -> RawHttpResult:
+    return _raw(
+        {
+            "jsonrpc": "2.0",
+            "id": "1",
+            "result": {
+                "meta_data": {},
+                "data": [{"app_id": app_id, "name": name, "timezone": "Europe/Moscow"}],
+            },
+        }
+    )
+
+
+def _scripted(handler):
+    seen: list[tuple[str, dict]] = []
+
+    async def _call(method, params=None):
+        body = dict(params or {})
+        seen.append((method, body))
+        return handler(method, body)
+
+    return seen, _call
+
+
+def test_client_key_omits_stored_user_id_and_keeps_auth():
+    auth = {"access_token": "token", "user_id": "99"}
+    client = NovofonClient(
+        ConnectionConfig(base_url="https://example.test/v2.0", auth_settings=auth),
+        retry=RetryPolicy(max_attempts=1, backoff_seconds=0),
+    )
+
+    def handler(method, params):
+        if method == contract.METHOD_CUSTOMER_USERS:
+            return _rpc_error("forbidden")
+        if method == contract.METHOD_ACCOUNT:
+            return _account()
+        assert "user_id" not in params
+        return _page(0, [])
+
+    seen, call = _scripted(handler)
+    client.call = call  # type: ignore[method-assign]
+
+    async def _run():
+        principal = await client.resolve_principal()
+        await client.get_page(contract.METHOD_AVAILABLE_VIRTUAL_NUMBERS, limit=1)
+        return principal
+
+    principal = asyncio.run(_run())
+    assert principal.kind == "client"
+    assert principal.user_id is None
+    assert principal.app_id == 15
+    assert "user_id=99 не отправлен" in principal.summary
+    assert auth["user_id"] == "99"
+    assert seen[-1][0] == contract.METHOD_AVAILABLE_VIRTUAL_NUMBERS
+    assert "user_id" not in seen[-1][1]
+
+
+def test_empty_customer_users_with_account_stays_client():
+    client = _client()
+
+    def handler(method, params):
+        if method == contract.METHOD_CUSTOMER_USERS:
+            return _page(0, [])
+        if method == contract.METHOD_ACCOUNT:
+            return _account(name="Клиент")
+        raise AssertionError(method)
+
+    _seen, call = _scripted(handler)
+    client.call = call  # type: ignore[method-assign]
+    principal = asyncio.run(client.resolve_principal())
+    assert principal.kind == "client"
+    assert "get.customer_users вернул 0" in principal.summary
+
+
+def test_agent_sends_only_a_verified_user_id():
+    client = _client(user_id="5")
+
+    def handler(method, params):
+        if method == contract.METHOD_CUSTOMER_USERS and "filter" not in params:
+            return _page(2, [{"id": 5, "name": "Анна", "login": "anna", "customer_id": 8}])
+        if method == contract.METHOD_CUSTOMER_USERS:
+            assert params["filter"] == {"field": "id", "operator": "=", "value": 5}
+            assert isinstance(params["filter"]["value"], int)
+            return _page(1, [{"id": 5, "name": "Анна", "login": "anna", "customer_id": 8}])
+        assert params["user_id"] == 5
+        return _page(1, [{"phone_number": "79001234567"}])
+
+    seen, call = _scripted(handler)
+    client.call = call  # type: ignore[method-assign]
+
+    async def _run():
+        principal = await client.resolve_principal()
+        await client.get_page(contract.METHOD_VIRTUAL_NUMBERS, limit=1)
+        return principal
+
+    principal = asyncio.run(_run())
+    assert principal.kind == "agent"
+    assert principal.user_id == 5
+    assert seen[-1][1]["user_id"] == 5
+
+
+def test_agent_without_user_id_does_not_call_number_methods():
+    client = _client()
+
+    def handler(method, params):
+        assert method == contract.METHOD_CUSTOMER_USERS
+        if params.get("limit") == 1:
+            return _page(2, [{"id": 5, "name": "Анна", "login": "anna", "customer_id": 8}])
+        return _page(
+            2,
+            [
+                {"id": 5, "name": "Анна", "login": "anna", "customer_id": 8},
+                {"id": 6, "name": "Борис", "login": "boris", "customer_id": 9},
+            ],
+        )
+
+    _seen, call = _scripted(handler)
+    client.call = call  # type: ignore[method-assign]
+    with pytest.raises(ProviderError) as exc:
+        asyncio.run(client.resolve_principal())
+    assert exc.value.code == "NOVOFON_AGENT_USER_REQUIRED"
+    assert "id=5" in str(exc.value)
+    assert "id=6" in str(exc.value)
+
+
+def test_agent_unknown_user_id_does_not_call_number_methods():
+    client = _client(user_id=7)
+
+    def handler(method, params):
+        assert method == contract.METHOD_CUSTOMER_USERS
+        if "filter" in params:
+            return _page(0, [])
+        return _page(1, [{"id": 5, "name": "Анна", "login": "anna", "customer_id": 8}])
+
+    _seen, call = _scripted(handler)
+    client.call = call  # type: ignore[method-assign]
+    with pytest.raises(ProviderError) as exc:
+        asyncio.run(client.resolve_principal())
+    assert exc.value.code == "NOVOFON_AGENT_USER_REQUIRED"
+    assert "user_id=7" in str(exc.value)
+
+
+def test_invalid_token_does_not_probe_account():
+    client = _client()
+    seen: list[str] = []
+
+    async def _call(method, params=None):
+        seen.append(method)
+        return _rpc_error("access_token_invalid", -32001)
+
+    client.call = _call  # type: ignore[method-assign]
+    with pytest.raises(ProviderAuthError):
+        asyncio.run(client.resolve_principal())
+    assert seen == [contract.METHOD_CUSTOMER_USERS]
+
+
+def test_principal_is_resolved_once_per_provider(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+
+    async def _resolve(self):
+        calls.append("resolve")
+        principal = NovofonPrincipal(
+            kind="client",
+            summary="Клиент «А» app_id=3",
+            app_id=3,
+            name="А",
+        )
+        self.adopt_principal(principal)
+        return principal
+
+    async def _iter(self, method, *, on_progress=None):
+        return [], [], {"method": method, "fetched": 0, "total_items": 0, "limits": {}}
+
+    monkeypatch.setattr(NovofonClient, "resolve_principal", _resolve)
+    monkeypatch.setattr(NovofonClient, "iter_all", _iter)
+    provider = NovofonProvider()
+    connection = ConnectionConfig(
+        base_url="https://example.test/v2.0",
+        auth_settings={"access_token": "token"},
+    )
+
+    async def _run():
+        free = await provider.sync_free_numbers(connection)
+        purchased = await provider.sync_purchased_numbers(connection)
+        return free, purchased
+
+    free, purchased = asyncio.run(_run())
+    assert calls == ["resolve"]
+    assert free.extra_stats["principal"]["app_id"] == 3
+    assert purchased.extra_stats["principal"]["summary"] == "Клиент «А» app_id=3"
+
+
+def test_connection_reports_failure_without_number_calls():
+    provider = NovofonProvider()
+    connection = ConnectionConfig(
+        base_url="https://example.test/v2.0",
+        auth_settings={"access_token": "token"},
+    )
+
+    async def _resolve(self):
+        raise ProviderError("нужен user_id", code="NOVOFON_AGENT_USER_REQUIRED")
+
+    async def _page(*args, **kwargs):
+        raise AssertionError("number method")
+
+    original_resolve = NovofonClient.resolve_principal
+    original_page = NovofonClient.get_page
+    NovofonClient.resolve_principal = _resolve  # type: ignore[method-assign]
+    NovofonClient.get_page = _page  # type: ignore[method-assign]
+    try:
+        result = asyncio.run(provider.test_connection(connection))
+    finally:
+        NovofonClient.resolve_principal = original_resolve  # type: ignore[method-assign]
+        NovofonClient.get_page = original_page  # type: ignore[method-assign]
+    assert result.ok is False
+    assert "нужен user_id" in result.message

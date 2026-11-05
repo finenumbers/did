@@ -853,7 +853,7 @@ export default function SettingsPage() {
                         placeholder={
                           d.settings?.auth_settings_masked?.user_id
                             ? `текущее: ${String(d.settings.auth_settings_masked.user_id)}`
-                            : "Только для агентского аккаунта"
+                            : "Пусто для клиента. Для агента — id из get.customer_users, не app_id"
                         }
                         value={d.userId}
                         onChange={(e) => setDraft(code, { userId: e.target.value })}

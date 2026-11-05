@@ -98,8 +98,9 @@ class ProvidersService:
         elif code == ProviderCode.novofon.value:
             notice = (
                 "Novofon Data API: access_token (API key from ЛК). "
-                "Optional user_id for an agent account. IP whitelist required in Novofon ЛК. "
-                "See novofon-contract.md. Read-only get.* only."
+                "Leave user_id empty for a client key. For an agent key set user_id to the "
+                "customer user id from get.customer_users, not app_id. "
+                "IP whitelist required in Novofon ЛК. See novofon-contract.md. Read-only get.* only."
             )
         elif code == ProviderCode.aurora.value:
             notice = (

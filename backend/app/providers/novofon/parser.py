@@ -66,28 +66,112 @@ def limit_retry_wait(raw: RawHttpResult) -> float | None:
     return None
 
 
-def _require_result(raw: RawHttpResult) -> dict[str, Any]:
+# These mnemonics mean the method is not for this token. They are not auth failures.
+NOT_AUDIENCE_MNEMONICS = frozenset({"forbidden", "method_not_found"})
+
+
+def _raise_rpc(err: dict[str, Any], mnemonic: str) -> None:
+    msg = (
+        f"Novofon RPC error code={err.get('code')} "
+        f"message={err.get('message')} mnemonic={mnemonic}"
+    )
+    if "access_token" in mnemonic or "auth" in mnemonic.lower():
+        raise ProviderAuthError(msg)
+    if mnemonic == "limit_exceeded":
+        raise ProviderError(msg, code="NOVOFON_LIMIT_EXCEEDED")
+    raise ProviderParseError(msg)
+
+
+def audience_or_result(raw: RawHttpResult) -> tuple[dict[str, Any] | None, str | None]:
+    """Success result, or (None, mnemonic) when this token cannot call the method.
+
+    Auth, IP, limit, and other RPC errors still raise. Number reads use
+    `_require_result`, which treats a missed audience as a parse error.
+    """
     if raw.status_code >= 400:
         raise ProviderParseError(f"Novofon HTTP {raw.status_code}")
     parts = _error_parts(raw)
     if parts is not None:
         err, mnemonic, _err_data = parts
-        msg = (
-            f"Novofon RPC error code={err.get('code')} "
-            f"message={err.get('message')} mnemonic={mnemonic}"
-        )
-        if "access_token" in mnemonic or "auth" in mnemonic.lower():
-            raise ProviderAuthError(msg)
-        if mnemonic == "limit_exceeded":
-            raise ProviderError(msg, code="NOVOFON_LIMIT_EXCEEDED")
-        raise ProviderParseError(msg)
+        if mnemonic in NOT_AUDIENCE_MNEMONICS:
+            return None, mnemonic
+        _raise_rpc(err, mnemonic)
     data = raw.body_json
     if not isinstance(data, dict):
         raise ProviderParseError("Novofon response is not a JSON object")
     result = data.get("result")
     if not isinstance(result, dict):
         raise ProviderParseError("Novofon result is not an object")
+    return result, None
+
+
+def _require_result(raw: RawHttpResult) -> dict[str, Any]:
+    result, missed = audience_or_result(raw)
+    if missed is not None or result is None:
+        raise ProviderParseError(f"Novofon RPC error mnemonic={missed or 'empty_result'}")
     return result
+
+
+def result_limits(result: dict[str, Any]) -> dict[str, Any]:
+    for key in ("metadata", "meta_data"):
+        meta = result.get(key)
+        if isinstance(meta, dict) and isinstance(meta.get("limits"), dict):
+            return dict(meta["limits"])
+    return {}
+
+
+def parse_account(result: dict[str, Any]) -> dict[str, Any] | None:
+    data = result.get("data")
+    if not isinstance(data, list) or not data or not isinstance(data[0], dict):
+        return None
+    row = data[0]
+    try:
+        app_id = int(row["app_id"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return {"app_id": app_id, "name": _as_text(row.get("name")) or ""}
+
+
+def parse_customer_users(result: dict[str, Any]) -> tuple[list[dict[str, Any]], int | None]:
+    data = result.get("data")
+    if data is None:
+        data = []
+    if not isinstance(data, list):
+        raise ProviderParseError("Novofon get.customer_users result.data is not an array")
+    users: list[dict[str, Any]] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        try:
+            user_id = int(item["id"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        customer_id = item.get("customer_id")
+        try:
+            customer_out = int(customer_id) if customer_id is not None else None
+        except (TypeError, ValueError):
+            customer_out = None
+        users.append(
+            {
+                "id": user_id,
+                "name": _as_text(item.get("name")) or "",
+                "login": _as_text(item.get("login")) or "",
+                "customer_id": customer_out,
+            }
+        )
+    return users, _total_items(result)
+
+
+def customer_users_are_agent(result: dict[str, Any]) -> tuple[bool, int | None]:
+    """A non-empty partner list means the token is an agent. An empty success does not."""
+    total = _total_items(result)
+    data = result.get("data")
+    nonempty = isinstance(data, list) and any(isinstance(row, dict) for row in data)
+    if total is not None and total > 0:
+        return True, total
+    if total is None and nonempty:
+        return True, None
+    return False, total
 
 
 def _total_items(result: dict[str, Any]) -> int | None:
