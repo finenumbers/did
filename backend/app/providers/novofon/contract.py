@@ -12,7 +12,7 @@ USER_PREVIEW_LIMIT = 20
 
 AUTH_ACCESS_TOKEN = "access_token"
 AUTH_USER_ID = "user_id"
-# Classic User API. Key is required for the order shop. Secret falls back to access_token.
+# Classic User API. Optional: the Novofon 2.0 cabinet does not show Key.
 AUTH_API_KEY = "api_key"
 AUTH_API_SECRET = "api_secret"
 
@@ -29,8 +29,8 @@ USER_API_PACE_SECONDS = 1.2
 USER_API_RETRY_MAX_SECONDS = 120
 
 KEY_MISSING_MESSAGE = (
-    "Витрина заказа не запрашивалась: не задан Key. "
-    "Key — поле на вкладке API в ЛК Novofon, рядом с Secret."
+    "Витрина заказа не запрашивалась: в кабинете Новофон 2.0 нет отдельного Key, "
+    "только один ключ Data API (Access token)."
 )
 
 # VERIFIED pagination. Product page sizes differ by method (operational).

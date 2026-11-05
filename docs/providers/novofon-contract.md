@@ -151,7 +151,7 @@ Auth header: `Authorization: {Key}:{base64(hex HMAC-SHA1)}`. The signed string i
 
 The free slice is the Data API connect-pool union this shop, keyed by normalized `7XXXXXXXXXX`. Data API wins on a duplicate. Shop `buy_price` / `period_price` come from the number's `connect_fee` / `monthly_fee` when present, otherwise from the direction. `0` is a real price. Prices are stored only when `currency` is `RUB` (any case). Direction `name` is raw `location_name` only. The opaque number `id` stays in `raw_payload`.
 
-There is no documented page size. The catalog stores the returned `numbers` arrays and does not scan `mask`. If any direction fails, the free slice is refused and neither source is written. Until `api_key` is set, the free slice is refused the same way: a Data API pool is not saved as the whole free catalog. Purchased numbers stay on `get.virtual_numbers`.
+There is no documented page size. The catalog stores the returned `numbers` arrays and does not scan `mask`. If any direction fails, the free slice is refused and neither source is written. The Novofon 2.0 cabinet does not show Key or Secret: it shows one permanent key, already stored as `access_token`. Without `api_key` the shop is not called, the Data API result is kept, and the stage text says the shop was not requested. Purchased numbers stay on `get.virtual_numbers`.
 
 Not called: `POST /v1/direct_numbers/order/`, `POST /v1/direct_numbers/prolong/`, any PUT, `GET /v1/direct_numbers/` (already connected).
 

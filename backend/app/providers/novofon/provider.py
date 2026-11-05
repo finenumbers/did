@@ -88,13 +88,14 @@ class NovofonProvider(AbstractProvider):
             if not str(auth.get(contract.AUTH_API_KEY) or "").strip():
                 parts.append(contract.KEY_MISSING_MESSAGE)
                 return DiagnosticsResult(
-                    ok=False,
+                    ok=True,
                     message="; ".join(parts),
                     checked_at=datetime.now(UTC),
                     details={
                         "methods": list(checked),
                         "principal": principal.as_dict(),
                         "totals": totals,
+                        "shop": "skipped",
                     },
                 )
             try:
@@ -252,6 +253,23 @@ def _combine_free(data: SyncResult, shop: OrderShop) -> SyncResult:
             items.append(item)
     warnings = list(data.warnings or [])
     extra = dict(data.extra_stats or {})
+    if shop.skipped:
+        extra["shop"] = {"read": False, "reason": "no_key"}
+        if not warnings and not items:
+            integrity = extra.get("integrity")
+            total = integrity.get("total_items") if isinstance(integrity, dict) else None
+            extra["empty_suffix"] = f"Data API total_items={total}. {contract.KEY_MISSING_MESSAGE}"
+        else:
+            extra["stage_note"] = contract.KEY_MISSING_MESSAGE
+        logger.info("Novofon shop skipped reason=no_key")
+        return SyncResult(
+            fetched=int(data.fetched or 0),
+            parsed=len(items),
+            items=items,
+            unmapped_raw=list(data.unmapped_raw or []),
+            warnings=warnings,
+            extra_stats=extra,
+        )
     extra["shop"] = {
         "directions": shop.directions,
         "numbers": shop.raw_count,

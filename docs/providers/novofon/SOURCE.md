@@ -29,4 +29,4 @@
 
 ## Rule
 
-Saved HTML under `novofon/raw/` is the method source of truth for the Data API. The order shop is the classic User API above; example payloads in the contract are field sketches, not inventory. Integration is **read-only**: classify the token, read `get.available_virtual_numbers` and `get.virtual_numbers`, then GET the three `direct_numbers` methods. `login.user`, `order`, and `prolong` are not called.
+Saved HTML under `novofon/raw/` is the method source of truth for the Data API. The order shop is the classic User API above; example payloads in the contract are field sketches, not inventory. The Novofon 2.0 API screen issues one key and does not show Key or Secret, so the shop is requested only when `api_key` is set. Integration is **read-only**: classify the token, read `get.available_virtual_numbers` and `get.virtual_numbers`, then GET the three `direct_numbers` methods only when Key is present. `login.user`, `order`, and `prolong` are not called.

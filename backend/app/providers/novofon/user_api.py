@@ -55,6 +55,7 @@ class OrderShop:
     russia_missing: bool
     mapped: list[NormalizedNumber] = field(default_factory=list)
     unmapped: list[dict[str, Any]] = field(default_factory=list)
+    skipped: bool = False
 
 
 def build_query(params: dict[str, str]) -> str:
@@ -363,7 +364,15 @@ async def load_order_shop(
     """Read every RU direction. A hole in the walk raises; it does not return a partial shop."""
     auth = connection.auth_settings or {}
     if not str(auth.get(contract.AUTH_API_KEY) or "").strip():
-        raise UserApiRefusal(contract.KEY_MISSING_MESSAGE)
+        return OrderShop(
+            directions=0,
+            raw_count=0,
+            min_per_direction=None,
+            max_per_direction=None,
+            secret_slot="",
+            russia_missing=False,
+            skipped=True,
+        )
     api = client or NovofonUserApi(connection)
     try:
         countries = await api.countries()

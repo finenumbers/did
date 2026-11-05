@@ -843,7 +843,7 @@ export default function SettingsPage() {
                         placeholder={
                           d.settings?.auth_settings_masked?.access_token
                             ? `текущее: ${String(d.settings.auth_settings_masked.access_token)}`
-                            : "Secret с вкладки API. Он же access_token Data API"
+                            : "Единственный ключ с экрана API. Он же access_token Data API"
                         }
                         value={d.accessToken}
                         onChange={(e) => setDraft(code, { accessToken: e.target.value })}
@@ -857,7 +857,7 @@ export default function SettingsPage() {
                         placeholder={
                           d.settings?.auth_settings_masked?.api_key
                             ? `текущее: ${String(d.settings.auth_settings_masked.api_key)}`
-                            : "Key с той же вкладки API. Нужен для витрины заказа"
+                            : "Необязательно. В кабинете Новофон 2.0 этого поля нет"
                         }
                         value={d.apiKey}
                         onChange={(e) => setDraft(code, { apiKey: e.target.value })}
@@ -871,7 +871,7 @@ export default function SettingsPage() {
                         placeholder={
                           d.settings?.auth_settings_masked?.api_secret
                             ? `текущее: ${String(d.settings.auth_settings_masked.api_secret)}`
-                            : "Пусто — для подписи берётся Access token"
+                            : "Необязательно. Только если в старом кабинете Secret другой"
                         }
                         value={d.userApiSecret}
                         onChange={(e) => setDraft(code, { userApiSecret: e.target.value })}

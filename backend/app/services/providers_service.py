@@ -97,13 +97,14 @@ class ProvidersService:
             )
         elif code == ProviderCode.novofon.value:
             notice = (
-                "Novofon Data API: access_token is the Secret from the API tab. "
+                "Novofon Data API: access_token is the single key from the Novofon 2.0 API screen. "
+                "That screen has no Key field; do not generate a new key. "
                 "Leave user_id empty for a client key. For an agent key set user_id to the "
                 "customer user id from get.customer_users, not app_id. "
-                "Free numbers also read the order shop on api.novofon.com: set api_key (Key "
-                "from the same tab). Blank api_secret uses access_token for the HMAC. "
+                "api_key is optional and only for an old cabinet that still shows Key and Secret. "
+                "Without it the free stage keeps the Data API result and does not call the shop. "
                 "IP whitelist required in Novofon ЛК. See novofon-contract.md. "
-                "Read-only: Data API get.* and GET direct_numbers. order/prolong are not called."
+                "Read-only: Data API get.* and, when Key is set, GET direct_numbers."
             )
         elif code == ProviderCode.aurora.value:
             notice = (

@@ -12,7 +12,11 @@ import pytest
 
 from app.models.enums import InventoryKind
 from app.modules.sync_engine.safety import confirmed_empty_slice
-from app.modules.sync_engine.service import _empty_stage_detail, refuse_slice_detail
+from app.modules.sync_engine.service import (
+    _empty_stage_detail,
+    _with_stage_note,
+    refuse_slice_detail,
+)
 from app.providers.dto.common import ConnectionConfig, SyncResult
 from app.providers.novofon import contract, mapper, parser
 from app.providers.novofon import user_api as user_api_module
@@ -306,7 +310,13 @@ def test_data_api_row_wins_on_duplicate_msisdn():
     assert result.extra_stats["shop"]["hmac_secret"] == "access_token"
 
 
-def test_missing_key_refuses_even_when_data_api_has_rows(monkeypatch: pytest.MonkeyPatch):
+def test_stage_note_is_appended_without_becoming_a_warning():
+    result = SyncResult(extra_stats={"stage_note": contract.KEY_MISSING_MESSAGE})
+    assert _with_stage_note("fetched=1", result) == f"fetched=1. {contract.KEY_MISSING_MESSAGE}"
+    assert _with_stage_note("fetched=1", SyncResult()) == "fetched=1"
+
+
+def test_missing_key_keeps_data_api_rows(monkeypatch: pytest.MonkeyPatch):
     number = _data_number("74951234567", "100")
 
     async def _sync(self, connection, **kwargs):
@@ -327,19 +337,41 @@ def test_missing_key_refuses_even_when_data_api_has_rows(monkeypatch: pytest.Mon
         auth_settings=auth,
     )
     result = asyncio.run(NovofonProvider().sync_free_numbers(connection))
-    assert result.items == []
-    assert result.extra_stats["refusal_detail"] == contract.KEY_MISSING_MESSAGE
-    assert result.warnings == [contract.KEY_MISSING_MESSAGE]
+    assert result.items == [number]
+    assert result.warnings == []
+    assert result.extra_stats["shop"] == {"read": False, "reason": "no_key"}
+    assert result.extra_stats["stage_note"] == contract.KEY_MISSING_MESSAGE
+    assert "refusal_detail" not in result.extra_stats
     assert auth == {"access_token": "token", "user_id": "15"}
-    assert (
-        confirmed_empty_slice(
-            previous=0,
-            incoming=0,
-            fetched=result.fetched,
-            warnings=result.warnings,
-            integrity=result.extra_stats["integrity"],
+
+
+def test_missing_key_and_empty_pool_is_confirmed_empty(monkeypatch: pytest.MonkeyPatch):
+    async def _sync(self, connection, **kwargs):
+        return SyncResult(
+            fetched=0,
+            parsed=0,
+            items=[],
+            extra_stats={"integrity": {"total_items": 0}, "principal": {"summary": "Клиент"}},
         )
-        is False
+
+    monkeypatch.setattr(NovofonProvider, "_sync_method", _sync)
+    result = asyncio.run(
+        NovofonProvider().sync_free_numbers(
+            ConnectionConfig(
+                base_url="https://dataapi-jsonrpc.novofon.ru/v2.0",
+                auth_settings={"access_token": "token"},
+            )
+        )
+    )
+    assert result.items == []
+    assert result.warnings == []
+    assert contract.KEY_MISSING_MESSAGE in result.extra_stats["empty_suffix"]
+    assert confirmed_empty_slice(
+        previous=0,
+        incoming=0,
+        fetched=result.fetched,
+        warnings=result.warnings,
+        integrity=result.extra_stats["integrity"],
     )
 
 

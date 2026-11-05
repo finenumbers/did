@@ -89,6 +89,16 @@ def _exc_summary(exc: BaseException, *, limit: int = 2000) -> str:
     return f"{type(exc).__name__}: {exc}"[:limit]
 
 
+def _with_stage_note(detail: str, result: Any) -> str:
+    """Append a provider note that is not a warning and must not refuse the slice."""
+    extra = getattr(result, "extra_stats", None)
+    if isinstance(extra, dict):
+        note = extra.get("stage_note")
+        if isinstance(note, str) and note.strip():
+            return f"{detail}. {note.strip()}"
+    return detail
+
+
 def _number_reload_detail(
     *,
     fetched: int,
@@ -678,10 +688,13 @@ class SyncService:
                         persist_stats.get("upserted"),
                         unique_incoming,
                     )
-                    free_detail = _number_reload_detail(
-                        fetched=fetched,
-                        parsed=parsed,
-                        upserted=int(persist_stats.get("upserted") or 0),
+                    free_detail = _with_stage_note(
+                        _number_reload_detail(
+                            fetched=fetched,
+                            parsed=parsed,
+                            upserted=int(persist_stats.get("upserted") or 0),
+                        ),
+                        result,
                     )
                     log_job(self.db, job.id, SyncLogLevel.info, f"Free numbers {free_detail}")
                     _log_page_integrity(
@@ -694,7 +707,7 @@ class SyncService:
                     await _hook("free", "end", free_detail)
             else:
                 self.db.commit()
-                await _hook("free", "end", f"fetched={result.fetched}")
+                await _hook("free", "end", _with_stage_note(f"fetched={result.fetched}", result))
 
         purchased_supported = bool(
             adapter.capabilities().get("purchased_numbers", {}).get("supported")
