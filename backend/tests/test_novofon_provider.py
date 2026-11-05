@@ -11,7 +11,7 @@ from app.models.enums import InventoryKind, ProviderCode
 from app.modules.pstn_inn_cache.service import REQUIRED_INNS, REQUIRED_OPERATORS
 from app.modules.sync_engine.unified import PROVIDER_ORDER
 from app.providers.dto.common import ConnectionConfig, RawHttpResult
-from app.providers.errors import ProviderAuthError, ProviderError
+from app.providers.errors import ProviderAuthError, ProviderError, ProviderParseError
 from app.providers.novofon import contract, mapper, parser
 from app.providers.novofon.client import NovofonClient, NovofonPrincipal
 from app.providers.novofon.provider import NovofonProvider
@@ -609,3 +609,102 @@ def test_connection_reports_failure_without_number_calls():
         NovofonClient.get_page = original_page  # type: ignore[method-assign]
     assert result.ok is False
     assert "нужен user_id" in result.message
+
+
+@pytest.mark.parametrize(
+    "mnemonic",
+    ["component_disabled", "method_component_disabled", "future_component_spelling"],
+)
+def test_component_miss_on_partner_probe_reads_numbers_as_client(mnemonic: str):
+    auth = {"access_token": "token", "user_id": "99"}
+    client = NovofonClient(
+        ConnectionConfig(base_url="https://example.test/v2.0", auth_settings=auth),
+        retry=RetryPolicy(max_attempts=1, backoff_seconds=0),
+    )
+
+    def handler(method, params):
+        if method == contract.METHOD_CUSTOMER_USERS:
+            return _rpc_error(mnemonic, -32008)
+        if method == contract.METHOD_ACCOUNT:
+            return _account()
+        assert "user_id" not in params
+        return _page(0, [])
+
+    seen, call = _scripted(handler)
+    client.call = call  # type: ignore[method-assign]
+
+    async def _run():
+        principal = await client.resolve_principal()
+        await client.get_page(contract.METHOD_AVAILABLE_VIRTUAL_NUMBERS, limit=1)
+        return principal
+
+    principal = asyncio.run(_run())
+    assert principal.kind == "client"
+    assert principal.user_id is None
+    assert principal.app_id == 15
+    assert f"get.customer_users={mnemonic}" in principal.summary
+    assert auth["user_id"] == "99"
+    assert "user_id" not in seen[-1][1]
+
+
+def test_component_miss_on_both_probes_still_reads_numbers():
+    client = _client(user_id="4")
+
+    def handler(method, params):
+        if method == contract.METHOD_CUSTOMER_USERS:
+            return _rpc_error("component_disabled", -32008)
+        if method == contract.METHOD_ACCOUNT:
+            return _rpc_error("component_disabled", -32008)
+        assert "user_id" not in params
+        return _page(0, [])
+
+    seen, call = _scripted(handler)
+    client.call = call  # type: ignore[method-assign]
+
+    async def _run():
+        principal = await client.resolve_principal()
+        await client.get_page(contract.METHOD_VIRTUAL_NUMBERS, limit=1)
+        return principal
+
+    principal = asyncio.run(_run())
+    assert principal.kind == "client"
+    assert principal.user_id is None
+    assert principal.app_id is None
+    assert "get.customer_users=component_disabled" in principal.summary
+    assert "get.account=component_disabled" in principal.summary
+    assert seen[-1][0] == contract.METHOD_VIRTUAL_NUMBERS
+    assert "user_id" not in seen[-1][1]
+
+
+def test_forbidden_on_both_probes_does_not_call_numbers():
+    client = _client()
+
+    def handler(method, params):
+        if method in (contract.METHOD_CUSTOMER_USERS, contract.METHOD_ACCOUNT):
+            return _rpc_error("forbidden")
+        raise AssertionError(method)
+
+    _seen, call = _scripted(handler)
+    client.call = call  # type: ignore[method-assign]
+    with pytest.raises(ProviderError) as exc:
+        asyncio.run(client.resolve_principal())
+    assert exc.value.code == "NOVOFON_PRINCIPAL_UNKNOWN"
+
+
+def test_component_disabled_on_number_page_keeps_server_message():
+    raw = _raw(
+        {
+            "jsonrpc": "2.0",
+            "id": "1",
+            "error": {
+                "code": -32008,
+                "message": "Component dataapi_agent has been disabled",
+                "data": {"mnemonic": "component_disabled"},
+            },
+        }
+    )
+    with pytest.raises(ProviderParseError) as exc:
+        parser.parse_list_page(raw)
+    text = str(exc.value)
+    assert "Component dataapi_agent has been disabled" in text
+    assert "mnemonic=component_disabled" in text

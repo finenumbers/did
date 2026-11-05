@@ -68,6 +68,8 @@ def limit_retry_wait(raw: RawHttpResult) -> float | None:
 
 # These mnemonics mean the method is not for this token. They are not auth failures.
 NOT_AUDIENCE_MNEMONICS = frozenset({"forbidden", "method_not_found"})
+# Live Novofon uses this code for component_disabled; the HTML names method_component_disabled.
+COMPONENT_ERROR_CODE = -32008
 
 
 def _raise_rpc(err: dict[str, Any], mnemonic: str) -> None:
@@ -82,19 +84,33 @@ def _raise_rpc(err: dict[str, Any], mnemonic: str) -> None:
     raise ProviderParseError(msg)
 
 
-def audience_or_result(raw: RawHttpResult) -> tuple[dict[str, Any] | None, str | None]:
-    """Success result, or (None, mnemonic) when this token cannot call the method.
+def _is_component_error(err: dict[str, Any]) -> bool:
+    try:
+        return int(err.get("code")) == COMPONENT_ERROR_CODE
+    except (TypeError, ValueError):
+        return False
 
-    Auth, IP, limit, and other RPC errors still raise. Number reads use
-    `_require_result`, which treats a missed audience as a parse error.
+
+def audience_or_result(
+    raw: RawHttpResult,
+    *,
+    soften_component: bool = False,
+) -> tuple[dict[str, Any] | None, str | None, bool]:
+    """Success result, or (None, mnemonic, component_group) when the token cannot call it.
+
+    Auth, IP, limit, and other RPC errors still raise. `soften_component` is only
+    for the partner probe and the account probe that follows a component miss:
+    error code -32008 becomes a miss instead of a parse error. Number reads keep
+    the default and surface the server message.
     """
     if raw.status_code >= 400:
         raise ProviderParseError(f"Novofon HTTP {raw.status_code}")
     parts = _error_parts(raw)
     if parts is not None:
         err, mnemonic, _err_data = parts
-        if mnemonic in NOT_AUDIENCE_MNEMONICS:
-            return None, mnemonic
+        component = _is_component_error(err)
+        if mnemonic in NOT_AUDIENCE_MNEMONICS or (soften_component and component):
+            return None, mnemonic or "component_disabled", component
         _raise_rpc(err, mnemonic)
     data = raw.body_json
     if not isinstance(data, dict):
@@ -102,11 +118,11 @@ def audience_or_result(raw: RawHttpResult) -> tuple[dict[str, Any] | None, str |
     result = data.get("result")
     if not isinstance(result, dict):
         raise ProviderParseError("Novofon result is not an object")
-    return result, None
+    return result, None, False
 
 
 def _require_result(raw: RawHttpResult) -> dict[str, Any]:
-    result, missed = audience_or_result(raw)
+    result, missed, _component = audience_or_result(raw)
     if missed is not None or result is None:
         raise ProviderParseError(f"Novofon RPC error mnemonic={missed or 'empty_result'}")
     return result

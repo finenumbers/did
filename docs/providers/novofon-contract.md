@@ -114,7 +114,7 @@ Before either number method, one classification per provider job:
 
 1. `get.customer_users` (`limit=1`, no `user_id`). Audience: partner. `id` is the `user_id` for client methods. Non-empty `total_items` means an agent key.
 2. Otherwise `get.account` (no `user_id`). Audience: client. Response example uses `meta_data` and `data[0].app_id` / `name`.
-3. `forbidden` and `method_not_found` mean “not this audience”. `access_token_*` and `ip_not_whitelisted` stop classification. Both probes missing the audience, or an agent list with zero users while `get.account` is forbidden, fail the stage and do not call the number methods.
+3. On `get.customer_users`, `forbidden`, `method_not_found`, and any JSON-RPC code `-32008` mean “not this audience”. The published mnemonic for `-32008` is `method_component_disabled`. A live client token instead returns `component_disabled` with message `Component dataapi_agent has been disabled`. That probe miss is not a refusal to read numbers. `access_token_*` and `ip_not_whitelisted` still stop classification. If the partner probe failed with `-32008` and `get.account` does not return `app_id` (including another `-32008` or `forbidden`, and not an auth or IP error), number methods are still called as a client without `user_id`. `forbidden` on both probes still fails closed. On `get.available_virtual_numbers` and `get.virtual_numbers`, code `-32008` stays an error and keeps the server message.
 4. Agent without a matching stored `user_id`: the stage lists at most 20 users and `total_items`. No number read.
 5. A confirmed empty number list is a success only after the client branch. The stage text includes the account name and `app_id`.
 

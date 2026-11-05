@@ -160,7 +160,9 @@ class NovofonClient:
             contract.METHOD_CUSTOMER_USERS,
             {"offset": 0, "limit": 1},
         )
-        users_result, users_miss = parser.audience_or_result(users_raw)
+        users_result, users_miss, users_component_miss = parser.audience_or_result(
+            users_raw, soften_component=True
+        )
         agent = False
         users_total: int | None = None
         if users_result is not None:
@@ -171,37 +173,79 @@ class NovofonClient:
             principal = await self._resolve_client(
                 users_miss=users_miss,
                 users_total=users_total,
+                users_component_miss=users_component_miss,
             )
         self.adopt_principal(principal)
         return principal
+
+    def _client_principal(
+        self,
+        *,
+        app_id: int | None,
+        name: str | None,
+        users_miss: str | None,
+        users_total: int | None,
+        account_miss: str | None = None,
+    ) -> NovofonPrincipal:
+        if app_id is not None:
+            summary = f"Клиент «{name or 'без названия'}» app_id={app_id}"
+        else:
+            summary = "Клиент"
+        if users_miss:
+            summary += f", get.customer_users={users_miss}"
+        elif users_total == 0:
+            summary += ", get.customer_users вернул 0"
+        if account_miss:
+            summary += f", get.account={account_miss}"
+        if self._configured_user_id is not None:
+            summary += f", сохранённый user_id={self._configured_user_id} не отправлен"
+        return NovofonPrincipal(
+            kind="client",
+            summary=summary,
+            app_id=app_id,
+            name=name,
+            user_id=None,
+        )
 
     async def _resolve_client(
         self,
         *,
         users_miss: str | None,
         users_total: int | None,
+        users_component_miss: bool,
     ) -> NovofonPrincipal:
         account_raw = await self._rpc(contract.METHOD_ACCOUNT)
-        account_result, account_miss = parser.audience_or_result(account_raw)
+        account_result, account_miss, _account_component = parser.audience_or_result(
+            account_raw, soften_component=users_component_miss
+        )
         if account_result is not None:
             account = parser.parse_account(account_result)
             if account is None:
+                if users_component_miss:
+                    return self._client_principal(
+                        app_id=None,
+                        name=None,
+                        users_miss=users_miss,
+                        users_total=users_total,
+                        account_miss="empty_app_id",
+                    )
                 raise ProviderError(
                     "Novofon get.account не вернул app_id",
                     code="NOVOFON_PRINCIPAL_UNKNOWN",
                 )
-            name = account["name"] or "без названия"
-            summary = f"Клиент «{name}» app_id={account['app_id']}"
-            if users_total == 0:
-                summary += ", get.customer_users вернул 0"
-            if self._configured_user_id is not None:
-                summary += f", сохранённый user_id={self._configured_user_id} не отправлен"
-            return NovofonPrincipal(
-                kind="client",
-                summary=summary,
+            return self._client_principal(
                 app_id=account["app_id"],
                 name=account["name"],
-                user_id=None,
+                users_miss=users_miss,
+                users_total=users_total,
+            )
+        if users_component_miss:
+            return self._client_principal(
+                app_id=None,
+                name=None,
+                users_miss=users_miss,
+                users_total=users_total,
+                account_miss=account_miss or "error",
             )
         if users_miss and account_miss:
             raise ProviderError(
@@ -226,7 +270,7 @@ class NovofonClient:
                 contract.METHOD_CUSTOMER_USERS,
                 {"offset": 0, "limit": contract.USER_PREVIEW_LIMIT},
             )
-            preview, _miss = parser.audience_or_result(preview_raw)
+            preview, _miss, _component = parser.audience_or_result(preview_raw)
             if preview is None:
                 raise ProviderError(
                     "Novofon get.customer_users недоступен при перечислении пользователей",
@@ -257,7 +301,7 @@ class NovofonClient:
                 },
             },
         )
-        found, _miss = parser.audience_or_result(filtered)
+        found, _miss, _component = parser.audience_or_result(filtered)
         if found is None:
             raise ProviderError(
                 "Novofon get.customer_users недоступен при проверке user_id",
