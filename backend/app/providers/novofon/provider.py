@@ -19,9 +19,11 @@ from app.providers.novofon.client import NovofonClient, NovofonPrincipal
 from app.providers.novofon.user_api import (
     NovofonUserApi,
     OrderShop,
+    OwnedNumbers,
     UserApiError,
     UserApiRefusal,
     load_order_shop,
+    load_owned_numbers,
 )
 
 logger = logging.getLogger(__name__)
@@ -98,10 +100,25 @@ class NovofonProvider(AbstractProvider):
                         "shop": "skipped",
                     },
                 )
+            api = NovofonUserApi(connection)
+            shop_errors: list[str] = []
+            countries: list[dict] = []
             try:
-                countries = await NovofonUserApi(connection).countries()
+                countries = await api.countries()
+                parts.append(f"{contract.USER_API_COUNTRIES} стран={len(countries)}")
+                if countries:
+                    iso = str(countries[0].get("countryCodeIso") or "")
+                    await api.directions(iso)
+                    parts.append(f"{contract.USER_API_COUNTRY} country={iso}")
             except UserApiError as exc:
-                parts.append(str(exc))
+                shop_errors.append(str(exc))
+            try:
+                owned_rows = await api.owned()
+                parts.append(f"{contract.USER_API_OWNED} номеров={len(owned_rows)}")
+            except UserApiError as exc:
+                shop_errors.append(str(exc))
+            if shop_errors:
+                parts.extend(shop_errors)
                 return DiagnosticsResult(
                     ok=False,
                     message="; ".join(parts),
@@ -110,9 +127,9 @@ class NovofonProvider(AbstractProvider):
                         "methods": list(checked),
                         "principal": principal.as_dict(),
                         "totals": totals,
+                        "countries": len(countries),
                     },
                 )
-            parts.append(f"{contract.USER_API_COUNTRIES} стран={len(countries)}")
             return DiagnosticsResult(
                 ok=True,
                 message="; ".join(parts),
@@ -215,13 +232,35 @@ class NovofonProvider(AbstractProvider):
     async def sync_purchased_numbers(
         self, connection: ConnectionConfig, **kwargs: Any
     ) -> SyncResult:
-        return await self._sync_method(
+        data = await self._sync_method(
             connection,
             method=contract.METHOD_VIRTUAL_NUMBERS,
             inventory_kind=InventoryKind.purchased,
             parse_item=parser.parse_virtual_item,
             on_progress=kwargs.get("on_progress"),
         )
+        auth = connection.auth_settings or {}
+        if not str(auth.get(contract.AUTH_API_KEY) or "").strip():
+            return data
+        try:
+            owned = await load_owned_numbers(connection, on_progress=kwargs.get("on_progress"))
+        except UserApiError as exc:
+            message = (
+                "Список купленных номеров кабинета не прочитан: "
+                f"{exc}. Пул Data API в этом прогоне не записан."
+            )
+            logger.warning("Novofon owned list refused: %s", message)
+            extra = dict(data.extra_stats or {})
+            extra["refusal_detail"] = message
+            extra["owned"] = {"read": False}
+            return SyncResult(
+                fetched=0,
+                parsed=0,
+                items=[],
+                warnings=[message],
+                extra_stats=extra,
+            )
+        return _combine_purchased(data, owned)
 
 
 def _refuse_free(data: SyncResult, message: str) -> SyncResult:
@@ -271,33 +310,29 @@ def _combine_free(data: SyncResult, shop: OrderShop) -> SyncResult:
             extra_stats=extra,
         )
     extra["shop"] = {
+        "countries": shop.countries,
         "directions": shop.directions,
         "numbers": shop.raw_count,
         "min_per_direction": shop.min_per_direction,
         "max_per_direction": shop.max_per_direction,
         "hmac_secret": shop.secret_slot,
-        "russia_missing": shop.russia_missing,
     }
     if not warnings and not items:
         integrity = extra.get("integrity")
         total = integrity.get("total_items") if isinstance(integrity, dict) else None
-        if shop.russia_missing:
-            extra["empty_suffix"] = (
-                f"Data API total_items={total}; витрина: в списке стран нет RU"
-            )
-        else:
-            extra["empty_suffix"] = (
-                f"Data API total_items={total}; "
-                f"витрина: направлений={shop.directions}, номеров={shop.raw_count}"
-            )
+        extra["empty_suffix"] = (
+            f"Data API total_items={total}; "
+            f"витрина: стран={shop.countries}, направлений={shop.directions}, "
+            f"номеров={shop.raw_count}"
+        )
     logger.info(
-        "Novofon shop directions=%s numbers=%s min=%s max=%s hmac_secret=%s russia_missing=%s",
+        "Novofon shop countries=%s directions=%s numbers=%s min=%s max=%s hmac_secret=%s",
+        shop.countries,
         shop.directions,
         shop.raw_count,
         shop.min_per_direction,
         shop.max_per_direction,
         shop.secret_slot,
-        shop.russia_missing,
     )
     return SyncResult(
         fetched=int(data.fetched or 0) + shop.raw_count,
@@ -305,5 +340,55 @@ def _combine_free(data: SyncResult, shop: OrderShop) -> SyncResult:
         items=items,
         unmapped_raw=[*list(data.unmapped_raw or []), *shop.unmapped],
         warnings=warnings,
+        extra_stats=extra,
+    )
+
+
+def _combine_purchased(data: SyncResult, owned: OwnedNumbers) -> SyncResult:
+    """One row per key. The cabinet row supplies price and place; Data API raw is nested."""
+    by_key: dict[str, Any] = {}
+    order: list[str] = []
+    for item in data.items or []:
+        key = getattr(item, "provider_number_key", None)
+        if not key or key in by_key:
+            continue
+        by_key[key] = item
+        order.append(key)
+    for item in owned.mapped:
+        key = item.provider_number_key
+        if not key:
+            continue
+        previous = by_key.get(key)
+        if previous is not None:
+            raw = dict(item.raw_payload)
+            raw["data_api"] = getattr(previous, "raw_payload", None)
+            item.raw_payload = raw
+        if key not in by_key:
+            order.append(key)
+        by_key[key] = item
+    items = [by_key[key] for key in order]
+    extra = dict(data.extra_stats or {})
+    extra["owned"] = {
+        "read": True,
+        "numbers": owned.raw_count,
+        "hmac_secret": owned.secret_slot,
+    }
+    if not data.warnings and not items:
+        integrity = extra.get("integrity")
+        total = integrity.get("total_items") if isinstance(integrity, dict) else None
+        extra["empty_suffix"] = (
+            f"Data API total_items={total}; список кабинета: номеров={owned.raw_count}"
+        )
+    logger.info(
+        "Novofon owned numbers=%s hmac_secret=%s",
+        owned.raw_count,
+        owned.secret_slot,
+    )
+    return SyncResult(
+        fetched=int(data.fetched or 0) + owned.raw_count,
+        parsed=len(items),
+        items=items,
+        unmapped_raw=list(data.unmapped_raw or []),
+        warnings=list(data.warnings or []),
         extra_stats=extra,
     )

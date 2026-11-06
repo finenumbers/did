@@ -27,6 +27,8 @@ from app.providers.novofon.user_api import (
     UserApiError,
     UserApiRefusal,
     load_order_shop,
+    load_owned_numbers,
+    parse_owned_number,
     parse_shop_number,
     sign_user_api,
 )
@@ -119,7 +121,7 @@ def test_country_iso_is_forwarded_unchanged():
 
     client = _client(handler)
     shop = asyncio.run(load_order_shop(_conn(), client=client))
-    assert shop.russia_missing is False
+    assert shop.countries == 1
     assert shop.directions == 0
     assert any("country=ru" in url and "country=RU" not in url for url in seen)
 
@@ -293,7 +295,7 @@ def test_data_api_row_wins_on_duplicate_msisdn():
         min_per_direction=1,
         max_per_direction=1,
         secret_slot="access_token",
-        russia_missing=False,
+        countries=1,
         mapped=[shop_row],
     )
     result = _combine_free(
@@ -395,16 +397,24 @@ def test_purchased_does_not_read_the_shop(monkeypatch: pytest.MonkeyPatch):
     async def _shop(*args, **kwargs):
         raise AssertionError("shop")
 
+    async def _owned(*args, **kwargs):
+        from app.providers.novofon.user_api import OwnedNumbers
+
+        return OwnedNumbers(raw_count=0, secret_slot="access_token")
+
     async def _iter(self, method, *, on_progress=None):
         return [], [], {"method": method, "fetched": 0, "total_items": 0, "limits": {}}
 
     monkeypatch.setattr("app.providers.novofon.provider.load_order_shop", _shop)
+    monkeypatch.setattr("app.providers.novofon.provider.load_owned_numbers", _owned)
     monkeypatch.setattr("app.providers.novofon.client.NovofonClient.iter_all", _iter)
     monkeypatch.setattr(
         "app.providers.novofon.client.NovofonClient.resolve_principal",
         _resolved_principal,
     )
-    asyncio.run(NovofonProvider().sync_purchased_numbers(_conn()))
+    result = asyncio.run(NovofonProvider().sync_purchased_numbers(_conn()))
+    assert result.warnings == []
+    assert result.extra_stats["owned"]["numbers"] == 0
 
 
 async def _resolved_principal(self):
@@ -447,6 +457,232 @@ def test_empty_stage_detail_appends_suffix_after_principal():
         "API вернул 0 свободных номеров. Клиент «А» app_id=1. "
         "витрина: направлений=2, номеров=0"
     )
+
+
+def test_every_country_is_walked_and_direction_id_and_mask_are_absent():
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        path = request.url.path
+        if path.endswith("/countries/"):
+            return _ok(
+                {
+                    "status": "success",
+                    "info": [
+                        {"countryCodeIso": "DE", "name": "Germany"},
+                        {"countryCodeIso": "ru", "name": "Россия"},
+                    ],
+                }
+            )
+        if path.endswith("/country/"):
+            assert "direction_id" not in str(request.url)
+            iso = request.url.params["country"]
+            direction_id = "20" if iso == "DE" else "10"
+            return _ok({"status": "success", "info": [{"id": direction_id, "name": iso, "currency": "RUB"}]})
+        assert "mask" not in str(request.url)
+        assert "?" not in str(request.url)
+        if path.endswith("/20/"):
+            return _ok({"status": "success", "numbers": [{"id": "g", "number": "+4930123456"}]})
+        return _ok({"status": "success", "numbers": [{"id": "r", "number": "+74951234567"}]})
+
+    shop = asyncio.run(load_order_shop(_conn(), client=_client(handler)))
+    assert shop.countries == 2
+    assert shop.directions == 2
+    assert shop.raw_count == 2
+    keys = {item.provider_number_key for item in shop.mapped}
+    assert keys == {"DE:4930123456", "74951234567"}
+    foreign = next(item for item in shop.mapped if item.provider_number_key.startswith("DE:"))
+    assert foreign.msisdn == "4930123456"
+    assert foreign.number_local == "4930123456"
+    assert foreign.abc_code is None
+    assert foreign.city_name == "DE"
+    assert foreign.region_name == "Germany"
+    assert any("country=DE" in url for url in seen)
+    assert any("country=ru" in url for url in seen)
+
+
+def test_foreign_ten_digits_are_not_prefixed_and_plus_seven_msisdn_stays_empty():
+    short = parse_shop_number(
+        {"id": "a", "number": "3012345678"},
+        {"id": "1", "name": "Berlin", "currency": "EUR", "monthly_fee": 4},
+        country_iso="DE",
+        country_name="Germany",
+    )
+    mapped_short = mapper.map_number(short, inventory_kind=InventoryKind.free)
+    assert mapped_short is not None
+    assert mapped_short.provider_number_key == "DE:3012345678"
+    assert mapped_short.msisdn == "3012345678"
+    assert mapped_short.buy_price is None
+    kz = parse_shop_number(
+        {"id": "b", "number": "+77001234567"},
+        {"id": "2", "name": "Almaty", "currency": "RUB", "connect_fee": 0, "monthly_fee": 3},
+        country_iso="KZ",
+        country_name="Kazakhstan",
+    )
+    mapped_kz = mapper.map_number(kz, inventory_kind=InventoryKind.free)
+    assert mapped_kz is not None
+    assert mapped_kz.provider_number_key == "KZ:77001234567"
+    assert mapped_kz.msisdn is None
+    assert mapped_kz.number_local == "77001234567"
+    assert mapped_kz.buy_price == Decimal(0)
+    assert mapped_kz.period_price == Decimal(3)
+    assert mapped_kz.city_name == "Almaty"
+    assert mapped_kz.region_name == "Kazakhstan"
+
+
+def test_duplicate_shop_key_refuses_the_whole_slice():
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path.endswith("/countries/"):
+            return _ok({"status": "success", "info": [{"countryCodeIso": "DE", "name": "Germany"}]})
+        if path.endswith("/country/"):
+            return _ok(
+                {
+                    "status": "success",
+                    "info": [
+                        {"id": "1", "name": "Berlin"},
+                        {"id": "2", "name": "Hamburg"},
+                    ],
+                }
+            )
+        return _ok({"status": "success", "numbers": [{"id": "a", "number": "+4930123456"}]})
+
+    with pytest.raises(UserApiRefusal, match="повтор ключа"):
+        asyncio.run(load_order_shop(_conn(), client=_client(handler)))
+
+
+def test_second_country_501_does_not_return_the_first_country():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/countries/"):
+            return _ok(
+                {
+                    "status": "success",
+                    "info": [
+                        {"countryCodeIso": "DE", "name": "Germany"},
+                        {"countryCodeIso": "FR", "name": "France"},
+                    ],
+                }
+            )
+        if "country=DE" in str(request.url):
+            return _ok({"status": "success", "info": []})
+        return httpx.Response(501, json={"status": "error", "message": "Method not implemented"})
+
+    with pytest.raises(UserApiRefusal, match="501") as caught:
+        asyncio.run(load_order_shop(_conn(), client=_client(handler)))
+    assert "France" in caught.value.message
+    assert "Пул Data API" in caught.value.message
+
+
+def test_owned_russia_and_foreign_and_total_mismatch():
+    ru = parse_owned_number(
+        {
+            "number": "74951270777",
+            "status": "on",
+            "country": "Russia",
+            "description": "Moscow",
+            "monthly_fee": 2,
+            "currency": "RUB",
+            "type": "common",
+            "start_date": "2015-01-01 18:14:44",
+        }
+    )
+    mapped = mapper.map_number(ru, inventory_kind=InventoryKind.purchased)
+    assert mapped is not None
+    assert mapped.provider_number_key == "74951270777"
+    assert mapped.msisdn == "74951270777"
+    assert mapped.period_price == Decimal(2)
+    assert mapped.status_raw == "on"
+    assert mapped.date_from == "2015-01-01 18:14:44"
+    assert mapped.city_name is None
+    foreign = mapper.map_number(
+        parse_owned_number(
+            {
+                "number": "+442045770077",
+                "status": "on",
+                "country": "United Kingdom",
+                "description": "London",
+                "monthly_fee": 9,
+                "currency": "USD",
+            }
+        ),
+        inventory_kind=InventoryKind.purchased,
+    )
+    assert foreign is not None
+    assert foreign.provider_number_key == "United Kingdom:442045770077"
+    assert foreign.msisdn == "442045770077"
+    assert foreign.period_price is None
+    assert foreign.number_local == "442045770077"
+    assert foreign.city_name == "London"
+    assert foreign.region_name == "United Kingdom"
+
+    def mismatch(request: httpx.Request) -> httpx.Response:
+        return _ok({"status": "success", "info": [], "total": 2})
+
+    with pytest.raises(UserApiError, match="total=2"):
+        asyncio.run(_client(mismatch).owned())
+
+
+def test_owned_failure_does_not_keep_data_api_rows(monkeypatch: pytest.MonkeyPatch):
+    number = _data_number("74951234567", "100")
+
+    async def _sync(self, connection, **kwargs):
+        return SyncResult(
+            fetched=1,
+            parsed=1,
+            items=[number],
+            extra_stats={"integrity": {"total_items": 1}},
+        )
+
+    async def _owned(*args, **kwargs):
+        raise UserApiError("User API HTTP 401 (/v1/direct_numbers/): no")
+
+    monkeypatch.setattr(NovofonProvider, "_sync_method", _sync)
+    monkeypatch.setattr("app.providers.novofon.provider.load_owned_numbers", _owned)
+    result = asyncio.run(NovofonProvider().sync_purchased_numbers(_conn()))
+    assert result.items == []
+    assert result.fetched == 0
+    assert result.warnings
+    assert "не записан" in result.extra_stats["refusal_detail"]
+
+
+def test_owned_row_replaces_data_api_duplicate(monkeypatch: pytest.MonkeyPatch):
+    data = mapper.map_number(
+        parser.parse_virtual_item(
+            {"id": 9, "virtual_phone_number": "74951234567", "status": "active"}
+        ),
+        inventory_kind=InventoryKind.purchased,
+    )
+    assert data is not None
+
+    async def _sync(self, connection, **kwargs):
+        return SyncResult(fetched=1, parsed=1, items=[data], extra_stats={"integrity": {"total_items": 1}})
+
+    async def _owned(*args, **kwargs):
+        from app.providers.novofon.user_api import OwnedNumbers
+
+        row = mapper.map_number(
+            parse_owned_number(
+                {
+                    "number": "74951234567",
+                    "status": "on",
+                    "country": "Russia",
+                    "monthly_fee": 5,
+                    "currency": "RUB",
+                }
+            ),
+            inventory_kind=InventoryKind.purchased,
+        )
+        assert row is not None
+        return OwnedNumbers(raw_count=1, mapped=[row], secret_slot="access_token")
+
+    monkeypatch.setattr(NovofonProvider, "_sync_method", _sync)
+    monkeypatch.setattr("app.providers.novofon.provider.load_owned_numbers", _owned)
+    result = asyncio.run(NovofonProvider().sync_purchased_numbers(_conn()))
+    assert len(result.items) == 1
+    assert result.items[0].period_price == Decimal(5)
+    assert result.items[0].status_raw == "on"
+    assert result.items[0].raw_payload["data_api"]["id"] == 9
 
 
 def test_user_api_module_has_no_mutating_paths():

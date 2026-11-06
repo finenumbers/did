@@ -1072,17 +1072,20 @@ def persist_novofon_numbers(
                     "created_at": loaded,
                 }
             )
-        cat_rows.append(
-            _catalog_row(
-                num,
-                provider_id=provider_id,
-                job_id=job_id,
-                inventory_kind=inventory_kind,
-                table_name=table_name,
-                raw_id=raw_id,
-                loaded=loaded,
-            )
+        catalog_row = _catalog_row(
+            num,
+            provider_id=provider_id,
+            job_id=job_id,
+            inventory_kind=inventory_kind,
+            table_name=table_name,
+            raw_id=raw_id,
+            loaded=loaded,
         )
+        if num.city_name:
+            catalog_row["city_name"] = num.city_name
+        if num.region_name:
+            catalog_row["region_name"] = num.region_name
+        cat_rows.append(catalog_row)
 
     upserted = insert_staging_batches(
         db,

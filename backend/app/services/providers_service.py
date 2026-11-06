@@ -103,6 +103,8 @@ class ProvidersService:
                 "customer user id from get.customer_users, not app_id. "
                 "api_key is optional and only for an old cabinet that still shows Key and Secret. "
                 "Without it the free stage keeps the Data API result and does not call the shop. "
+                "With it, free walks every country on the order shop and purchased also reads "
+                "GET /v1/direct_numbers/. HTTP 501 on the shop writes nothing for that free run. "
                 "IP whitelist required in Novofon ЛК. See novofon-contract.md. "
                 "Read-only: Data API get.* and, when Key is set, GET direct_numbers."
             )

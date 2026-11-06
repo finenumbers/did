@@ -24,11 +24,14 @@ from app.models.enums import InventoryKind
 from app.providers.dto.common import ConnectionConfig
 from app.providers.dto.numbers import NormalizedNumber, ParsedNumberItem
 from app.providers.errors import ProviderError
-from app.providers.msisdn_split import normalize_phone
+from app.providers.msisdn_split import normalize_phone, split_from_parts
 from app.providers.novofon import contract, mapper, parser
 from app.providers.progress_emit import emit_progress
 
 _DIRECTION_ID = re.compile(r"^[A-Za-z0-9]+$")
+_RU_LOOKING = re.compile(r"^7[0-9]{10}$")
+_RU_LABELS = frozenset({"ru", "russia", "россия", "russian federation"})
+_LIST_TOTAL_KEYS = ("total", "count", "total_items")
 Sleep = Callable[[float], Awaitable[None]]
 Clock = Callable[[], float]
 
@@ -52,9 +55,17 @@ class OrderShop:
     min_per_direction: int | None
     max_per_direction: int | None
     secret_slot: str
-    russia_missing: bool
+    countries: int
     mapped: list[NormalizedNumber] = field(default_factory=list)
     unmapped: list[dict[str, Any]] = field(default_factory=list)
+    skipped: bool = False
+
+
+@dataclass
+class OwnedNumbers:
+    raw_count: int
+    mapped: list[NormalizedNumber] = field(default_factory=list)
+    secret_slot: str = ""
     skipped: bool = False
 
 
@@ -98,18 +109,75 @@ def canonical_direction_id(value: Any) -> str:
     return text
 
 
-def russia_iso(countries: list[dict[str, Any]]) -> str | None:
-    """ISO string as the countries payload spelled it. ``None`` when Russia is absent."""
-    found: str | None = None
-    for row in countries:
-        if not isinstance(row, dict) or not isinstance(row.get("countryCodeIso"), str):
-            raise UserApiError("countries[].countryCodeIso missing")
-        iso = row["countryCodeIso"]
-        if not iso.strip():
-            raise UserApiError("countries[].countryCodeIso missing")
-        if found is None and iso.casefold() == "ru":
-            found = iso
-    return found
+def _digits(value: Any) -> str:
+    return "".join(ch for ch in str(value or "") if ch.isdigit())
+
+
+def _russia_label(value: str | None) -> bool:
+    if not value or not value.strip():
+        return False
+    return value.strip().casefold() in _RU_LABELS
+
+
+@dataclass
+class _Identity:
+    provider_number_key: str
+    msisdn: str | None
+    number_local: str | None
+    city_name: str | None
+    region_name: str | None
+    foreign: bool
+
+
+def identity_for_number(
+    number: Any,
+    *,
+    country_iso: str | None,
+    country_label: str | None,
+    place_name: str | None,
+) -> _Identity:
+    """RU keys stay ``7XXXXXXXXXX``. Other countries keep their own digits.
+
+    A non-RU number whose digits look like a Russian MSISDN gets an empty
+    ``msisdn`` so the ABC directory does not assign it a Russian city.
+    """
+    iso = (country_iso or "").strip()
+    label = (country_label or "").strip()
+    russia = iso.casefold() == "ru" or (not iso and (_russia_label(label) or not label))
+    if russia:
+        phone = normalize_phone(number)
+        if phone:
+            _abc, local = split_from_parts(msisdn=phone)
+            return _Identity(phone, phone, local, None, None, False)
+        if iso or label:
+            raise UserApiError(f"Номер не приводится к 7XXXXXXXXXX: {number!r}")
+    digits = _digits(number)
+    if not digits:
+        raise UserApiError("номер без цифр")
+    prefix = iso or label
+    if not prefix:
+        raise UserApiError(f"Нет страны для номера {number!r}")
+    return _Identity(
+        provider_number_key=f"{prefix}:{digits}",
+        msisdn=None if _RU_LOOKING.fullmatch(digits) else digits,
+        number_local=digits,
+        city_name=place_name,
+        region_name=label or iso,
+        foreign=True,
+    )
+
+
+def assert_list_complete(body: dict[str, Any], rows: list[Any]) -> None:
+    """Refuse a list when the payload names a total that is not its length."""
+    for key in _LIST_TOTAL_KEYS:
+        if key not in body or body[key] is None:
+            continue
+        try:
+            expected = int(body[key])
+        except (TypeError, ValueError) as exc:
+            raise UserApiError(f"{key} не число") from exc
+        if expected != len(rows):
+            raise UserApiError(f"{key}={expected} не равно числу строк {len(rows)}")
 
 
 def _as_text(value: Any) -> str | None:
@@ -132,31 +200,81 @@ def _fee(row: dict[str, Any], direction: dict[str, Any], key: str) -> Any:
     return direction.get(key)
 
 
-def parse_shop_number(row: Any, direction: dict[str, Any]) -> ParsedNumberItem:
+def parse_shop_number(
+    row: Any,
+    direction: dict[str, Any],
+    *,
+    country_iso: str = "RU",
+    country_name: str | None = None,
+) -> ParsedNumberItem:
     if not isinstance(row, dict) or "number" not in row:
         raise UserApiError("available.numbers[] без поля number")
     currency = _currency(row, direction)
     connect = _fee(row, direction, "connect_fee")
     monthly = _fee(row, direction, "monthly_fee")
     rub = currency is not None and currency.casefold() == "rub"
-    phone = normalize_phone(row.get("number"))
+    place = _as_text(direction.get("name"))
+    ident = identity_for_number(
+        row.get("number"),
+        country_iso=country_iso,
+        country_label=country_name,
+        place_name=place,
+    )
     payload = {
         "source": "user_api",
         "number": row.get("number"),
         "user_api_number_id": row.get("id"),
         "direction_id": direction.get("id"),
-        "location_name": _as_text(direction.get("name")),
+        "location_name": place,
+        "country_iso": country_iso,
+        "country_name": country_name,
         "area_code": _as_text(direction.get("areaCode")),
         "connect_fee": connect,
         "monthly_fee": monthly,
         "currency": currency,
     }
+    if ident.foreign:
+        payload["foreign_catalog"] = True
+        payload["catalog_number_local"] = ident.number_local
     return ParsedNumberItem(
         raw_payload=payload,
-        provider_number_key=phone,
-        msisdn=phone,
+        provider_number_key=ident.provider_number_key,
+        msisdn=ident.msisdn,
+        city_name=ident.city_name,
+        region_name=ident.region_name,
         buy_price=parser._parse_price(connect) if rub else None,
         period_price=parser._parse_price(monthly) if rub else None,
+    )
+
+
+def parse_owned_number(row: Any) -> ParsedNumberItem:
+    if not isinstance(row, dict) or "number" not in row:
+        raise UserApiError("direct_numbers[] без поля number")
+    currency = _as_text(row.get("currency"))
+    rub = currency is not None and currency.casefold() == "rub"
+    country = _as_text(row.get("country"))
+    place = _as_text(row.get("description"))
+    ident = identity_for_number(
+        row.get("number"),
+        country_iso=None,
+        country_label=country,
+        place_name=place,
+    )
+    payload = dict(row)
+    payload["source"] = "user_api_owned"
+    if ident.foreign:
+        payload["foreign_catalog"] = True
+        payload["catalog_number_local"] = ident.number_local
+    return ParsedNumberItem(
+        raw_payload=payload,
+        provider_number_key=ident.provider_number_key,
+        msisdn=ident.msisdn,
+        city_name=ident.city_name,
+        region_name=ident.region_name,
+        period_price=parser._parse_price(row.get("monthly_fee")) if rub else None,
+        status_raw=_as_text(row.get("status")),
+        number_type=_as_text(row.get("type")),
+        date_from=_as_text(row.get("start_date")),
     )
 
 
@@ -222,6 +340,19 @@ class NovofonUserApi:
             if not isinstance(row, dict):
                 raise UserApiError("country.info содержит не объект")
             rows.append(row)
+        return rows
+
+    async def owned(self) -> list[dict[str, Any]]:
+        body = await self._get(contract.USER_API_OWNED, {})
+        info = body.get("info")
+        if not isinstance(info, list):
+            raise UserApiError("direct_numbers.info is not an array")
+        rows: list[dict[str, Any]] = []
+        for row in info:
+            if not isinstance(row, dict):
+                raise UserApiError("direct_numbers.info содержит не объект")
+            rows.append(row)
+        assert_list_complete(body, rows)
         return rows
 
     async def available_numbers(self, direction_id: str) -> list[Any]:
@@ -355,13 +486,19 @@ class NovofonUserApi:
                 pass
 
 
+def _refuse(message: str) -> UserApiRefusal:
+    return UserApiRefusal(
+        f"Витрина заказа не дочитана: {message}. Пул Data API в этом прогоне не записан."
+    )
+
+
 async def load_order_shop(
     connection: ConnectionConfig,
     *,
     on_progress: Any | None = None,
     client: NovofonUserApi | None = None,
 ) -> OrderShop:
-    """Read every RU direction. A hole in the walk raises; it does not return a partial shop."""
+    """Read every country and direction. A hole raises; it does not return a partial shop."""
     auth = connection.auth_settings or {}
     if not str(auth.get(contract.AUTH_API_KEY) or "").strip():
         return OrderShop(
@@ -370,73 +507,75 @@ async def load_order_shop(
             min_per_direction=None,
             max_per_direction=None,
             secret_slot="",
-            russia_missing=False,
+            countries=0,
             skipped=True,
         )
     api = client or NovofonUserApi(connection)
     try:
         countries = await api.countries()
-        iso = russia_iso(countries)
     except UserApiError as exc:
-        raise UserApiRefusal(
-            f"Витрина заказа не дочитана: {exc}. Пул Data API в этом прогоне не записан."
-        ) from exc
-    if iso is None:
+        raise _refuse(str(exc)) from exc
+    if not countries:
         return OrderShop(
             directions=0,
             raw_count=0,
             min_per_direction=None,
             max_per_direction=None,
             secret_slot=api.secret_slot,
-            russia_missing=True,
+            countries=0,
         )
-    try:
-        directions = await api.directions(iso)
-    except UserApiError as exc:
-        raise UserApiRefusal(
-            f"Витрина заказа не дочитана: {exc}. Пул Data API в этом прогоне не записан."
-        ) from exc
 
-    prepared: list[tuple[str, dict[str, Any]]] = []
-    for direction in directions:
+    prepared: list[tuple[str, str | None, str, dict[str, Any]]] = []
+    for country in countries:
+        iso = country["countryCodeIso"]
+        country_name = _as_text(country.get("name"))
         try:
-            direction_id = canonical_direction_id(direction.get("id"))
+            directions = await api.directions(iso)
         except UserApiError as exc:
+            label = country_name or iso
+            raise _refuse(f"страна {label}: {exc}") from exc
+        for direction in directions:
             name = _as_text(direction.get("name")) or ""
-            raise UserApiRefusal(
-                f"Витрина заказа не дочитана, направление ({name}): {exc}. "
-                "Пул Data API в этом прогоне не записан."
-            ) from exc
-        prepared.append((direction_id, direction))
+            try:
+                direction_id = canonical_direction_id(direction.get("id"))
+            except UserApiError as exc:
+                raise _refuse(f"страна {country_name or iso}, направление ({name}): {exc}") from exc
+            prepared.append((iso, country_name, direction_id, direction))
 
     mapped: list[NormalizedNumber] = []
-    unmapped: list[dict[str, Any]] = []
+    seen: set[str] = set()
     counts: list[int] = []
     total = len(prepared)
-    for index, (direction_id, direction) in enumerate(prepared, start=1):
-        await emit_progress(on_progress, f"направление {index}/{total}", index, total)
+    country_total = len(countries)
+    for index, (iso, country_name, direction_id, direction) in enumerate(prepared, start=1):
         name = _as_text(direction.get("name")) or ""
+        await emit_progress(
+            on_progress,
+            f"страна {iso} ({country_total}), направление {index}/{total}",
+            index,
+            total,
+        )
         try:
             rows = await api.available_numbers(direction_id)
         except UserApiError as exc:
-            raise UserApiRefusal(
-                f"Витрина заказа не дочитана, направление {direction_id} ({name}): {exc}. "
-                "Пул Data API в этом прогоне не записан."
-            ) from exc
+            raise _refuse(f"направление {direction_id} ({name}): {exc}") from exc
         counts.append(len(rows))
         for row in rows:
             try:
-                parsed = parse_shop_number(row, direction)
+                parsed = parse_shop_number(
+                    row, direction, country_iso=iso, country_name=country_name
+                )
+                item = mapper.map_number(parsed, inventory_kind=InventoryKind.free)
             except UserApiError as exc:
-                raise UserApiRefusal(
-                    f"Витрина заказа не дочитана, направление {direction_id} ({name}): {exc}. "
-                    "Пул Data API в этом прогоне не записан."
-                ) from exc
-            item = mapper.map_number(parsed, inventory_kind=InventoryKind.free)
-            if item is None:
-                unmapped.append(parsed.raw_payload)
-            else:
-                mapped.append(item)
+                raise _refuse(f"направление {direction_id} ({name}): {exc}") from exc
+            if item is None or not item.provider_number_key:
+                raise _refuse(f"направление {direction_id} ({name}): номер без ключа")
+            if item.provider_number_key in seen:
+                raise _refuse(
+                    f"направление {direction_id} ({name}): повтор ключа {item.provider_number_key}"
+                )
+            seen.add(item.provider_number_key)
+            mapped.append(item)
     raw_count = sum(counts)
     return OrderShop(
         directions=total,
@@ -444,7 +583,37 @@ async def load_order_shop(
         min_per_direction=min(counts) if counts else None,
         max_per_direction=max(counts) if counts else None,
         secret_slot=api.secret_slot,
-        russia_missing=False,
+        countries=country_total,
         mapped=mapped,
-        unmapped=unmapped,
+    )
+
+
+async def load_owned_numbers(
+    connection: ConnectionConfig,
+    *,
+    on_progress: Any | None = None,
+    client: NovofonUserApi | None = None,
+) -> OwnedNumbers:
+    """Read GET /v1/direct_numbers/. A bad row raises; it does not return a partial list."""
+    auth = connection.auth_settings or {}
+    if not str(auth.get(contract.AUTH_API_KEY) or "").strip():
+        return OwnedNumbers(raw_count=0, skipped=True)
+    api = client or NovofonUserApi(connection)
+    await emit_progress(on_progress, "список кабинета")
+    rows = await api.owned()
+    mapped: list[NormalizedNumber] = []
+    seen: set[str] = set()
+    for row in rows:
+        parsed = parse_owned_number(row)
+        item = mapper.map_number(parsed, inventory_kind=InventoryKind.purchased)
+        if item is None or not item.provider_number_key:
+            raise UserApiError("номер кабинета без ключа")
+        if item.provider_number_key in seen:
+            raise UserApiError(f"повтор ключа {item.provider_number_key}")
+        seen.add(item.provider_number_key)
+        mapped.append(item)
+    return OwnedNumbers(
+        raw_count=len(rows),
+        mapped=mapped,
+        secret_slot=api.secret_slot,
     )

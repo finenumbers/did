@@ -21,6 +21,8 @@ USER_API_BASE_URL = "https://api.novofon.com"
 USER_API_COUNTRIES = "/v1/direct_numbers/countries/"
 USER_API_COUNTRY = "/v1/direct_numbers/country/"
 USER_API_AVAILABLE = "/v1/direct_numbers/available/"
+# Already connected direct numbers. Read when Key is set. Not the order shop.
+USER_API_OWNED = "/v1/direct_numbers/"
 USER_API_LANGUAGE = "ru"
 USER_API_CONNECT_TIMEOUT = 10.0
 USER_API_READ_TIMEOUT = 30.0

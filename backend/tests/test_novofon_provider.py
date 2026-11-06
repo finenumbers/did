@@ -15,6 +15,7 @@ from app.providers.errors import ProviderAuthError, ProviderError, ProviderParse
 from app.providers.novofon import contract, mapper, parser
 from app.providers.novofon.client import NovofonClient, NovofonPrincipal
 from app.providers.novofon.provider import NovofonProvider
+from app.providers.novofon.user_api import UserApiError
 from app.providers.retry import RetryPolicy
 
 
@@ -609,6 +610,58 @@ def test_connection_reports_failure_without_number_calls():
         NovofonClient.get_page = original_page  # type: ignore[method-assign]
     assert result.ok is False
     assert "нужен user_id" in result.message
+
+
+def test_connection_fails_when_the_country_method_returns_501():
+    import app.providers.novofon.provider as provider_module
+
+    provider = NovofonProvider()
+    connection = ConnectionConfig(
+        base_url="https://example.test/v2.0",
+        auth_settings={"access_token": "token", "api_key": "key", "api_secret": "secret"},
+    )
+    probed: list[str] = []
+
+    class _Api:
+        def __init__(self, connection):
+            pass
+
+        async def countries(self):
+            return [{"countryCodeIso": "DE", "name": "Germany"}, {"countryCodeIso": "FR"}]
+
+        async def directions(self, iso: str):
+            assert iso == "DE"
+            probed.append("country")
+            raise UserApiError(
+                "User API HTTP 501 (/v1/direct_numbers/country/): Method not implemented"
+            )
+
+        async def owned(self):
+            probed.append("owned")
+            return [{"number": "74951234567"}]
+
+    async def _resolve(self):
+        return NovofonPrincipal(kind="client", app_id=1, name="A", summary="Клиент «A» app_id=1")
+
+    async def _data_page(self, method, **kwargs):
+        return _page(0, [])
+
+    original_api = provider_module.NovofonUserApi
+    original_resolve = NovofonClient.resolve_principal
+    original_page = NovofonClient.get_page
+    provider_module.NovofonUserApi = _Api  # type: ignore[misc]
+    NovofonClient.resolve_principal = _resolve  # type: ignore[method-assign]
+    NovofonClient.get_page = _data_page  # type: ignore[method-assign]
+    try:
+        result = asyncio.run(provider.test_connection(connection))
+    finally:
+        provider_module.NovofonUserApi = original_api  # type: ignore[misc]
+        NovofonClient.resolve_principal = original_resolve  # type: ignore[method-assign]
+        NovofonClient.get_page = original_page  # type: ignore[method-assign]
+    assert result.ok is False
+    assert "501" in result.message
+    assert "номеров=1" in result.message
+    assert probed == ["country", "owned"]
 
 
 @pytest.mark.parametrize(

@@ -6,7 +6,7 @@
 - Auth session (documented, unused): [login.user](https://novofon.github.io/data_api/authentication/login_user/)
 - Client account: [get.account](https://novofon.github.io/data_api/account/get_account/)
 - Agent customer users: [get.customer_users](https://novofon.github.io/data_api/partner/get_customer_users/)
-- Order shop (classic User API, not Data API): [novofon/user-api-v1](https://github.com/novofon/user-api-v1) `GET /v1/direct_numbers/countries/`, `/country/`, `/available/<DIRECTION_ID>/` on `https://api.novofon.com`
+- Order shop and owned list (classic User API, not Data API): [novofon/user-api-v1](https://github.com/novofon/user-api-v1) and the Zadarma numbers instruction. `GET /v1/direct_numbers/countries/`, `/country/`, `/available/<DIRECTION_ID>/`, and `GET /v1/direct_numbers/` on `https://api.novofon.com`
 
 ## Artifacts
 
@@ -29,4 +29,4 @@
 
 ## Rule
 
-Saved HTML under `novofon/raw/` is the method source of truth for the Data API. The order shop is the classic User API above; example payloads in the contract are field sketches, not inventory. The Novofon 2.0 API screen issues one key and does not show Key or Secret, so the shop is requested only when `api_key` is set. Integration is **read-only**: classify the token, read `get.available_virtual_numbers` and `get.virtual_numbers`, then GET the three `direct_numbers` methods only when Key is present. `login.user`, `order`, and `prolong` are not called.
+Saved HTML under `novofon/raw/` is the method source of truth for the Data API. The order shop and the owned list are the classic User API above; example payloads in the contract are field sketches, not inventory. The Novofon 2.0 API screen issues one key and does not show Key or Secret, so those calls are made only when `api_key` is set. Integration is **read-only**: classify the token, read `get.available_virtual_numbers` and `get.virtual_numbers`, then GET every country's shop and `GET /v1/direct_numbers/` only when Key is present. `login.user`, `order`, and `prolong` are not called. HTTP 501 on `/country/` refuses the free slice and writes nothing.
