@@ -661,7 +661,12 @@ class RunexisNumberingClient:
                 items, envelopes, page_meta = await self._page_all(
                     used_filter, on_progress=on_progress
                 )
-            except (ProviderAuthError, ProviderTransportError) as primary_exc:
+            except ProviderAuthError as primary_exc:
+                # Alternate filter key only when the RPC rejects access_state
+                # before any page is returned. Timeouts and HTTP 502 stay on
+                # the primary filter: restarting the whole list hammers the
+                # gateway and must not run after a page already succeeded.
+                # Parallel-wave failures are wrapped as ProviderTransportError.
                 used_filter = dict(contract.NUMBERING_FREE_FILTER_FALLBACK)
                 meta["filter"] = used_filter
                 meta["primary_filter_error"] = str(primary_exc)

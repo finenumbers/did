@@ -5,7 +5,11 @@ from __future__ import annotations
 import asyncio
 import time
 
+import pytest
+
 from app.providers.dto.common import ConnectionConfig, RawHttpResult
+from app.providers.errors import ProviderAuthError, ProviderTransportError
+from app.providers.runexis import contract as runexis_contract
 from app.providers.runexis.numbering_client import RunexisNumberingClient
 
 
@@ -282,3 +286,81 @@ def test_list_all_free_emits_session_progress():
     assert "Numbering: сессия" in events
     assert "Numbering: запрос count" in events
     assert "Numbering: загрузка страницы 1" in events
+
+
+def _bind_offline(client: ScriptedNumberingClient) -> None:
+    async def _noop():
+        return None
+
+    client.connect = _noop  # type: ignore[method-assign]
+    client.aclose = _noop  # type: ignore[method-assign]
+
+
+def _pin_page(limit: int, concurrency: int):
+    orig_limit = runexis_contract.NUMBERING_PAGE_LIMIT
+    orig_conc = runexis_contract.NUMBERING_FETCH_CONCURRENCY
+    runexis_contract.NUMBERING_PAGE_LIMIT = limit
+    runexis_contract.NUMBERING_FETCH_CONCURRENCY = concurrency
+    return orig_limit, orig_conc
+
+
+def test_transport_error_does_not_restart_with_fallback_filter():
+    """A timed-out or 502 page must not call count again or switch filters."""
+    limit = 20
+    full = [{"n": i} for i in range(limit)]
+
+    class _Boom(ScriptedNumberingClient):
+        def __init__(self):
+            super().__init__({0: [full]}, count_hint=400)
+            self.count_filters: list[dict] = []
+
+        async def search_numbers_count(self, filters: dict) -> int:  # type: ignore[override]
+            self.count_filters.append(dict(filters))
+            return await super().search_numbers_count(filters)
+
+        async def _fetch_page(self, filters, *, offset: int, limit: int):
+            if offset > 0:
+                raise ProviderTransportError("Runexis Numbering HTTP 502: bad gateway")
+            return await super()._fetch_page(filters, offset=offset, limit=limit)
+
+    client = _Boom()
+    _bind_offline(client)
+    orig = _pin_page(limit, 1)
+    try:
+        with pytest.raises(ProviderTransportError, match="parallel page failed"):
+            asyncio.run(client.list_all_free_numbers())
+    finally:
+        runexis_contract.NUMBERING_PAGE_LIMIT, runexis_contract.NUMBERING_FETCH_CONCURRENCY = orig
+
+    assert client.count_filters == [dict(runexis_contract.NUMBERING_FREE_FILTER_PRIMARY)]
+
+
+def test_auth_error_before_pages_still_uses_fallback_filter():
+    """RPC rejection of access_state before any page still tries usage_statuses."""
+
+    class _AuthThenOk(ScriptedNumberingClient):
+        def __init__(self):
+            super().__init__({0: [[{"n": 1}]]}, count_hint=1)
+            self.count_filters: list[dict] = []
+
+        async def search_numbers_count(self, filters: dict) -> int:  # type: ignore[override]
+            self.count_filters.append(dict(filters))
+            if "access_state" in filters:
+                raise ProviderAuthError("unknown filter field access_state")
+            return self._count_hint
+
+    client = _AuthThenOk()
+    _bind_offline(client)
+    orig = _pin_page(20, 1)
+    try:
+        items, _envs, meta = asyncio.run(client.list_all_free_numbers())
+    finally:
+        runexis_contract.NUMBERING_PAGE_LIMIT, runexis_contract.NUMBERING_FETCH_CONCURRENCY = orig
+
+    assert len(items) == 1
+    assert client.count_filters == [
+        dict(runexis_contract.NUMBERING_FREE_FILTER_PRIMARY),
+        dict(runexis_contract.NUMBERING_FREE_FILTER_FALLBACK),
+    ]
+    assert meta["filter"] == dict(runexis_contract.NUMBERING_FREE_FILTER_FALLBACK)
+    assert "access_state" in meta["primary_filter_error"]
