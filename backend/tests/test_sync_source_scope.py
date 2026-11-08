@@ -15,6 +15,7 @@ from app.modules.catalog.geographic_from_regions import (
     geographic_update_sql,
 )
 from app.modules.sync_engine.persist import apply_rtu_connected_flags
+from app.modules.sync_engine.service import public_job_stats
 from app.modules.sync_engine.unified import (
     _committed_kinds,
     _scope_filter,
@@ -37,9 +38,34 @@ def test_unknown_provider_is_rejected():
 def test_committed_kinds_follow_cutover_flags_only():
     assert _committed_kinds({}) == set()
     assert _committed_kinds({"_free_cutover_committed": True}) == {"free"}
+    assert _committed_kinds({"free_cutover_committed": True}) == {"free"}
     assert _committed_kinds(
         {"_free_cutover_committed": True, "_purchased_cutover_committed": True}
     ) == {"free", "purchased"}
+    assert _committed_kinds({"purchased_cutover_committed": True}) == {"purchased"}
+    assert _committed_kinds({"_free_cutover_committed": False}) == set()
+
+
+def test_public_cutover_flags_survive_the_private_key_strip():
+    public = public_job_stats(
+        {
+            "_free_cutover_committed": True,
+            "_purchased_cutover_committed": True,
+            "_inventory_split": True,
+            "_fatal_error": "hidden",
+            "categories": {"free_numbers": {}},
+        }
+    )
+    assert "_free_cutover_committed" not in public
+    assert "_purchased_cutover_committed" not in public
+    assert "_fatal_error" not in public
+    assert public["free_cutover_committed"] is True
+    assert public["purchased_cutover_committed"] is True
+    assert public["inventory_split"] is True
+    assert public["categories"] == {"free_numbers": {}}
+    assert _committed_kinds(public) == {"free", "purchased"}
+    assert public_job_stats({}) == {}
+    assert public_job_stats({"_free_cutover_committed": False}) == {}
 
 
 def test_skip_scope_does_not_open_catalog_writes():

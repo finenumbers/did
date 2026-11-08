@@ -2,6 +2,7 @@ from app.modules.sync_engine.progress import (
     _PHASE_STAGE,
     STAGE_DEFS,
     build_initial_progress,
+    stages_for_display,
 )
 
 _PROVIDERS = (
@@ -55,3 +56,38 @@ def test_stage_defs_full_provider_matrix():
     assert "runexis_free" not in one_ids
     assert one_ids[-6:] == list(_TAIL)
     assert one["scope"] == {"provider": "mcn"}
+
+
+def test_finished_individual_run_shows_every_source():
+    progress = build_initial_progress(provider="mcn")
+    stored_ids = [stage["id"] for stage in progress["stages"]]
+    mcn_free = next(stage for stage in progress["stages"] if stage["id"] == "mcn_free")
+    mcn_free["status"] = "done"
+    mcn_free["detail"] = "235735"
+    for run_status in ("success", "partial", "failed"):
+        board = stages_for_display(progress, run_status=run_status)
+        assert [stage["id"] for stage in board] == [stage["id"] for stage in STAGE_DEFS]
+        shown = next(stage for stage in board if stage["id"] == "mcn_free")
+        assert shown["status"] == "done"
+        assert shown["detail"] == "235735"
+        absent = next(stage for stage in board if stage["id"] == "sipout_free")
+        assert absent["status"] == "outside"
+        assert absent["detail"] == ""
+    assert [stage["id"] for stage in progress["stages"]] == stored_ids
+    assert "sipout_free" not in stored_ids
+
+
+def test_running_individual_run_stays_short():
+    progress = build_initial_progress(provider="mcn")
+    stored_ids = [stage["id"] for stage in progress["stages"]]
+    for run_status in ("pending", "running"):
+        board = stages_for_display(progress, run_status=run_status)
+        assert [stage["id"] for stage in board] == stored_ids
+        assert all(stage["status"] != "outside" for stage in board)
+
+
+def test_finished_full_run_has_no_outside_stages():
+    progress = build_initial_progress()
+    board = stages_for_display(progress, run_status="success")
+    assert [stage["id"] for stage in board] == [stage["id"] for stage in STAGE_DEFS]
+    assert all(stage["status"] != "outside" for stage in board)

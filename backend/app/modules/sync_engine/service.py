@@ -84,6 +84,18 @@ def refuse_slice_detail(result: Any, *, reason: str | None, incoming: int) -> st
     return detail
 
 
+def public_job_stats(stats: dict[str, Any]) -> dict[str, Any]:
+    """Drop private keys, but keep cutover marks the completion stage can read."""
+    public = {k: v for k, v in stats.items() if not str(k).startswith("_")}
+    if stats.get("_free_cutover_committed"):
+        public["free_cutover_committed"] = True
+    if stats.get("_purchased_cutover_committed"):
+        public["purchased_cutover_committed"] = True
+    if stats.get("_inventory_split"):
+        public["inventory_split"] = True
+    return public
+
+
 def _exc_summary(exc: BaseException, *, limit: int = 2000) -> str:
     """Include exception type so bare NoSuchTableError names are actionable in the UI."""
     return f"{type(exc).__name__}: {exc}"[:limit]
@@ -287,9 +299,7 @@ class SyncService:
                 stats["inventory_split"] = True
             job.error_summary = summary
             job.finished_at = datetime.now(timezone.utc)
-            job.stats = {
-                k: v for k, v in stats.items() if not str(k).startswith("_")
-            }
+            job.stats = public_job_stats(stats)
             log_job(
                 self.db, job.id, SyncLogLevel.error, f"Sync failed: {summary}"
             )
@@ -304,10 +314,7 @@ class SyncService:
             except Exception:
                 self.db.rollback()
 
-        public_stats = {k: v for k, v in stats.items() if not str(k).startswith("_")}
-        if stats.get("_inventory_split"):
-            public_stats["inventory_split"] = True
-        job.stats = public_stats
+        job.stats = public_job_stats(stats)
         job.finished_at = datetime.now(timezone.utc)
         self.db.commit()
         self.db.refresh(job)

@@ -213,9 +213,9 @@ def normalize_sync_provider(provider: str | None) -> str | None:
 def _committed_kinds(stats: dict[str, Any] | None) -> set[str]:
     flags = stats or {}
     kinds: set[str] = set()
-    if flags.get("_free_cutover_committed"):
+    if flags.get("_free_cutover_committed") or flags.get("free_cutover_committed"):
         kinds.add("free")
-    if flags.get("_purchased_cutover_committed"):
+    if flags.get("_purchased_cutover_committed") or flags.get("purchased_cutover_committed"):
         kinds.add("purchased")
     return kinds
 

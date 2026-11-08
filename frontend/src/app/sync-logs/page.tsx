@@ -174,6 +174,7 @@ function statusLabel(status: string): string {
     failed: "ошибка",
     partial: "частично",
     skipped: "пропуск",
+    outside: "не в этом запуске",
   };
   return map[status] || status;
 }

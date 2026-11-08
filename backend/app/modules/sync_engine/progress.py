@@ -123,6 +123,48 @@ def build_initial_progress(provider: str | None = None) -> dict[str, Any]:
     }
 
 
+def stages_for_display(
+    progress: dict[str, Any] | None,
+    *,
+    run_status: str,
+) -> list[dict[str, Any]]:
+    """Full stage board after a run ends. Stored progress is left unchanged.
+
+    While the run is pending or running, the caller still sees only the stages
+    that were started. Afterwards every catalog source is listed so another
+    one can be started. Stages that were not part of this run are marked
+    ``outside`` and are not written back.
+    """
+    stored = [
+        stage
+        for stage in ((progress or {}).get("stages") or [])
+        if isinstance(stage, dict)
+    ]
+    if run_status in _ACTIVE_RUN_STATUSES:
+        return stored
+    by_id = {stage.get("id"): stage for stage in stored}
+    board: list[dict[str, Any]] = []
+    for spec in STAGE_DEFS:
+        existing = by_id.get(spec["id"])
+        if existing is not None:
+            board.append(existing)
+            continue
+        board.append(
+            {
+                "id": spec["id"],
+                "group": spec["group"],
+                "label": spec["label"],
+                "status": "outside",
+                "detail": "",
+                "substage": "",
+                "progress": {"current": None, "total": None, "unit": ""},
+                "started_at": None,
+                "finished_at": None,
+            }
+        )
+    return board
+
+
 def stage_for_provider_phase(provider_code: str, phase: str) -> str | None:
     return _PHASE_STAGE.get((provider_code, phase))
 

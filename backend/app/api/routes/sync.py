@@ -15,7 +15,7 @@ from app.modules.sync_engine.run_file_log import (
     sync_debug_log_exists,
     sync_debug_log_path,
 )
-from app.modules.sync_engine.progress import build_initial_progress
+from app.modules.sync_engine.progress import build_initial_progress, stages_for_display
 from app.modules.sync_engine.unified import (
     create_run,
     get_latest_run,
@@ -39,8 +39,9 @@ _XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
 
 def _run_out(run: SyncRun) -> SyncRunOut:
     progress = run.progress or build_initial_progress()
+    run_status = run.status.value if hasattr(run.status, "value") else str(run.status)
     stages = []
-    for s in progress.get("stages") or []:
+    for s in stages_for_display(progress, run_status=run_status):
         prog = s.get("progress") or {}
         stages.append(
             SyncStageOut(
