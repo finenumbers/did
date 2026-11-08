@@ -1,6 +1,6 @@
 """
 Runexis Numbering API client (JSON-RPC).
-Doc: Runexis-Numbering-API.docx — sole source for free / purchasable catalog.
+Doc: https://help.runexis.ru/api/numbering_api — source for the free catalog.
 READ-ONLY: connect + search_numbers (+ count). Never reserv/book/sell/…
 """
 
@@ -101,11 +101,12 @@ class RunexisNumberingClient:
         self.base_url = str(base).rstrip("/") + "/"
         self._client: httpx.AsyncClient | None = None
         self._reconnect_lock = asyncio.Lock()
+        self._session_started_at: float | None = None
         if not self.login or not self.password:
             raise ProviderAuthError(
                 "Runexis Numbering API requires auth_settings.numbering_login and "
                 "auth_settings.numbering_password "
-                "(VERIFIED: JSON-RPC connect in Runexis-Numbering-API.docx)."
+                "(VERIFIED: JSON-RPC connect in https://help.runexis.ru/api/numbering_api)."
             )
 
     def _timeout(self) -> httpx.Timeout:
@@ -131,43 +132,112 @@ class RunexisNumberingClient:
         auth[contract.AUTH_NUMBERING_SESSION] = session_id
         self.connection.auth_settings = auth
 
+    def _retry_delay(self, attempt: int, stagger_key: int) -> float:
+        slots = max(int(contract.NUMBERING_FETCH_CONCURRENCY), 1)
+        return (
+            contract.NUMBERING_RETRY_BACKOFF_SECONDS * attempt
+            + (int(stagger_key) % slots) * contract.NUMBERING_RETRY_STAGGER_SECONDS
+        )
+
+    async def _refresh_session_if_stale(self) -> None:
+        started = self._session_started_at
+        if started is None:
+            return
+        if time.monotonic() - started < contract.NUMBERING_SESSION_REFRESH_AFTER:
+            return
+        async with self._reconnect_lock:
+            started = self._session_started_at
+            if started is None:
+                return
+            age = time.monotonic() - started
+            if age < contract.NUMBERING_SESSION_REFRESH_AFTER:
+                return
+            logger.warning(
+                "Runexis Numbering session age %.0fs; reconnecting",
+                age,
+            )
+            await self._connect_once()
+
+    async def _transport_retry(
+        self,
+        op: Any,
+        *,
+        stagger_key: int,
+        what: str,
+        prior_attempts: int = 0,
+        refresh: bool = True,
+        failure_label: str = "request",
+    ) -> Any:
+        """Retry one Numbering read. Same callable, so the filter and offset stay put."""
+        last: Exception | None = None
+        attempts = max(1, int(self.retry.max_attempts))
+        for attempt in range(prior_attempts, attempts):
+            if attempt > 0:
+                delay = self._retry_delay(attempt, stagger_key)
+                logger.warning(
+                    "Runexis Numbering retry %s attempt %s/%s in %.1fs",
+                    what,
+                    attempt + 1,
+                    attempts,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+            try:
+                if refresh:
+                    await self._refresh_session_if_stale()
+                return await op()
+            except ProviderTransportError as exc:
+                last = exc
+                logger.warning(
+                    "Runexis Numbering %s attempt %s/%s failed: %s",
+                    what,
+                    attempt + 1,
+                    attempts,
+                    exc,
+                )
+        raise ProviderTransportError(
+            f"Runexis Numbering {failure_label} failed: {last}"
+        ) from last
+
     async def _post_form(self, form: dict[str, str]) -> RawHttpResult:
         client = await self._get_client()
-        last_exc: Exception | None = None
-        for attempt in range(self.retry.max_attempts):
-            try:
-                start = time.perf_counter()
-                response = await client.post(
-                    self.base_url,
-                    data=form,
-                    headers={
-                        "Content-Type": "application/x-www-form-urlencoded",
-                        "Accept": "application/json, text/plain, */*",
-                    },
-                )
-                elapsed = (time.perf_counter() - start) * 1000
+        try:
+            start = time.perf_counter()
+            response = await client.post(
+                self.base_url,
+                data=form,
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Accept": "application/json, text/plain, */*",
+                },
+            )
+        except httpx.HTTPError as exc:
+            raise ProviderTransportError(
+                f"Runexis Numbering transport failed: {exc}"
+            ) from exc
+        elapsed = (time.perf_counter() - start) * 1000
+        try:
+            body_json = response.json()
+        except Exception:
+            body_json = None
+            if response.text:
                 try:
-                    body_json = response.json()
+                    body_json = json.loads(response.text)
                 except Exception:
                     body_json = None
-                    if response.text:
-                        try:
-                            body_json = json.loads(response.text)
-                        except Exception:
-                            body_json = None
-                return RawHttpResult(
-                    status_code=response.status_code,
-                    body_text=response.text,
-                    body_json=body_json,
-                    headers=dict(response.headers),
-                    elapsed_ms=elapsed,
-                    request_url=str(response.request.url),
-                )
-            except httpx.HTTPError as exc:
-                last_exc = exc
-                if attempt + 1 >= self.retry.max_attempts:
-                    break
-        raise ProviderTransportError(f"Runexis Numbering transport failed: {last_exc}")
+        raw = RawHttpResult(
+            status_code=response.status_code,
+            body_text=response.text,
+            body_json=body_json,
+            headers=dict(response.headers),
+            elapsed_ms=elapsed,
+            request_url=str(response.request.url),
+        )
+        if response.status_code in self.retry.retry_on_status:
+            raise ProviderTransportError(
+                f"Runexis Numbering HTTP {response.status_code}: {response.text[:300]}"
+            )
+        return raw
 
     async def rpc(self, method: str, params: list[Any], *, rpc_id: int = 1) -> RawHttpResult:
         envelope = {
@@ -198,7 +268,7 @@ class RunexisNumberingClient:
             raise ProviderAuthError(f"Runexis Numbering result error: {result}")
         return result
 
-    async def connect(self) -> str:
+    async def _connect_once(self) -> str:
         params: list[Any] = [self.login, self.password]
         if self.partition not in (None, ""):
             params.append(self.partition)
@@ -209,7 +279,17 @@ class RunexisNumberingClient:
                 f"Runexis Numbering connect did not return session id: {result!r}"
             )
         self._persist_session(result)
+        self._session_started_at = time.monotonic()
         return result
+
+    async def connect(self) -> str:
+        return await self._transport_retry(
+            self._connect_once,
+            stagger_key=0,
+            what="connect",
+            refresh=False,
+            failure_label="connect",
+        )
 
     async def ensure_session(self) -> str:
         if self.session_id:
@@ -247,7 +327,7 @@ class RunexisNumberingClient:
             self.extract_result(raw2)
             return raw2
 
-    async def search_numbers_count(self, filters: dict[str, Any]) -> int:
+    async def _search_numbers_count_once(self, filters: dict[str, Any]) -> int:
         session = await self.ensure_session()
         raw = await self.rpc(
             contract.NUMBERING_METHOD_SEARCH_COUNT,
@@ -268,6 +348,14 @@ class RunexisNumberingClient:
             result = self.extract_result(raw)
         return _parse_count(result)
 
+    async def search_numbers_count(self, filters: dict[str, Any]) -> int:
+        return await self._transport_retry(
+            lambda: self._search_numbers_count_once(filters),
+            stagger_key=0,
+            what="search_numbers_count",
+            failure_label="search_numbers_count",
+        )
+
     async def _fetch_page(
         self,
         filters: dict[str, Any],
@@ -275,6 +363,7 @@ class RunexisNumberingClient:
         offset: int,
         limit: int,
     ) -> tuple[int, list[Any], RawHttpResult, int]:
+        await self._refresh_session_if_stale()
         t0 = time.perf_counter()
         raw = await self.search_numbers(filters, offset=offset, limit=limit)
         result = self.extract_result(raw)
@@ -346,7 +435,12 @@ class RunexisNumberingClient:
         )
         concurrency = concurrency_requested
 
-        offset0, chunk0, raw0, ms0 = await self._fetch_page(filters, offset=0, limit=limit)
+        offset0, chunk0, raw0, ms0 = await self._transport_retry(
+            lambda: self._fetch_page(filters, offset=0, limit=limit),
+            stagger_key=0,
+            what="search_numbers offset=0",
+            failure_label="parallel page",
+        )
         pages: dict[int, list[Any]] = {0: chunk0}
         last_env = raw0
         logger.warning(
@@ -409,6 +503,7 @@ class RunexisNumberingClient:
             pending = set(tasks.values())
             end_signal_offset: int | None = None
             typed: list[tuple[int, list[Any], RawHttpResult, int]] = []
+            failed_offsets: list[tuple[int, ProviderTransportError]] = []
 
             while pending:
                 done, pending = await asyncio.wait(
@@ -418,6 +513,16 @@ class RunexisNumberingClient:
                     try:
                         off, chunk, raw, elapsed_ms = task.result()
                     except asyncio.CancelledError:
+                        continue
+                    except ProviderTransportError as exc:
+                        # Keep sibling pages. Retry only this offset after the wave.
+                        off = next(o for o, running in tasks.items() if running is task)
+                        failed_offsets.append((off, exc))
+                        logger.warning(
+                            "Runexis Numbering search_numbers offset=%s failed: %s",
+                            off,
+                            exc,
+                        )
                         continue
                     except Exception as exc:
                         for t in pending:
@@ -450,6 +555,37 @@ class RunexisNumberingClient:
                                 len(to_cancel),
                             )
                             await asyncio.gather(*to_cancel, return_exceptions=True)
+
+            if failed_offsets:
+                short_offs = [
+                    off
+                    for off, chunk, _raw, _ms in typed
+                    if (not chunk) or len(chunk) < limit
+                ]
+                end_at = min(short_offs) if short_offs else None
+                for off, exc in sorted(failed_offsets, key=lambda row: row[0]):
+                    if end_at is not None and off > end_at:
+                        logger.warning(
+                            "Runexis Numbering skip retry offset=%s after short page at %s",
+                            off,
+                            end_at,
+                        )
+                        continue
+                    logger.warning(
+                        "Runexis Numbering retry offset=%s after %s",
+                        off,
+                        exc,
+                    )
+                    fetched = await self._transport_retry(
+                        lambda off=off: self._fetch_page(
+                            filters, offset=off, limit=limit
+                        ),
+                        stagger_key=off // limit if limit else off,
+                        what=f"search_numbers offset={off}",
+                        prior_attempts=1,
+                        failure_label="parallel page",
+                    )
+                    typed.append(fetched)
 
             typed.sort(key=lambda row: row[0])
             progress_total = (

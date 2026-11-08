@@ -5,7 +5,7 @@
 | Surface | Base (docs) | Inventory role | Artifact |
 |---|---|---|---|
 | **DIDAPI** (Scribe HTML) | `https://didapi.runexis.ru` | Purchased partner inventory, Bearer auth, regions/cities | [`raw/Runexis.html`](raw/Runexis.html) |
-| **Numbering API** (DOCX) | `https://did-api.runexis.ru/` | **Sole** source for free / purchasable catalog | [`raw/Runexis-Numbering-API.docx`](raw/Runexis-Numbering-API.docx) + [`.txt`](raw/Runexis-Numbering-API.txt) |
+| **Numbering API** (live help) | `https://did-api.runexis.ru/` | **Sole** source for free / purchasable catalog | [help.runexis.ru/api/numbering_api](https://help.runexis.ru/api/numbering_api) (checked `2026-11-04T21:36:14Z`). DOCX/txt in `raw/` are an archive |
 
 ## DIDAPI (purchased / dictionaries)
 
@@ -16,7 +16,9 @@
 
 ## Numbering API (free catalog)
 
-- Copied from: `/Users/dvpershin/Downloads/Runexis Numbering API.docx`
+- Canonical, changeable text: [https://help.runexis.ru/api/numbering_api](https://help.runexis.ru/api/numbering_api)
+- Checked: `2026-11-04T21:36:14Z` (Sergey Lependin). Re-read the page before changing free-number sync.
+- Archive only: `/Users/dvpershin/Downloads/Runexis Numbering API.docx` → `raw/Runexis-Numbering-API.docx`
 - Protocol: JSON-RPC 2.0 over POST (`application/x-www-form-urlencoded`, form field `jsonrpc`)
 - Derived: [`../runexis-numbering-api-contract.md`](../runexis-numbering-api-contract.md)
 
@@ -30,7 +32,7 @@
 
 ## Rules
 
-1. Uploaded files win over code, memory, and internet.
-2. For **free / available-for-purchase** numbers, **only** Numbering API DOCX is the method source of truth.
+1. For DIDAPI, the uploaded HTML wins over code and memory. For free numbers, the live Numbering API help page wins over the archived DOCX.
+2. For **free / available-for-purchase** numbers, the method source of truth is the live Numbering API help page. The DOCX is an archive. A field the page does not describe stays as observed on live `search_numbers`.
 3. For **purchased** partner inventory and DIDAPI REST auth/dictionaries, **only** `Runexis.html` applies.
 4. Never call mutating Numbering/DIDAPI number actions from sync or probes (see `.cursor/rules/provider-api-read-only.mdc`).

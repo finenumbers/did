@@ -5,7 +5,7 @@ Nav: [`runexis/SOURCE.md`](runexis/SOURCE.md) · [`runexis-numbering-api-contrac
 Sources:
 
 - DIDAPI REST: [`runexis/raw/Runexis.html`](runexis/raw/Runexis.html) — purchased inventory, Bearer auth, DIDAPI dictionaries.
-- **Free / purchasable catalog (sole method source):** Numbering API DOCX → [`runexis-numbering-api-contract.md`](runexis-numbering-api-contract.md).
+- **Free / purchasable catalog (method source):** [Numbering API help](https://help.runexis.ru/api/numbering_api) → [`runexis-numbering-api-contract.md`](runexis-numbering-api-contract.md).
 
 Live response shape notes marked separately.
 
@@ -55,7 +55,7 @@ Pagination envelope EXAMPLE-CONFIRMED: `meta.total`, `meta.page`, `meta.limit`.
 
 | Inventory | Rule | Evidence |
 |---|---|---|
-| **free** (available for purchase) | **Numbering API** JSON-RPC `search_numbers` with free status filter | Sole source: `Runexis-Numbering-API.docx` / [`runexis-numbering-api-contract.md`](runexis-numbering-api-contract.md). **Not** DIDAPI `management`. |
+| **free** (available for purchase) | **Numbering API** JSON-RPC `search_numbers` with free status filter | Source: [Numbering API help](https://help.runexis.ru/api/numbering_api) / [`runexis-numbering-api-contract.md`](runexis-numbering-api-contract.md). **Not** DIDAPI `management`. |
 | **purchased** | DIDAPI `GET api/v1/numbers/management`, `status.mnemonic != "free"` | Title «Список номеров партнера»; live: `allocated`, `sump`. |
 
 ### Free numbers — superseded by Numbering API

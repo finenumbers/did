@@ -1,8 +1,12 @@
 # Runexis Numbering API contract (free / purchasable inventory)
 
-**Sole source of truth** for Runexis numbers available for purchase (product «свободные»):  
-[`runexis/raw/Runexis-Numbering-API.docx`](runexis/raw/Runexis-Numbering-API.docx)  
+**Source of truth** for Runexis numbers available for purchase (product «свободные»):  
+[https://help.runexis.ru/api/numbering_api](https://help.runexis.ru/api/numbering_api)  
+Checked `2026-11-04T21:36:14Z`. The page changes; re-read it before editing this contract.  
+Archive only: [`runexis/raw/Runexis-Numbering-API.docx`](runexis/raw/Runexis-Numbering-API.docx)  
 (text extract: [`runexis/raw/Runexis-Numbering-API.txt`](runexis/raw/Runexis-Numbering-API.txt))
+
+The public page lists `connect`, `search_numbers`, `search_numbers_count`, `get_regions`, `get_city_codes`, and the mutating `reserv_numbers`, `book_numbers`, `sell_numbers`, `install_numbers`, `return_numbers`. Methods that exist only in the DOCX are not part of the current public contract. The page does not describe the number object beyond `display_mask`; live `search_numbers` fields stay in the mapping below.
 
 DIDAPI HTML (`Runexis.html`) is **not** used for free-for-sale catalog methods.
 

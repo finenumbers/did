@@ -11,6 +11,7 @@ from app.modules.sync_engine.modes import SyncMode
 from app.modules.sync_engine.service import SyncService
 from app.providers.dto.common import ConnectionConfig, SyncResult
 from app.providers.dto.numbers import NormalizedNumber
+from app.providers.errors import ProviderTransportError
 
 
 def _number(key: str) -> NormalizedNumber:
@@ -175,3 +176,78 @@ def test_refused_free_wipe_still_loads_purchased(monkeypatch):
     assert any(phase == "free" and event == "fail" for phase, event, _detail in events)
     assert persisted == ["purchased"]
     assert "Refusing wipe" in stats["_fatal_error"]
+
+
+def test_free_transport_error_still_loads_purchased(monkeypatch):
+    class _BoomFree(_Adapter):
+        async def sync_free_numbers(self, connection, **kwargs):
+            self.calls.append("free")
+            raise ProviderTransportError("Runexis Numbering HTTP 502: bad gateway")
+
+    purchased = SyncResult(fetched=1, parsed=1, items=[_number("79001234567")])
+    adapter_holder: dict[str, _BoomFree] = {}
+
+    def _run_boom():
+        monkeypatch.setattr(
+            "app.modules.sync_engine.service.build_city_lookup",
+            lambda db, code: {},
+        )
+        monkeypatch.setattr(
+            "app.modules.sync_engine.service.count_present_numbers",
+            lambda *args, **kwargs: 0,
+        )
+        monkeypatch.setattr(
+            "app.modules.sync_engine.service.log_job", lambda *args, **kwargs: None
+        )
+        monkeypatch.setattr(
+            "app.modules.sync_engine.service.record_number_drops",
+            lambda *args, **kwargs: None,
+        )
+        monkeypatch.setattr(
+            "app.modules.sync_engine.service.preserve_operators_on_numbers",
+            lambda *args, **kwargs: 0,
+        )
+        persisted: list[str] = []
+
+        def _persist(*args, **kwargs):
+            persisted.append(kwargs["inventory_kind"].value)
+            return {"upserted": 1}
+
+        monkeypatch.setattr(
+            "app.modules.sync_engine.service.persist_novofon_numbers",
+            _persist,
+        )
+        monkeypatch.setattr(
+            "app.modules.sync_engine.service._throttled_persist_progress",
+            lambda *args, **kwargs: (lambda *a, **k: None),
+        )
+        events: list[tuple[str, str, str]] = []
+
+        async def _hook(phase, event, detail="", **kwargs):
+            events.append((phase, event, detail))
+
+        adapter = _BoomFree(SyncResult(fetched=0, parsed=0, items=[]), purchased)
+        adapter_holder["adapter"] = adapter
+        stats = asyncio.run(
+            SyncService(db=SimpleNamespace(commit=lambda: None))._execute(
+                job=SimpleNamespace(id=uuid.uuid4()),
+                provider=SimpleNamespace(code=ProviderCode.novofon, id=uuid.uuid4()),
+                adapter=adapter,
+                connection=ConnectionConfig(base_url="https://example.test", auth_settings={}),
+                mode=SyncMode.full,
+                stats={"mode": "full", "limitations": [], "categories": {}},
+                phase_hook=_hook,
+            )
+        )
+        return stats, events, persisted
+
+    stats, events, persisted = _run_boom()
+    assert adapter_holder["adapter"].calls == ["free", "purchased"]
+    assert any(
+        phase == "free" and event == "fail" and "502" in detail
+        for phase, event, detail in events
+    )
+    assert any(phase == "purchased" and event == "end" for phase, event, _detail in events)
+    assert persisted == ["purchased"]
+    assert "502" in stats["_fatal_error"]
+    assert stats.get("_free_cutover_committed") is not True

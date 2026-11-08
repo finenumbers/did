@@ -3,7 +3,7 @@
 Sources:
 
 - Purchased / DIDAPI: `runexis/raw/Runexis.html` + `runexis-contract.md`
-- Free / purchasable: `runexis/raw/Runexis-Numbering-API.docx` + `runexis-numbering-api-contract.md` (**sole** method source for free)
+- Free / purchasable: [Numbering API help](https://help.runexis.ru/api/numbering_api) (checked `2026-11-04T21:36:14Z`) + `runexis-numbering-api-contract.md`. The DOCX is an archive. Live `search_numbers` item fields stay when the page does not list them.
 
 ## Inventory categories
 

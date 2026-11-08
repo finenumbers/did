@@ -1,4 +1,4 @@
-"""Runexis orchestrator. Docs: Runexis.html + Runexis-Numbering-API.docx."""
+"""Runexis orchestrator. Docs: Runexis.html + https://help.runexis.ru/api/numbering_api."""
 
 from __future__ import annotations
 
@@ -204,7 +204,7 @@ class RunexisProvider(AbstractProvider):
         return mapped, unmapped_raw
 
     async def sync_free_numbers(self, connection: ConnectionConfig, **kwargs: Any) -> SyncResult:
-        # VERIFIED sole source: Numbering API search_numbers (Runexis-Numbering-API.docx)
+        # VERIFIED: Numbering API search_numbers (https://help.runexis.ru/api/numbering_api)
         if not self._has_numbering_auth(connection):
             raise ProviderAuthError(
                 "Runexis free sync requires numbering_login and numbering_password "

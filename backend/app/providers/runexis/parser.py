@@ -248,7 +248,7 @@ def parse_numbering_search_items(items: list[Any]) -> list[ParsedNumberItem]:
     """
     Parse Numbering API search_numbers result list.
     Item schema is sparse in DOCX — flexible extraction; preserve raw.
-    Doc: Runexis-Numbering-API.docx / runexis-numbering-api-contract.md
+    Doc: https://help.runexis.ru/api/numbering_api / runexis-numbering-api-contract.md
     """
     out: list[ParsedNumberItem] = []
     for raw_item in items:

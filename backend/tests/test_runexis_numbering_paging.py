@@ -304,6 +304,23 @@ def _pin_page(limit: int, concurrency: int):
     return orig_limit, orig_conc
 
 
+def _quiet_retries():
+    orig = (
+        runexis_contract.NUMBERING_RETRY_BACKOFF_SECONDS,
+        runexis_contract.NUMBERING_RETRY_STAGGER_SECONDS,
+    )
+    runexis_contract.NUMBERING_RETRY_BACKOFF_SECONDS = 0
+    runexis_contract.NUMBERING_RETRY_STAGGER_SECONDS = 0
+    return orig
+
+
+def _restore_retries(orig: tuple[float, float]) -> None:
+    (
+        runexis_contract.NUMBERING_RETRY_BACKOFF_SECONDS,
+        runexis_contract.NUMBERING_RETRY_STAGGER_SECONDS,
+    ) = orig
+
+
 def test_transport_error_does_not_restart_with_fallback_filter():
     """A timed-out or 502 page must not call count again or switch filters."""
     limit = 20
@@ -313,6 +330,7 @@ def test_transport_error_does_not_restart_with_fallback_filter():
         def __init__(self):
             super().__init__({0: [full]}, count_hint=400)
             self.count_filters: list[dict] = []
+            self.failed_attempts = 0
 
         async def search_numbers_count(self, filters: dict) -> int:  # type: ignore[override]
             self.count_filters.append(dict(filters))
@@ -320,19 +338,84 @@ def test_transport_error_does_not_restart_with_fallback_filter():
 
         async def _fetch_page(self, filters, *, offset: int, limit: int):
             if offset > 0:
+                self.failed_attempts += 1
                 raise ProviderTransportError("Runexis Numbering HTTP 502: bad gateway")
             return await super()._fetch_page(filters, offset=offset, limit=limit)
 
     client = _Boom()
     _bind_offline(client)
     orig = _pin_page(limit, 1)
+    quiet = _quiet_retries()
     try:
         with pytest.raises(ProviderTransportError, match="parallel page failed"):
             asyncio.run(client.list_all_free_numbers())
     finally:
         runexis_contract.NUMBERING_PAGE_LIMIT, runexis_contract.NUMBERING_FETCH_CONCURRENCY = orig
+        _restore_retries(quiet)
 
     assert client.count_filters == [dict(runexis_contract.NUMBERING_FREE_FILTER_PRIMARY)]
+    # First shot plus two retries. The free list is not returned.
+    assert client.failed_attempts == 3
+
+
+def test_transport_error_retries_same_offset_and_keeps_earlier_page():
+    """A 502 on one offset is retried in place. Page 0 is not fetched again."""
+    limit = 20
+    full = [{"n": i, "access_state": "free"} for i in range(limit)]
+    tail = [{"n": i, "access_state": "free"} for i in range(limit, limit + 3)]
+
+    class _Once(ScriptedNumberingClient):
+        def __init__(self):
+            super().__init__({0: [full], limit: [tail]}, count_hint=400)
+            self.count_filters: list[dict] = []
+            self.fails_left = 1
+
+        async def search_numbers_count(self, filters: dict) -> int:  # type: ignore[override]
+            self.count_filters.append(dict(filters))
+            return await super().search_numbers_count(filters)
+
+        async def _fetch_page(self, filters, *, offset: int, limit: int):
+            if offset > 0 and self.fails_left:
+                self.fails_left -= 1
+                self.fetch_log.append((offset, limit))
+                raise ProviderTransportError("Runexis Numbering HTTP 502: bad gateway")
+            return await super()._fetch_page(filters, offset=offset, limit=limit)
+
+    client = _Once()
+    _bind_offline(client)
+    orig = _pin_page(limit, 1)
+    quiet = _quiet_retries()
+    try:
+        items, _envs, meta = asyncio.run(client.list_all_free_numbers())
+    finally:
+        runexis_contract.NUMBERING_PAGE_LIMIT, runexis_contract.NUMBERING_FETCH_CONCURRENCY = orig
+        _restore_retries(quiet)
+
+    assert len(items) == limit + 3
+    assert client.fetch_log.count((0, limit)) == 1
+    assert client.fetch_log.count((limit, limit)) == 2
+    assert client.count_filters == [dict(runexis_contract.NUMBERING_FREE_FILTER_PRIMARY)]
+    assert meta["filter"] == dict(runexis_contract.NUMBERING_FREE_FILTER_PRIMARY)
+
+
+def test_session_refreshes_after_45_minutes():
+    client = ScriptedNumberingClient({0: [[{"n": 1}]]}, count_hint=1)
+    calls: list[str] = []
+
+    async def _connect_once() -> str:
+        calls.append("connect")
+        client._session_started_at = time.monotonic()
+        client.session_id = "new"
+        return "new"
+
+    client._connect_once = _connect_once  # type: ignore[method-assign]
+    client._session_started_at = time.monotonic() - (
+        runexis_contract.NUMBERING_SESSION_REFRESH_AFTER + 5
+    )
+    client.session_id = "old"
+    asyncio.run(client._refresh_session_if_stale())
+    assert calls == ["connect"]
+    assert client.session_id == "new"
 
 
 def test_auth_error_before_pages_still_uses_fallback_filter():

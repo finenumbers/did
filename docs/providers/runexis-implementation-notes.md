@@ -7,7 +7,7 @@ Nav: [`runexis/SOURCE.md`](runexis/SOURCE.md) · [`runexis-contract.md`](runexis
 | Surface | Base | Auth keys | Product use |
 |---|---|---|---|
 | DIDAPI (Scribe HTML) | `base_url` / `https://didapi.runexis.ru` | `email`, `password` → Bearer `token` | purchased, dictionaries, DIDAPI half of testConnection |
-| Numbering API (DOCX) | `numbering_base_url` / `https://did-api.runexis.ru/` | `numbering_login`, `numbering_password`, optional `numbering_partition` → `numbering_session_id` | **free / purchasable** catalog |
+| Numbering API ([live help](https://help.runexis.ru/api/numbering_api)) | `numbering_base_url` / `https://did-api.runexis.ru/` | `numbering_login`, `numbering_password`, optional `numbering_partition` → `numbering_session_id` | **free / purchasable** catalog |
 
 ## Sync stages
 
@@ -26,7 +26,7 @@ Nav: [`runexis/SOURCE.md`](runexis/SOURCE.md) · [`runexis-contract.md`](runexis
 | testConnection | DIDAPI `GET me` and/or Numbering `connect` when respective creds set |
 | sync regions/cities | DIDAPI |
 | sync purchased | DIDAPI `GET api/v1/numbers/management` exclude free mnemonic |
-| sync free | Numbering `search_numbers` with free filter (`access_state` then fallback `usage_statuses`); parallel pages with early-cancel of higher offsets + sequential verify for completeness |
+| sync free | Numbering `search_numbers` with free filter (`access_state` then fallback `usage_statuses`); parallel pages. A 502/503/504 retries that offset only. A still-failed free list is not written. Purchased DIDAPI still runs. |
 
 ## Settings UI
 

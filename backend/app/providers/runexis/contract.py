@@ -2,13 +2,15 @@
 Runexis machine contract — mirrors docs/providers/runexis-contract.md
 Sources:
 - DIDAPI: docs/providers/runexis/raw/Runexis.html
-- Numbering (free catalog): docs/providers/runexis/raw/Runexis-Numbering-API.docx
+- Numbering (free catalog): https://help.runexis.ru/api/numbering_api
+  (checked 2026-11-04T21:36:14Z). DOCX in docs/providers/runexis/raw/ is an archive.
 """
 
 # VERIFIED: Introduction Base URL (DIDAPI)
 EXAMPLE_BASE_URL = "https://didapi.runexis.ru"
 
-# VERIFIED: Numbering API base (Runexis-Numbering-API.docx)
+# VERIFIED: Numbering API base (https://help.runexis.ru/api/numbering_api)
+NUMBERING_DOC_URL = "https://help.runexis.ru/api/numbering_api"
 NUMBERING_EXAMPLE_BASE_URL = "https://did-api.runexis.ru/"
 NUMBERING_METHOD_CONNECT = "connect"
 NUMBERING_METHOD_SEARCH = "search_numbers"
@@ -29,6 +31,11 @@ NUMBERING_FREE_STATUS_VALUES = frozenset({"free", "0"})
 NUMBERING_PAGE_LIMIT = 20_000
 # Parallel search_numbers pages (all-or-nothing; lower if API rate-limits)
 NUMBERING_FETCH_CONCURRENCY = 6
+# Same offset and filter. Pause is local to Numbering; shared retry.py stays unchanged.
+NUMBERING_RETRY_BACKOFF_SECONDS = 5.0
+NUMBERING_RETRY_STAGGER_SECONDS = 0.75
+# Help page: connect session lasts 1 hour. Refresh before a long retry crosses it.
+NUMBERING_SESSION_REFRESH_AFTER = 45 * 60
 # search_numbers_count is a progress upper bound (API total), not free-list size
 NUMBERING_SOURCE_ENDPOINT = "numbering-api:search_numbers"
 # Numbering search is slow; defaults in TimeoutConfig are too short
@@ -36,8 +43,8 @@ NUMBERING_CONNECT_TIMEOUT = 30.0
 NUMBERING_READ_TIMEOUT = 300.0
 NUMBERING_TOTAL_TIMEOUT = 330.0
 DOC_REFS_NUMBERING_FREE = [
+    "https://help.runexis.ru/api/numbering_api",
     "docs/providers/runexis-numbering-api-contract.md",
-    "docs/providers/runexis/raw/Runexis-Numbering-API.docx",
 ]
 
 # VERIFIED: Authenticating requests
