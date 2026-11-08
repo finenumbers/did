@@ -20,10 +20,9 @@ from app.modules.sync_engine.service import (
 from app.providers.dto.common import ConnectionConfig, SyncResult
 from app.providers.novofon import contract, mapper, parser
 from app.providers.novofon import user_api as user_api_module
-from app.providers.novofon.provider import NovofonProvider, _combine_free
+from app.providers.novofon.provider import NovofonProvider
 from app.providers.novofon.user_api import (
     NovofonUserApi,
-    OrderShop,
     UserApiError,
     UserApiRefusal,
     load_order_shop,
@@ -281,37 +280,6 @@ def test_rub_zero_is_a_price_and_other_currency_is_not():
     assert usd.raw_payload["currency"] == "USD"
 
 
-def test_data_api_row_wins_on_duplicate_msisdn():
-    data = _data_number("74951234567", "100")
-    shop_parsed = parse_shop_number(
-        {"id": "a", "number": "+74951234567", "connect_fee": 1},
-        {"id": "10", "name": "Москва", "currency": "rub", "monthly_fee": 2},
-    )
-    shop_row = mapper.map_number(shop_parsed, inventory_kind=InventoryKind.free)
-    assert shop_row is not None
-    shop = OrderShop(
-        directions=1,
-        raw_count=1,
-        min_per_direction=1,
-        max_per_direction=1,
-        secret_slot="access_token",
-        countries=1,
-        mapped=[shop_row],
-    )
-    result = _combine_free(
-        SyncResult(
-            fetched=1,
-            parsed=1,
-            items=[data],
-            extra_stats={"integrity": {"total_items": 1}, "principal": {"summary": "Клиент"}},
-        ),
-        shop,
-    )
-    assert len(result.items) == 1
-    assert result.items[0].buy_price == Decimal(100)
-    assert result.extra_stats["shop"]["hmac_secret"] == "access_token"
-
-
 def test_stage_note_is_appended_without_becoming_a_warning():
     result = SyncResult(extra_stats={"stage_note": contract.KEY_MISSING_MESSAGE})
     assert _with_stage_note("fetched=1", result) == f"fetched=1. {contract.KEY_MISSING_MESSAGE}"
@@ -341,8 +309,7 @@ def test_missing_key_keeps_data_api_rows(monkeypatch: pytest.MonkeyPatch):
     result = asyncio.run(NovofonProvider().sync_free_numbers(connection))
     assert result.items == [number]
     assert result.warnings == []
-    assert result.extra_stats["shop"] == {"read": False, "reason": "no_key"}
-    assert result.extra_stats["stage_note"] == contract.KEY_MISSING_MESSAGE
+    assert "shop" not in result.extra_stats
     assert "refusal_detail" not in result.extra_stats
     assert auth == {"access_token": "token", "user_id": "15"}
 
@@ -367,7 +334,9 @@ def test_missing_key_and_empty_pool_is_confirmed_empty(monkeypatch: pytest.Monke
     )
     assert result.items == []
     assert result.warnings == []
-    assert contract.KEY_MISSING_MESSAGE in result.extra_stats["empty_suffix"]
+    assert result.extra_stats["empty_suffix"] == (
+        f"{contract.METHOD_AVAILABLE_VIRTUAL_NUMBERS} total_items=0"
+    )
     assert confirmed_empty_slice(
         previous=0,
         incoming=0,
@@ -377,20 +346,67 @@ def test_missing_key_and_empty_pool_is_confirmed_empty(monkeypatch: pytest.Monke
     )
 
 
-def test_shop_refusal_drops_data_api_rows(monkeypatch: pytest.MonkeyPatch):
+def test_free_keeps_data_api_rows_when_api_key_is_set(monkeypatch: pytest.MonkeyPatch):
     number = _data_number("74951234567", "100")
 
     async def _sync(self, connection, **kwargs):
-        return SyncResult(fetched=1, parsed=1, items=[number], extra_stats={"integrity": {"total_items": 1}})
+        return SyncResult(
+            fetched=1,
+            parsed=1,
+            items=[number],
+            extra_stats={"integrity": {"fetched": 1, "total_items": 1}},
+        )
 
-    async def _shop(connection, **kwargs):
-        raise UserApiRefusal("Витрина заказа не дочитана, направление 11 (Тула): down")
+    async def _shop(*args, **kwargs):
+        raise AssertionError("shop")
 
     monkeypatch.setattr(NovofonProvider, "_sync_method", _sync)
-    monkeypatch.setattr("app.providers.novofon.provider.load_order_shop", _shop)
+    monkeypatch.setattr("app.providers.novofon.user_api.load_order_shop", _shop)
+    result = asyncio.run(NovofonProvider().sync_free_numbers(_conn()))
+    assert result.items == [number]
+    assert result.warnings == []
+    assert "refusal_detail" not in result.extra_stats
+
+
+def test_free_short_page_refuses_the_slice(monkeypatch: pytest.MonkeyPatch):
+    number = _data_number("74951234567", "100")
+
+    async def _sync(self, connection, **kwargs):
+        return SyncResult(
+            fetched=1,
+            parsed=1,
+            items=[number],
+            extra_stats={"integrity": {"fetched": 1, "total_items": 4, "total_items_mismatch": True}},
+        )
+
+    monkeypatch.setattr(NovofonProvider, "_sync_method", _sync)
     result = asyncio.run(NovofonProvider().sync_free_numbers(_conn()))
     assert result.items == []
-    assert "направление 11" in result.extra_stats["refusal_detail"]
+    assert result.warnings
+    assert "total_items=4" in result.extra_stats["refusal_detail"]
+    assert confirmed_empty_slice(
+        previous=0,
+        incoming=0,
+        fetched=result.fetched,
+        warnings=result.warnings,
+        integrity=result.extra_stats["integrity"],
+    ) is False
+
+
+def test_free_unmapped_number_refuses_the_slice(monkeypatch: pytest.MonkeyPatch):
+    async def _sync(self, connection, **kwargs):
+        return SyncResult(
+            fetched=1,
+            parsed=0,
+            items=[],
+            unmapped_raw=[{"phone_number": "123"}],
+            extra_stats={"integrity": {"fetched": 1, "total_items": 1}},
+        )
+
+    monkeypatch.setattr(NovofonProvider, "_sync_method", _sync)
+    result = asyncio.run(NovofonProvider().sync_free_numbers(_conn()))
+    assert result.items == []
+    assert "не разобрано номеров=1" in result.extra_stats["refusal_detail"]
 
 
 def test_purchased_does_not_read_the_shop(monkeypatch: pytest.MonkeyPatch):
@@ -405,7 +421,7 @@ def test_purchased_does_not_read_the_shop(monkeypatch: pytest.MonkeyPatch):
     async def _iter(self, method, *, on_progress=None):
         return [], [], {"method": method, "fetched": 0, "total_items": 0, "limits": {}}
 
-    monkeypatch.setattr("app.providers.novofon.provider.load_order_shop", _shop)
+    monkeypatch.setattr("app.providers.novofon.user_api.load_order_shop", _shop)
     monkeypatch.setattr("app.providers.novofon.provider.load_owned_numbers", _owned)
     monkeypatch.setattr("app.providers.novofon.client.NovofonClient.iter_all", _iter)
     monkeypatch.setattr(

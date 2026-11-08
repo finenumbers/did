@@ -7,7 +7,7 @@ Nav: [`novofon/SOURCE.md`](novofon/SOURCE.md) · [`novofon-contract.md`](novofon
 | Key | Purpose |
 |---|---|
 | `access_token` | The only key on the Novofon 2.0 API screen. Data API token. Also the HMAC secret when `api_secret` is empty |
-| `api_key` | Optional Key from an older cabinet that still shows Key and Secret. Blank save does not delete it. Absent Key does not fail the free stage |
+| `api_key` | Optional Key from an older cabinet that still shows Key and Secret. Blank save does not delete it. Used only for the purchased cabinet list. Absent Key does not fail the free stage |
 | `api_secret` | Optional User API HMAC secret. Blank save does not delete it. Blank value means `access_token` |
 | `user_id` | Agent customer user `id` from `get.customer_users`. Blank save deletes the stored value. Ignored on a client key and never sent to the User API |
 
@@ -18,7 +18,7 @@ Product does **not** call `login.user`.
 | Stage id | Phase |
 |---|---|
 | `novofon_dictionaries` | skipped — no regions/cities dictionary |
-| `novofon_free` | Data API connect-pool `get.available_virtual_numbers`, then User API order shop |
+| `novofon_free` | Complete `get.available_virtual_numbers` read. The order shop is not called |
 | `novofon_purchased` | `get.virtual_numbers`, and `GET /v1/direct_numbers/` when `api_key` is set |
 
 Order in the RU run: immediately after UIS and before Finenumbers, so purchased Novofon numbers participate in REG dedup.
@@ -29,7 +29,7 @@ Order in the RU run: immediately after UIS and before Finenumbers, so purchased 
 2. Host `dataapi-jsonrpc.novofon.ru` with Novofon credentials (not UIS).
 3. Empty `access_token` skips the provider (the unified run stays successful). A configured token that fails still marks the run partial.
 4. Page size: free 10000, purchased 1000. Requests are sequential.
-5. Short page is not an early stop while `offset < total_items`. Empty page inside the window with `fetched < total_items` is `total_items_mismatch` (warning, rows kept).
+5. Short page is not an early stop while `offset < total_items`. Empty page inside the window with `fetched < total_items` is `total_items_mismatch`. The free stage refuses that slice and writes nothing. Purchased keeps the warning and the rows already read.
 6. When `total_items` exceeds `100_000 + limit`, refetch by `category` (`usual`, `bronze`, `silver`, `gold`, purchased also `platinum`, plus `= null`). Concatenated length must equal the unfiltered `total_items`. Otherwise `NOVOFON_PAGINATION_TRUNCATED` and no wipe.
 7. `limit_exceeded`: one retry when minute reset is 1–120 seconds. Day limit fails the stage before cutover.
 8. Blank `base_url` falls back to `https://dataapi-jsonrpc.novofon.ru/v2.0`.
@@ -38,7 +38,7 @@ Order in the RU run: immediately after UIS and before Finenumbers, so purchased 
 11. `build_city_lookup("novofon")` is empty. Do not fall through to Runexis cities.
 12. PSTN min cache includes ООО «НОВОФОН-ОС» (`9703126821`). After deploy, load the cache before the next 00:00 Europe/Moscow sync. Zero ranges for this INN block every provider, not only Novofon.
 13. Before number reads, classify the token once per job. `get.customer_users` with `total_items > 0` is an agent: send `user_id` only when filter `id =` finds the stored value, otherwise fail without calling number methods. Code `-32008` on that probe (live mnemonic `component_disabled`, component `dataapi_agent`) means the token is not an agent; number methods are still read without `user_id`. The same code on a number method fails that stage and keeps the server message. A client (`get.account.app_id`) is queried without `user_id`. The stored key is not removed. A confirmed zero stays successful and the stage names the account. An unclassified token is not reported as an empty warehouse.
-14. Free numbers are the Data API connect-pool union the User API order shop (`https://api.novofon.com`, not `base_url`) when `api_key` is set. The shop walks every country, then every direction, then `available` with no mask and no `direction_id`. The Novofon 2.0 cabinet shows one key and no Key field; that key is `access_token`, and generating a new one replaces it. Without `api_key` the shop is not requested, the Data API rows are kept, and the stage text says so. A bad payload, HTTP 501, or any unread country or direction refuses the free slice with `refusal_detail` and writes nothing, including countries already read and a non-empty Data API pool. Purchased still runs. `numbers: []` is an empty direction, not a failure. Zero countries is an empty shop. A real zero (Data API empty, and the shop empty or not requested, no warnings) appends `empty_suffix` to the stage text. Shop prices are stored only for currency `RUB`; `0` is kept. A non-Russian number is stored under `{iso}:{digits}`. Digits that look like `7XXXXXXXXXX` keep `msisdn` empty. The stage does not raise, so a shop refusal does not skip purchased.
+14. Free numbers are a complete `get.available_virtual_numbers` read. The order shop on `https://api.novofon.com` is not called, with or without `api_key`. The slice is written only when `fetched == total_items` and every `phone_number` normalizes to `7XXXXXXXXXX`. A missing total, a short page, or an unmapped row sets `refusal_detail` and writes nothing. `total_items=0` with no warnings is a confirmed empty and the stage names the method and `total_items`. Purchased still runs.
 15. Purchased numbers are `get.virtual_numbers`. With `api_key`, `GET /v1/direct_numbers/` is read as well and its row wins on a shared key. A User API error yields an empty purchased result and a warning, so the Data API rows from that run are not written. A named total that does not match `info` refuses the list. Empty `info` and Data API `total_items=0` is a confirmed empty and the stage names both sources.
 
 ## Test connection
@@ -46,4 +46,4 @@ Order in the RU run: immediately after UIS and before Finenumbers, so purchased 
 1. Require stored `access_token`.
 2. Classify the key the same way as sync. An agent key without a verified `user_id` fails here and does not call the number methods.
 3. For a client key, `get.virtual_numbers` and `get.available_virtual_numbers`, each with `limit=1`. An empty list is success. The message includes the account name and both `total_items`.
-4. Without `api_key` the check stays successful and does not call the User API. With `api_key`, one `GET /v1/direct_numbers/countries/`, then `GET /v1/direct_numbers/country/` for the first `countryCodeIso` only (available numbers are not walked), then `GET /v1/direct_numbers/`. HTTP 501 or a failure of either list makes the check red. Both errors are collected.
+4. Without `api_key` the check stays successful and does not call the User API. With `api_key`, `GET /v1/direct_numbers/` is read. A failure of that list makes the check red. `/v1/direct_numbers/country/` and `available/` are not called.

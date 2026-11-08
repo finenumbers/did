@@ -45,7 +45,7 @@ Read only when `api_key` is set. Union with `get.virtual_numbers` on `provider_n
 
 ## Free order shop (`GET /v1/direct_numbers/available/<DIRECTION_ID>/`)
 
-Union with the Data API pool on `provider_number_key`. The Data API row is kept when both have the same number.
+Sync does not read this method. Free rows come only from `get.available_virtual_numbers`.
 
 | User API field | Catalog / behavior |
 |---|---|

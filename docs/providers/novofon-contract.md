@@ -129,47 +129,25 @@ Before either number method, one classification per provider job:
 | `get.campaign_available_phone_numbers` | Campaign setup, not stock. |
 | `get.available_phone_prefixes` | Site-monitoring report (`prefix`, `prefix_name`). Not linked to VN methods. Example response field is `prefixe`. Not in the permissions table. |
 
-`get.available_virtual_numbers` is the connect-pool (numbers waiting for `enable.virtual_numbers`). A client with nothing waiting receives `total_items=0`. That is not the personal-account order catalog.
+`get.available_virtual_numbers` is the free catalog. Sync stores a read only when `fetched == total_items` and every `phone_number` normalizes to `7XXXXXXXXXX`. `total_items=0` is a complete empty catalog. A missing total, a short page, or an unmapped row writes nothing.
 
-## User API order shop — documentation-derived
+## User API — purchased cabinet
 
-The LK screen «номера для заказа» is the classic User API, the same family as the official client [novofon/user-api-v1](https://github.com/novofon/user-api-v1). Method shapes follow that client's GET calls. Example JSON below is a field sketch, not inventory.
+The free stage does not call the order shop. `GET /v1/direct_numbers/country/` and `GET /v1/direct_numbers/available/<DIRECTION_ID>/` are not part of the published Novofon User API and are not requested during sync or the connection check.
 
 Host is the constant `https://api.novofon.com`. Sync `base_url` stays the Data API host and is not used for these calls. The sandbox URL from the PHP client is not used. TLS verification stays on.
 
 | Call | Role |
 |---|---|
-| `GET /v1/direct_numbers/countries/?language=ru` | Country list. `info[].countryCodeIso` is required. `language` changes names only. |
-| `GET /v1/direct_numbers/country/?country=<iso>&language=ru` | Directions in that country. `country` is `countryCodeIso` as spelled. `direction_id` is not sent. |
-| `GET /v1/direct_numbers/available/<DIRECTION_ID>/` | Numbers available for order. No `offset` / `limit`. `mask` is not sent. |
-| `GET /v1/direct_numbers/` | Already connected numbers. Purchased only. Not the order shop. |
-
-Every country is walked, then every direction, then `available` with no query. Zero countries is an empty shop. A country with no directions is empty and the walk continues. `numbers: []` is an empty direction and the walk continues. A missing `countryCodeIso`, a missing `numbers` key, a non-array `numbers`, `status` other than `success`, or any other failure (including HTTP 501) refuses the whole free slice. Already-read countries are not written, and the Data API pool is not written either. HTTP 501 is not a successful empty.
-
-`DIRECTION_ID` must match `^[A-Za-z0-9]+$`. Anything else cancels the free slice before that direction is requested.
+| `GET /v1/direct_numbers/` | Already connected numbers. Purchased only, and only when `api_key` is set. |
 
 Auth header: `Authorization: {Key}:{base64(hex HMAC-SHA1)}`. The signed string is `method + query + md5(query)` with query keys sorted and encoded like PHP `http_build_query` (`PHP_QUERY_RFC1738`). `method` includes the `/v1/.../` path. `format` is not added. Key is settings `api_key`. The HMAC secret is `api_secret` when set, otherwise the Data API `access_token` (Novofon's CRM guide calls that Secret the Data API token; this is not a captured handshake). One attempt. A rejected signature does not try the other slot. `user_id` is not sent.
 
-The free slice is the Data API connect-pool union this shop. Data API wins on a duplicate key. A Russian number (`countryCodeIso` `ru`, or a Russia label when the owned list has no ISO) is keyed `7XXXXXXXXXX`. Any other country is keyed `{iso or country name}:{digits}` and is not passed through the global `8`/`10`-digit prefix. If those digits match `7` plus ten digits, `msisdn` stays empty so the ABC directory does not assign a Russian city; the visible number is `number_local`. Shop `buy_price` / `period_price` come from the number's `connect_fee` / `monthly_fee` when present, otherwise from the direction. `0` is a real price. Prices are stored only when `currency` is `RUB` (any case). For a non-Russian row, direction `name` is the city and the country name is the region. The opaque number `id` stays in `raw_payload`. An empty number or a duplicate key refuses the whole shop.
-
-There is no documented page size. The catalog stores the returned `numbers` arrays and does not scan `mask`. If any country or direction fails, the free slice is refused and neither source is written. The Novofon 2.0 cabinet does not show Key or Secret: it shows one permanent key, already stored as `access_token`. Without `api_key` the shop is not called, the Data API result is kept, and the stage text says the shop was not requested.
-
-When `api_key` is set, purchased numbers are `get.virtual_numbers` union `GET /v1/direct_numbers/`. `type` `common` and `order` both stay purchased. The cabinet row supplies price and place; the Data API payload is nested under `raw_payload.data_api`. `monthly_fee` becomes `period_price` only when `currency` is `RUB`, including `0`. `buy_price` stays empty. `description` stays in `raw_payload` and, for a non-Russian row, is the city. A User API error returns no rows and a warning, so a later non-empty Data API pool cannot replace a cabinet list that was not read. If the body names `total`, `count`, or `total_items` and that value is not the length of `info`, the list is refused. Empty `info` together with Data API `total_items=0` is a confirmed empty. Without `api_key`, purchased stays on the Data API only.
+When `api_key` is set, purchased numbers are `get.virtual_numbers` union `GET /v1/direct_numbers/`. `type` `common` and `order` both stay purchased. The cabinet row supplies price and place; the Data API payload is nested under `raw_payload.data_api`. `monthly_fee` becomes `period_price` only when `currency` is `RUB`, including `0`. `buy_price` stays empty. `description` stays in `raw_payload` and, for a non-Russian row, is the city. A User API error returns no rows and a warning, so a later non-empty Data API pool cannot replace a cabinet list that was not read. If the body names `total`, `count`, or `total_items` and that value is not the length of `info`, the list is refused. Empty `info` together with Data API `total_items=0` is a confirmed empty. Without `api_key`, purchased stays on the Data API only. A Russian cabinet number (`country` is Russia / Россия / RU, or the label is empty and the number normalizes) is keyed `7XXXXXXXXXX`. Any other country is keyed `{country}:{digits}` and is not passed through the global `8`/`10`-digit prefix. If those digits match `7` plus ten digits, `msisdn` stays empty.
 
 Not called: `POST /v1/direct_numbers/order/`, `POST /v1/direct_numbers/prolong/`, any PUT, per-number `GET /v1/direct_numbers/number/`.
 
-Rate limit headers `X-RateLimit-Remaining` and `X-RateLimit-Reset` (unix time) are read the same way as the official client. Remaining `0` waits only when reset is inside 120 seconds. With no headers, `available` calls are spaced by 1.2 seconds. `429` and a connect/read timeout are retried once. Authorization and other HTTP errors are not retried. Connect timeout 10s, read timeout 30s.
-
-```json
-{
-  "status": "success",
-  "numbers": [
-    {"id": "1712p0D1643D0t42r198658", "direction_id": 13755, "number": "+74950000001"}
-  ]
-}
-```
-
-Direction fees (`connect_fee`, `monthly_fee`, `currency`) are on `GET /v1/direct_numbers/country/`, not on this number object, unless the number object itself carries them.
+Rate limit headers `X-RateLimit-Remaining` and `X-RateLimit-Reset` (unix time) are read the same way as the official client. Remaining `0` waits only when reset is inside 120 seconds. `429` and a connect/read timeout are retried once. Authorization and other HTTP errors are not retried. Connect timeout 10s, read timeout 30s.
 
 ## Limits — partial
 

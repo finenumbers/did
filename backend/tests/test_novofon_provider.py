@@ -15,7 +15,6 @@ from app.providers.errors import ProviderAuthError, ProviderError, ProviderParse
 from app.providers.novofon import contract, mapper, parser
 from app.providers.novofon.client import NovofonClient, NovofonPrincipal
 from app.providers.novofon.provider import NovofonProvider
-from app.providers.novofon.user_api import UserApiError
 from app.providers.retry import RetryPolicy
 
 
@@ -612,7 +611,7 @@ def test_connection_reports_failure_without_number_calls():
     assert "нужен user_id" in result.message
 
 
-def test_connection_fails_when_the_country_method_returns_501():
+def test_connection_reads_the_cabinet_and_does_not_call_the_shop():
     import app.providers.novofon.provider as provider_module
 
     provider = NovofonProvider()
@@ -627,14 +626,10 @@ def test_connection_fails_when_the_country_method_returns_501():
             pass
 
         async def countries(self):
-            return [{"countryCodeIso": "DE", "name": "Germany"}, {"countryCodeIso": "FR"}]
+            raise AssertionError("countries")
 
         async def directions(self, iso: str):
-            assert iso == "DE"
-            probed.append("country")
-            raise UserApiError(
-                "User API HTTP 501 (/v1/direct_numbers/country/): Method not implemented"
-            )
+            raise AssertionError(iso)
 
         async def owned(self):
             probed.append("owned")
@@ -658,10 +653,11 @@ def test_connection_fails_when_the_country_method_returns_501():
         provider_module.NovofonUserApi = original_api  # type: ignore[misc]
         NovofonClient.resolve_principal = original_resolve  # type: ignore[method-assign]
         NovofonClient.get_page = original_page  # type: ignore[method-assign]
-    assert result.ok is False
-    assert "501" in result.message
+    assert result.ok is True
+    assert "501" not in result.message
     assert "номеров=1" in result.message
-    assert probed == ["country", "owned"]
+    assert probed == ["owned"]
+    assert result.details["owned"] == 1
 
 
 @pytest.mark.parametrize(
