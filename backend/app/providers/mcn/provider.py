@@ -214,16 +214,20 @@ class McnProvider(AbstractProvider):
             await emit_progress(
                 on_progress,
                 f"MCN free country-wide totalNumbers={country_total}",
+                len(country_items),
+                country_total,
             )
-            # Restart full country pagination (include first page)
             items, envs, meta = await client.iter_numbers_slice(
                 city_id=None,
                 expected_count=country_total,
                 on_progress=on_progress,
                 label="RU",
+                seed_items=country_items,
+                seed_total=country_total,
+                seed_envelope=env0,
             )
-            # iter starts from page 1 again — fine
             all_items.extend(items)
+            envelopes = [env_cities]
             envelopes.extend(envs)
             slice_metas.append(meta)
         else:

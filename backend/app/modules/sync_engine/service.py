@@ -819,6 +819,7 @@ class SyncService:
                     log_job(
                         self.db, job.id, SyncLogLevel.info, f"Purchased numbers {purch_detail}"
                     )
+                    stats["_purchased_cutover_committed"] = True
                     self.db.commit()
                     await _hook("purchased", "end", purch_detail)
                 else:
@@ -947,6 +948,7 @@ class SyncService:
                         if result.extra_stats:
                             purch_block.update(result.extra_stats)
                         stats["categories"]["purchased_numbers"] = purch_block
+                        stats["_purchased_cutover_committed"] = True
                         purch_detail = _number_reload_detail(
                             fetched=fetched,
                             parsed=parsed,

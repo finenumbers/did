@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Any
+from uuid import UUID
 
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
@@ -129,10 +131,46 @@ FROM upd
 """
 
 
-def apply_geographic_from_regions(db: Session) -> dict[str, int]:
+def geographic_update_sql(
+    *,
+    provider_id: UUID | None = None,
+    inventory_kinds: tuple[Any, ...] | None = None,
+) -> tuple[str, dict[str, Any]]:
+    """Full-catalog SQL stays unchanged when no single-source filter is passed."""
+    extra = ""
+    params: dict[str, Any] = {}
+    if provider_id is not None:
+        extra += "\n    AND n.provider_id = :provider_id"
+        params["provider_id"] = provider_id
+    if inventory_kinds:
+        extra += "\n    AND n.inventory_kind::text IN :inventory_kinds"
+        params["inventory_kinds"] = [
+            kind.value if hasattr(kind, "value") else str(kind) for kind in inventory_kinds
+        ]
+    needle = "    AND substring(n.msisdn FROM 2 FOR 3) <> '800'\n"
+    if needle not in _GEO_UPDATE_SQL:
+        raise RuntimeError("geographic SQL anchor missing")
+    sql = _GEO_UPDATE_SQL.replace(needle, needle.rstrip("\n") + extra + "\n", 1)
+    return sql, params
+
+
+def apply_geographic_from_regions(
+    db: Session,
+    *,
+    provider_id: UUID | None = None,
+    inventory_kinds: tuple[Any, ...] | None = None,
+) -> dict[str, int]:
     """Rewrite present geographic catalog rows from regions_directory. One SQL pass."""
     directory_n = int(db.scalar(select(func.count()).select_from(RegionsDirectory)) or 0)
-    row = db.execute(text(_GEO_UPDATE_SQL)).one()
+    sql, params = geographic_update_sql(
+        provider_id=provider_id, inventory_kinds=inventory_kinds
+    )
+    stmt = text(sql)
+    if inventory_kinds:
+        from sqlalchemy import bindparam
+
+        stmt = stmt.bindparams(bindparam("inventory_kinds", expanding=True))
+    row = db.execute(stmt, params).one()
     matched = int(row.matched or 0)
     reset = int(row.reset or 0)
     return {

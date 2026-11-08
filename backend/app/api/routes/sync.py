@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -29,6 +29,7 @@ from app.schemas.sync import (
     SyncProgressOut,
     SyncRunOut,
     SyncStageOut,
+    SyncStartIn,
 )
 
 router = APIRouter(tags=["Sync"])
@@ -66,6 +67,7 @@ def _run_out(run: SyncRun) -> SyncRunOut:
         progress=SyncProgressOut(
             current_stage_id=progress.get("current_stage_id"),
             stages=stages,
+            scope_provider=(progress.get("scope") or {}).get("provider"),
         ),
         stats=run.stats or {},
         error_summary=run.error_summary,
@@ -79,8 +81,12 @@ def _run_out(run: SyncRun) -> SyncRunOut:
     response_model=SyncRunOut,
     summary="Start unified sync of all providers",
 )
-def start_unified_sync(db: Session = Depends(get_db)) -> SyncRunOut:
-    run = create_run(db, triggered_by="api")
+def start_unified_sync(
+    payload: SyncStartIn | None = Body(default=None),
+    db: Session = Depends(get_db),
+) -> SyncRunOut:
+    provider = payload.provider if payload is not None else None
+    run = create_run(db, triggered_by="api", provider=provider)
     spawn_unified_run(run.id)
     return _run_out(run)
 

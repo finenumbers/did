@@ -350,11 +350,14 @@ export default function SyncPage() {
     }
   };
 
-  const startSync = async () => {
+  const startSync = async (provider?: string) => {
     setStarting(true);
     setError(null);
     try {
-      const started = await apiFetch<SyncRun>("/api/v1/sync/start", { method: "POST" });
+      const started = await apiFetch<SyncRun>("/api/v1/sync/start", {
+        method: "POST",
+        body: provider ? JSON.stringify({ provider }) : undefined,
+      });
       setRun(started);
       setLogs([]);
       void loadLogs(started.id);
@@ -384,7 +387,7 @@ export default function SyncPage() {
   return (
     <>
       <div className="filters">
-        <button onClick={startSync} disabled={!canStart} title={cacheHint || undefined}>
+        <button onClick={() => void startSync()} disabled={!canStart} title={cacheHint || undefined}>
           {starting ? "Запуск…" : isActive ? "Синхронизация…" : "Синхронизация"}
         </button>
         <button
@@ -434,6 +437,11 @@ export default function SyncPage() {
             <span className={`badge ${statusBadgeClass(run.status)}`}>
               {statusLabel(run.status)}
             </span>
+            {` · ${
+              run.progress.scope_provider
+                ? `источник ${run.progress.scope_provider}`
+                : "все источники"
+            }`}
             {` · ${triggeredByLabel(run.triggered_by)}`}
             {run.started_at ? ` · ${new Date(run.started_at).toLocaleString()}` : ""}
           </span>
@@ -470,7 +478,11 @@ export default function SyncPage() {
                 )}
               </div>
             )}
-            {groups.map(({ group, stages }) => (
+            {groups.map(({ group, stages }) => {
+              const providerCode = stages[0]?.id.match(
+                /^(sipout|runexis|uis|novofon|aurora|exolve|voximplant|mcn|finenumbers)_/,
+              )?.[1];
+              return (
               <div key={group} className="sync-stages-group" style={{ marginBottom: "1rem" }}>
                 <div
                   style={{
@@ -478,9 +490,21 @@ export default function SyncPage() {
                     marginBottom: "0.4rem",
                     color: "var(--muted)",
                     fontSize: "0.85rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.6rem",
                   }}
                 >
-                  {group}
+                  <span>{group}</span>
+                  {providerCode && (
+                    <button
+                      className="secondary"
+                      disabled={!canStart}
+                      onClick={() => void startSync(providerCode)}
+                    >
+                      Запустить
+                    </button>
+                  )}
                 </div>
                 <table className="sync-stages-table">
                   <thead>
@@ -514,7 +538,8 @@ export default function SyncPage() {
                   </tbody>
                 </table>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           {inventorySummary.length > 0 && (

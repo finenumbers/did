@@ -11,6 +11,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Session, load_only
 
 from app.models.catalog import NumbersCatalogNormalized
+from app.models.enums import InventoryKind
 from app.models.mask_types import MaskType
 from app.modules.catalog.beauty_mask import beauty_mask, digits_only
 
@@ -109,7 +110,12 @@ def _values_changed(current: MaskTypeValues, new: MaskTypeValues) -> bool:
     )
 
 
-def apply_mask_types(db: Session) -> dict[str, int]:
+def apply_mask_types(
+    db: Session,
+    *,
+    provider_id: UUID | None = None,
+    inventory_kinds: tuple[InventoryKind, ...] | None = None,
+) -> dict[str, int]:
     rows = db.scalars(select(MaskType)).all()
     index = build_mask_type_index(list(rows))
     stmt = (
@@ -128,6 +134,10 @@ def apply_mask_types(db: Session) -> dict[str, int]:
         .where(NumbersCatalogNormalized.is_currently_present.is_(True))
         .execution_options(yield_per=_BATCH, stream_results=True)
     )
+    if provider_id is not None:
+        stmt = stmt.where(NumbersCatalogNormalized.provider_id == provider_id)
+    if inventory_kinds:
+        stmt = stmt.where(NumbersCatalogNormalized.inventory_kind.in_(tuple(inventory_kinds)))
 
     pending: list[tuple[UUID, str | None, Decimal | None, Decimal | None]] = []
     scanned = 0

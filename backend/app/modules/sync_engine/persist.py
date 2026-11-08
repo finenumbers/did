@@ -1344,6 +1344,7 @@ def apply_rtu_connected_flags(
     *,
     reg_keys: set[str],
     reg_clients: dict[str, str] | None = None,
+    provider_id: uuid.UUID | None = None,
 ) -> dict[str, int]:
     """Set rtu_connected on all present purchased rows.
 
@@ -1358,14 +1359,17 @@ def apply_rtu_connected_flags(
     from app.models.providers import Provider
     from app.providers.finenumbers import contract
 
-    rows = db.execute(
-        select(NumbersCatalogNormalized, Provider.code).join(
-            Provider, Provider.id == NumbersCatalogNormalized.provider_id
-        ).where(
+    rows_stmt = (
+        select(NumbersCatalogNormalized, Provider.code)
+        .join(Provider, Provider.id == NumbersCatalogNormalized.provider_id)
+        .where(
             NumbersCatalogNormalized.inventory_kind == InventoryKind.purchased,
             NumbersCatalogNormalized.is_currently_present.is_(True),
         )
-    ).all()
+    )
+    if provider_id is not None:
+        rows_stmt = rows_stmt.where(NumbersCatalogNormalized.provider_id == provider_id)
+    rows = db.execute(rows_stmt).all()
     own = 0
     external = 0
     not_connected = 0

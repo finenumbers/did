@@ -14,7 +14,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.db import SessionLocal, dispose_engine_pool
-from app.models.enums import ProviderCode, SyncJobStatus, SyncJobType, SyncLogLevel
+from app.models.enums import InventoryKind, ProviderCode, SyncJobStatus, SyncJobType, SyncLogLevel
 from app.models.providers import Provider
 from app.models.sync import SyncJob, SyncRun
 from app.modules.sync_engine.dropped_export import (
@@ -196,11 +196,47 @@ def get_latest_run(db: Session) -> SyncRun | None:
     return db.scalars(select(SyncRun).order_by(SyncRun.created_at.desc()).limit(1)).first()
 
 
-def create_run(db: Session, *, triggered_by: str = "api") -> SyncRun:
+def normalize_sync_provider(provider: str | None) -> str | None:
+    """None means the full sync. Any other value must be one catalog source."""
+    if provider is None or str(provider).strip() == "":
+        return None
+    code = str(provider).strip().lower()
+    allowed = {item.value for item in PROVIDER_ORDER}
+    if code not in allowed:
+        raise ProviderError(
+            f"Неизвестный источник синхронизации: {code}",
+            code="SYNC_UNKNOWN_PROVIDER",
+        )
+    return code
+
+
+def _committed_kinds(stats: dict[str, Any] | None) -> set[str]:
+    flags = stats or {}
+    kinds: set[str] = set()
+    if flags.get("_free_cutover_committed"):
+        kinds.add("free")
+    if flags.get("_purchased_cutover_committed"):
+        kinds.add("purchased")
+    return kinds
+
+
+def _inventory_kinds(kinds: set[str]) -> tuple[InventoryKind, ...]:
+    return tuple(InventoryKind(kind) for kind in sorted(kinds))
+
+
+def create_run(
+    db: Session,
+    *,
+    triggered_by: str = "api",
+    provider: str | None = None,
+) -> SyncRun:
     from sqlalchemy.exc import IntegrityError
 
     from app.modules.pstn_inn_cache.service import require_min_cache_ready
 
+    provider = normalize_sync_provider(provider)
+    if provider and triggered_by == "api":
+        triggered_by = f"api:{provider}"
     require_min_cache_ready(db)
     if get_active_run(db) is not None:
         raise ProviderError(
@@ -210,7 +246,7 @@ def create_run(db: Session, *, triggered_by: str = "api") -> SyncRun:
     run = SyncRun(
         status=SyncJobStatus.pending,
         triggered_by=triggered_by,
-        progress=build_initial_progress(),
+        progress=build_initial_progress(provider=provider),
         stats={},
     )
     db.add(run)
@@ -401,14 +437,30 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
     dropped_meta: dict[str, Any] = {"available": False}
     dropped_written = False
     try:
-        log_run(db, run.id, SyncLogLevel.info, "Unified sync started")
+        scope_provider = normalize_sync_provider(
+            ((run.progress or {}).get("scope") or {}).get("provider")
+        )
+        if scope_provider:
+            log_run(
+                db,
+                run.id,
+                SyncLogLevel.info,
+                f"Individual sync provider={scope_provider}",
+            )
+        else:
+            log_run(db, run.id, SyncLogLevel.info, "Unified sync started")
 
         tracker.begin("prepare", "Проверка подключений провайдеров")
         providers = {
             p.code: p
             for p in db.scalars(select(Provider).options(joinedload(Provider.connection))).all()
         }
-        missing = [c.value for c in PROVIDER_ORDER if c not in providers]
+        provider_order = (
+            tuple(code for code in PROVIDER_ORDER if code.value == scope_provider)
+            if scope_provider
+            else PROVIDER_ORDER
+        )
+        missing = [c.value for c in provider_order if c not in providers]
         if missing:
             tracker.fail("prepare", f"Нет провайдеров в БД: {', '.join(missing)}")
             try:
@@ -424,8 +476,9 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
         provider_ok = 0
         category_stats: dict[str, Any] = {}
         inventory_split_providers: list[str] = []
+        committed_by_provider: dict[str, set[str]] = {}
 
-        for code in PROVIDER_ORDER:
+        for code in provider_order:
             db.refresh(run)
             if run.status not in ACTIVE_STATUSES:
                 raise SyncAborted(
@@ -481,7 +534,7 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
                         "Provider novofon: skipped (нет access_token)",
                     )
                     continue
-            ok = await _sync_provider(
+            ok, committed_kinds = await _sync_provider(
                 db,
                 run=run,
                 tracker=tracker,
@@ -489,6 +542,7 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
                 category_stats=category_stats,
                 inventory_split_providers=inventory_split_providers,
             )
+            committed_by_provider[code.value] = committed_kinds
             if ok:
                 provider_ok += 1
             else:
@@ -500,6 +554,14 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
                 run.error_summary
                 or f"Sync run stopped externally (status={run.status.value})"
             )
+
+        write_scope: tuple[Any, set[str]] | str | None = None
+        if scope_provider:
+            kinds = committed_by_provider.get(scope_provider) or set()
+            if not kinds:
+                write_scope = "skip"
+            else:
+                write_scope = (providers[ProviderCode(scope_provider)].id, kinds)
 
         tracker.begin("finalize", "Завершение")
         try:
@@ -567,6 +629,7 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
             tracker=tracker,
             category_stats=category_stats,
             only_missing=False,
+            write_scope=write_scope,
         )
         # Rebuild checksum after enrich so enrich_rows_scanned / enrich_matches_catalog
         # reflect real PSTN stats (including partial-fail details when present).
@@ -594,11 +657,28 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
                 catalog_checksum,
             )
         # RTU depends on post-enrich operator; mask types need final ABC/local after geo.
-        _run_rtu_flags(db, run=run, tracker=tracker, category_stats=category_stats)
-        _run_geographic_from_regions(
-            db, run=run, tracker=tracker, category_stats=category_stats
+        _run_rtu_flags(
+            db,
+            run=run,
+            tracker=tracker,
+            category_stats=category_stats,
+            write_scope=write_scope,
+            scope_provider=scope_provider,
         )
-        _run_mask_types(db, run=run, tracker=tracker, category_stats=category_stats)
+        _run_geographic_from_regions(
+            db,
+            run=run,
+            tracker=tracker,
+            category_stats=category_stats,
+            write_scope=write_scope,
+        )
+        _run_mask_types(
+            db,
+            run=run,
+            tracker=tracker,
+            category_stats=category_stats,
+            write_scope=write_scope,
+        )
         try:
             from app.modules.sync_engine.geo_log_dump import dump_sync_geo_diagnostics
 
@@ -632,7 +712,8 @@ async def _execute_unified_run(db: Session, run_id: uuid.UUID) -> None:
             db,
             run=run,
             tracker=tracker,
-            schedule=status in (SyncJobStatus.success, SyncJobStatus.partial)
+            schedule=write_scope != "skip"
+            and status in (SyncJobStatus.success, SyncJobStatus.partial)
             and provider_ok > 0,
         )
         db.refresh(run)
@@ -693,7 +774,7 @@ async def _sync_provider(
     provider: Provider,
     category_stats: dict[str, Any],
     inventory_split_providers: list[str],
-) -> bool:
+) -> tuple[bool, set[str]]:
     code = provider.code
     adapter = get_provider(code)
     caps = adapter.capabilities()
@@ -769,11 +850,13 @@ async def _sync_provider(
     except ProviderCapabilityLimitedError as exc:
         log_run(db, run.id, SyncLogLevel.error, f"{code.value}: capability limited: {exc}")
         _fail_remaining_provider_stages(db, tracker, code.value, str(exc))
-        return False
+        db.refresh(job)
+        return False, _committed_kinds(job.stats)
     except Exception as exc:
         log_run(db, run.id, SyncLogLevel.error, f"{code.value}: {exc}")
         _fail_remaining_provider_stages(db, tracker, code.value, str(exc))
-        return False
+        db.refresh(job)
+        return False, _committed_kinds(job.stats)
 
     db.refresh(run)
     category_stats[code.value] = (job.stats or {}).get("categories") or {}
@@ -790,7 +873,7 @@ async def _sync_provider(
         _fail_remaining_provider_stages(
             db, tracker, code.value, job.error_summary or "failed"
         )
-        return False
+        return False, _committed_kinds(job.stats)
 
     _skip_pending_dict_purchased(
         db,
@@ -802,10 +885,10 @@ async def _sync_provider(
 
     if job.status == SyncJobStatus.partial:
         log_run(db, run.id, SyncLogLevel.warning, f"{code.value} completed with limitations")
-        return True
+        return True, _committed_kinds(job.stats)
 
     log_run(db, run.id, SyncLogLevel.info, f"{code.value} completed status={job.status.value}")
-    return True
+    return True, _committed_kinds(job.stats)
 
 
 def _fail_remaining_provider_stages(
@@ -832,6 +915,16 @@ def _fail_remaining_provider_stages(
         tracker.fail(sid, detail)
 
 
+def _scope_filter(
+    write_scope: tuple[Any, set[str]] | str | None,
+) -> tuple[Any, tuple[InventoryKind, ...] | None] | None:
+    """None keeps the full catalog. A tuple limits writes to one source."""
+    if write_scope is None or write_scope == "skip":
+        return None
+    provider_id, kinds = write_scope
+    return provider_id, _inventory_kinds(set(kinds))
+
+
 async def _run_operator_enrichment(
     db: Session,
     *,
@@ -839,8 +932,13 @@ async def _run_operator_enrichment(
     tracker: SyncProgressTracker,
     category_stats: dict[str, Any],
     only_missing: bool = False,
+    write_scope: tuple[Any, set[str]] | str | None = None,
 ) -> None:
+    if write_scope == "skip":
+        tracker.skip("operator_enrichment", "номера источника не записаны")
+        return
     tracker.begin("operator_enrichment", "Обогащение PSTN")
+    scope_filter = _scope_filter(write_scope)
     provider = db.scalars(
         select(Provider)
         .options(joinedload(Provider.connection))
@@ -868,11 +966,16 @@ async def _run_operator_enrichment(
 
     try:
         # Operator + GAR city/region (mobile/800). Geographic geo stays empty here.
+        enrich_kwargs: dict[str, Any] = {}
+        if scope_filter is not None:
+            enrich_kwargs["provider_id"] = scope_filter[0]
+            enrich_kwargs["inventory_kinds"] = scope_filter[1]
         enrich_stats = await enrich_catalog_operators(
             db,
             connection=connection,
             on_progress=_on_enrich_progress,
             only_missing=only_missing,
+            **enrich_kwargs,
         )
         category_stats["operator_enrichment"] = enrich_stats
         log_run(
@@ -971,8 +1074,19 @@ def _run_rtu_flags(
     run: SyncRun,
     tracker: SyncProgressTracker,
     category_stats: dict[str, Any],
+    write_scope: tuple[Any, set[str]] | str | None = None,
+    scope_provider: str | None = None,
 ) -> None:
     """Re-apply RTU after enrich even if PSTN failed — batches may already be committed."""
+    if write_scope == "skip":
+        tracker.skip("rtu_flags", "номера источника не записаны")
+        return
+    if write_scope is not None and (
+        scope_provider != ProviderCode.finenumbers.value
+        or "purchased" not in write_scope[1]
+    ):
+        tracker.skip("rtu_flags", "нет REG ключей")
+        return
     fn_cats = category_stats.get("finenumbers")
     purch_stats = (
         fn_cats.get("purchased_numbers") if isinstance(fn_cats, dict) else None
@@ -980,12 +1094,19 @@ def _run_rtu_flags(
     if not isinstance(purch_stats, dict) or "reg_keys" not in purch_stats:
         tracker.skip("rtu_flags", "нет REG ключей")
         return
+    reg_keys = set(purch_stats.get("reg_keys") or [])
+    if write_scope is not None and not reg_keys:
+        tracker.skip("rtu_flags", "нет REG ключей")
+        return
     tracker.begin("rtu_flags", "Флаги РТУ")
     try:
         from app.modules.sync_engine.persist import apply_rtu_connected_flags
 
+        rtu_provider_id = write_scope[0] if isinstance(write_scope, tuple) else None
         rtu_stats = apply_rtu_connected_flags(
-            db, reg_keys=set(purch_stats.get("reg_keys") or [])
+            db,
+            reg_keys=reg_keys,
+            provider_id=rtu_provider_id,
         )
         purch_stats.update(rtu_stats)
         db.commit()
@@ -1018,14 +1139,23 @@ def _run_geographic_from_regions(
     run: SyncRun,
     tracker: SyncProgressTracker,
     category_stats: dict[str, Any],
+    write_scope: tuple[Any, set[str]] | str | None = None,
 ) -> None:
+    if write_scope == "skip":
+        tracker.skip("geographic_from_regions", "номера источника не записаны")
+        return
     tracker.begin("geographic_from_regions", "Разбор городских по справочнику Регионы")
+    scope_filter = _scope_filter(write_scope)
     try:
         from app.modules.catalog.geographic_from_regions import (
             apply_geographic_from_regions,
         )
 
-        geo_stats = apply_geographic_from_regions(db)
+        geo_kwargs: dict[str, Any] = {}
+        if scope_filter is not None:
+            geo_kwargs["provider_id"] = scope_filter[0]
+            geo_kwargs["inventory_kinds"] = scope_filter[1]
+        geo_stats = apply_geographic_from_regions(db, **geo_kwargs)
         db.commit()
         category_stats["geographic_from_regions"] = geo_stats
         log_run(
@@ -1062,14 +1192,23 @@ def _run_mask_types(
     run: SyncRun,
     tracker: SyncProgressTracker,
     category_stats: dict[str, Any],
+    write_scope: tuple[Any, set[str]] | str | None = None,
 ) -> None:
+    if write_scope == "skip":
+        tracker.skip("mask_types", "номера источника не записаны")
+        return
     tracker.begin("mask_types", "Тип и премиум по справочнику Маски и типы")
+    scope_filter = _scope_filter(write_scope)
     try:
         from app.modules.catalog.apply_mask_types import apply_mask_types
         from app.services.mask_types_service import ensure_mask_types_seeded
 
         ensure_mask_types_seeded(db)
-        stats = apply_mask_types(db)
+        mask_kwargs: dict[str, Any] = {}
+        if scope_filter is not None:
+            mask_kwargs["provider_id"] = scope_filter[0]
+            mask_kwargs["inventory_kinds"] = scope_filter[1]
+        stats = apply_mask_types(db, **mask_kwargs)
         db.commit()
         category_stats["mask_types"] = stats
         log_run(

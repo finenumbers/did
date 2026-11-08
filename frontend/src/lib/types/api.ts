@@ -111,6 +111,7 @@ export interface SyncRun {
   progress: {
     current_stage_id: string | null;
     stages: SyncStage[];
+    scope_provider?: string | null;
   };
   stats: Record<string, unknown>;
   error_summary: string | null;

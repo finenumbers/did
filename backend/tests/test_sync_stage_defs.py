@@ -43,3 +43,15 @@ def test_stage_defs_full_provider_matrix():
     progress = build_initial_progress()
     assert [s["id"] for s in progress["stages"]] == ids
     assert progress["stages"][1]["id"] == "sipout_dictionaries"
+    assert progress["scope"] == {"provider": None}
+
+    one = build_initial_progress(provider="mcn")
+    one_ids = [s["id"] for s in one["stages"]]
+    assert one_ids[0] == "prepare"
+    assert "mcn_dictionaries" in one_ids
+    assert "mcn_free" in one_ids
+    assert "mcn_purchased" in one_ids
+    assert "sipout_free" not in one_ids
+    assert "runexis_free" not in one_ids
+    assert one_ids[-6:] == list(_TAIL)
+    assert one["scope"] == {"provider": "mcn"}

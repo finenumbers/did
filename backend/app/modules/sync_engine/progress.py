@@ -93,7 +93,15 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def build_initial_progress() -> dict[str, Any]:
+def build_initial_progress(provider: str | None = None) -> dict[str, Any]:
+    selected = STAGE_DEFS
+    if provider:
+        prefix = f"{provider}_"
+        selected = [
+            s
+            for s in STAGE_DEFS
+            if s["id"] == "prepare" or s["id"].startswith(prefix) or s["group"] == "Завершение"
+        ]
     stages = [
         {
             "id": s["id"],
@@ -106,9 +114,13 @@ def build_initial_progress() -> dict[str, Any]:
             "started_at": None,
             "finished_at": None,
         }
-        for s in STAGE_DEFS
+        for s in selected
     ]
-    return {"current_stage_id": "prepare", "stages": stages}
+    return {
+        "current_stage_id": "prepare",
+        "stages": stages,
+        "scope": {"provider": provider},
+    }
 
 
 def stage_for_provider_phase(provider_code: str, phase: str) -> str | None:

@@ -16,6 +16,7 @@ from bisect import bisect_right
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 from sqlalchemy import Boolean, bindparam, func, or_, select, text
 from sqlalchemy.dialects.postgresql import ARRAY
@@ -244,6 +245,20 @@ class OperatorRangeCache:
         return None
 
 
+def catalog_scope_clauses(
+    *,
+    provider_id: Any | None = None,
+    inventory_kinds: tuple[Any, ...] | None = None,
+) -> list[Any]:
+    """Extra filters for a single-source run. Empty means the whole catalog."""
+    clauses: list[Any] = []
+    if provider_id is not None:
+        clauses.append(NumbersCatalogNormalized.provider_id == provider_id)
+    if inventory_kinds:
+        clauses.append(NumbersCatalogNormalized.inventory_kind.in_(tuple(inventory_kinds)))
+    return clauses
+
+
 async def enrich_catalog_operators(
     db: Session,
     *,
@@ -255,6 +270,8 @@ async def enrich_catalog_operators(
     max_rounds: int = 8,
     only_missing: bool = False,
     on_progress: ProgressCb | None = None,
+    provider_id: Any | None = None,
+    inventory_kinds: tuple[Any, ...] | None = None,
 ) -> dict[str, int]:
     """
     Set operator (and GAR city/region when present) on currently present catalog rows.
@@ -285,6 +302,8 @@ async def enrich_catalog_operators(
             max_rounds=max_rounds,
             only_missing=only_missing,
             on_progress=on_progress,
+            provider_id=provider_id,
+            inventory_kinds=inventory_kinds,
         )
     finally:
         await client.aclose()
@@ -401,6 +420,8 @@ async def _enrich_catalog_operators_inner(
     max_rounds: int,
     only_missing: bool,
     on_progress: ProgressCb | None,
+    provider_id: Any | None = None,
+    inventory_kinds: tuple[Any, ...] | None = None,
 ) -> dict[str, int]:
     _progress(on_progress, "Загрузка локального кеша операторов")
     local_ranges = load_enabled_ranges_for_enrich(db)
@@ -460,6 +481,10 @@ async def _enrich_catalog_operators_inner(
                 NumbersCatalogNormalized.operator == "",
             )
         )
+    for clause in catalog_scope_clauses(
+        provider_id=provider_id, inventory_kinds=inventory_kinds
+    ):
+        stmt = stmt.where(clause)
     rows = db.execute(stmt).all()
     total_rows = len(rows)
     logger.warning("PSTN enrich: rows to process=%s only_missing=%s", total_rows, only_missing)
@@ -822,6 +847,9 @@ async def _enrich_catalog_operators_inner(
                     NumbersCatalogNormalized.operator.is_(None),
                     NumbersCatalogNormalized.operator == "",
                 ),
+                *catalog_scope_clauses(
+                    provider_id=provider_id, inventory_kinds=inventory_kinds
+                ),
             )
         )
         or 0
@@ -851,6 +879,9 @@ async def _enrich_catalog_operators_inner(
                     or_(
                         NumbersCatalogNormalized.operator.is_(None),
                         NumbersCatalogNormalized.operator == "",
+                    ),
+                    *catalog_scope_clauses(
+                        provider_id=provider_id, inventory_kinds=inventory_kinds
                     ),
                 )
                 .limit(10)

@@ -33,9 +33,14 @@ class SyncStageOut(BaseModel):
     finished_at: str | None = None
 
 
+class SyncStartIn(BaseModel):
+    provider: str | None = None
+
+
 class SyncProgressOut(BaseModel):
     current_stage_id: str | None = None
     stages: list[SyncStageOut] = Field(default_factory=list)
+    scope_provider: str | None = None
 
 
 class SyncRunOut(BaseModel):
