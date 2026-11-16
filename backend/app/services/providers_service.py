@@ -19,7 +19,7 @@ from app.schemas.providers import (
     TestConnectionOut,
 )
 
-# Non-secret / display-safe auth fields (still docs-derived metadata)
+# Shown in the legacy masked field as-is. Secrets are still starred there.
 _AUTH_PLAIN_KEYS = frozenset(
     {
         "email",
@@ -38,6 +38,23 @@ _AUTH_TOKEN_KEYS = frozenset(
     {"token", "access_token", "refresh_token", "token_expire", "refresh_token_expire"}
 )
 _AUTH_NUMBERING_SESSION_KEYS = frozenset({"numbering_session_id"})
+# Written by clients during login or sync. The settings form does not edit them.
+_AUTH_HIDDEN_FROM_SETTINGS = frozenset(
+    {
+        "token",
+        "refresh_token",
+        "token_expire",
+        "refresh_token_expire",
+        "numbering_session_id",
+        "numbering_partition",
+        "auth_header_mode",
+    }
+)
+_VOX_CREDENTIAL_KEYS = ("account_id", "key_id", "private_key", "credentials_json")
+
+
+def _is_blank(value: object) -> bool:
+    return value is None or (isinstance(value, str) and value.strip() == "")
 
 
 def _mask_auth(auth: dict) -> dict:
@@ -49,6 +66,66 @@ def _mask_auth(auth: dict) -> dict:
             s = str(v)
             out[k] = ("*" * max(0, len(s) - 4)) + s[-4:] if len(s) > 4 else "****"
     return out
+
+
+def open_auth_settings(code: str, auth: dict | None) -> dict:
+    """Credentials the settings form may show. Session material stays in the database."""
+    hidden = set(_AUTH_HIDDEN_FROM_SETTINGS)
+    if code == ProviderCode.runexis.value:
+        hidden.add("access_token")
+    return {k: v for k, v in (auth or {}).items() if k not in hidden}
+
+
+def _value_changed(payload: dict, stored: dict, key: str) -> bool:
+    if key not in payload:
+        return False
+    incoming = payload.get(key)
+    current = stored.get(key)
+    if _is_blank(incoming) and _is_blank(current):
+        return False
+    return incoming != current
+
+
+def _apply_vox_credentials(merged: dict, raw: object) -> None:
+    if _is_blank(raw):
+        for key in _VOX_CREDENTIAL_KEYS:
+            merged.pop(key, None)
+        return
+    from app.providers.voximplant.auth_jwt import parse_credentials
+
+    creds = parse_credentials({"credentials_json": raw})
+    merged.pop("credentials_json", None)
+    merged["account_id"] = creds["account_id"]
+    merged["key_id"] = creds["key_id"]
+    merged["private_key"] = creds["private_key"]
+
+
+def merge_auth_settings(code: str, stored: dict | None, incoming: dict | None) -> dict:
+    """Apply only keys present in the request. A blank value deletes that key."""
+    merged = dict(stored or {})
+    payload = dict(incoming or {})
+    password_changed = code == ProviderCode.runexis.value and _value_changed(
+        payload, merged, "password"
+    )
+    numbering_password_changed = code == ProviderCode.runexis.value and _value_changed(
+        payload, merged, "numbering_password"
+    )
+    vox_sent = incoming is not None and "credentials_json" in incoming
+    vox_raw = payload.pop("credentials_json", None) if vox_sent else None
+    for key, value in payload.items():
+        if _is_blank(value):
+            merged.pop(key, None)
+        else:
+            merged[key] = value
+    if code == ProviderCode.voximplant.value and vox_sent:
+        _apply_vox_credentials(merged, vox_raw)
+    if password_changed:
+        for key in _AUTH_TOKEN_KEYS:
+            merged.pop(key, None)
+    if numbering_password_changed:
+        for key in _AUTH_NUMBERING_SESSION_KEYS:
+            merged.pop(key, None)
+    return merged
 
 
 def persist_auth_settings(conn: ProviderConnection, auth_settings: dict) -> None:
@@ -154,14 +231,17 @@ class ProvidersService:
         if not conn:
             return ProviderSettingsOut(
                 provider_code=code,
+                auth_settings={},
                 auth_settings_masked={},
                 is_enabled=True,
                 docs_notice=notice,
             )
+        stored_auth = dict(conn.auth_settings or {})
         return ProviderSettingsOut(
             provider_code=code,
             base_url=conn.base_url,
-            auth_settings_masked=_mask_auth(conn.auth_settings),
+            auth_settings=open_auth_settings(code, stored_auth),
+            auth_settings_masked=_mask_auth(stored_auth),
             extra_settings=conn.extra_settings or {},
             is_enabled=conn.is_enabled,
             last_tested_at=conn.last_tested_at,
@@ -179,39 +259,7 @@ class ProvidersService:
         if payload.base_url is not None:
             conn.base_url = payload.base_url
         if payload.auth_settings is not None:
-            incoming = {k: v for k, v in payload.auth_settings.items() if v not in (None, "")}
-            merged = dict(conn.auth_settings or {})
-            password_changed = (
-                "password" in incoming and incoming.get("password") != merged.get("password")
-            )
-            numbering_password_changed = (
-                "numbering_password" in incoming
-                and incoming.get("numbering_password") != merged.get("numbering_password")
-            )
-            merged.update(incoming)
-            if code == ProviderCode.novofon.value and payload.auth_settings.get("user_id") in (
-                None,
-                "",
-            ):
-                merged.pop("user_id", None)
-            if code == ProviderCode.runexis.value and password_changed:
-                for key in _AUTH_TOKEN_KEYS:
-                    merged.pop(key, None)
-            if code == ProviderCode.runexis.value and numbering_password_changed:
-                for key in _AUTH_NUMBERING_SESSION_KEYS:
-                    merged.pop(key, None)
-            if code == ProviderCode.voximplant.value:
-                from app.providers.voximplant.auth_jwt import parse_credentials
-
-                try:
-                    creds = parse_credentials(merged)
-                except ProviderError as exc:
-                    raise ProviderError(str(exc)) from exc
-                merged = {
-                    "account_id": creds["account_id"],
-                    "key_id": creds["key_id"],
-                    "private_key": creds["private_key"],
-                }
+            merged = merge_auth_settings(code, conn.auth_settings, payload.auth_settings)
             persist_auth_settings(conn, merged)
         if payload.extra_settings is not None:
             if code == ProviderCode.aurora.value:
@@ -231,6 +279,9 @@ class ProvidersService:
             else:
                 merged_extra = dict(conn.extra_settings or {})
                 for key, value in payload.extra_settings.items():
+                    if key == "reg_base_url" and _is_blank(value):
+                        merged_extra.pop(key, None)
+                        continue
                     if value in (None, ""):
                         continue
                     merged_extra[key] = value

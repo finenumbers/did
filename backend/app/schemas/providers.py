@@ -29,6 +29,8 @@ class ProviderOut(BaseModel):
 class ProviderSettingsOut(BaseModel):
     provider_code: str
     base_url: str | None = None
+    # Operator-facing credentials in full. Runtime session keys stay out of this field.
+    auth_settings: dict[str, Any] = Field(default_factory=dict)
     auth_settings_masked: dict[str, Any] = Field(default_factory=dict)
     extra_settings: dict[str, Any] = Field(default_factory=dict)
     is_enabled: bool = True

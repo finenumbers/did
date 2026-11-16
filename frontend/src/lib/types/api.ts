@@ -45,6 +45,7 @@ export type ColumnFilters = Record<string, string[]>;
 export interface ProviderSettings {
   provider_code: string;
   base_url: string | null;
+  auth_settings?: Record<string, unknown>;
   auth_settings_masked: Record<string, string>;
   extra_settings: Record<string, unknown>;
   is_enabled: boolean;

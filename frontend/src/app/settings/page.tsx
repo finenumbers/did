@@ -24,7 +24,7 @@ type ProviderCode =
 
 type AuroraCsvFile = { url: string; has_status_column: boolean };
 
-type Draft = {
+type FieldSnapshot = {
   baseUrl: string;
   apiKey: string;
   regApiKey: string;
@@ -40,15 +40,20 @@ type Draft = {
   credentialsJson: string;
   accountSid: string;
   authToken: string;
+};
+
+type Draft = FieldSnapshot & {
   csvFiles: AuroraCsvFile[];
   settings: ProviderSettings | null;
   message: string | null;
   error: string | null;
   saving: boolean;
   testing: boolean;
+  secretsWritable: boolean;
+  baseline: FieldSnapshot;
 };
 
-const EMPTY_DRAFT: Draft = {
+const EMPTY_FIELDS: FieldSnapshot = {
   baseUrl: "",
   apiKey: "",
   regApiKey: "",
@@ -64,12 +69,18 @@ const EMPTY_DRAFT: Draft = {
   credentialsJson: "",
   accountSid: "",
   authToken: "",
+};
+
+const EMPTY_DRAFT: Draft = {
+  ...EMPTY_FIELDS,
   csvFiles: [],
   settings: null,
   message: null,
   error: null,
   saving: false,
   testing: false,
+  secretsWritable: false,
+  baseline: { ...EMPTY_FIELDS },
 };
 
 const PROVIDERS: { code: ProviderCode; title: string }[] = [
@@ -105,22 +116,80 @@ function parseAuroraCsvFiles(extra: Record<string, unknown> | undefined): Aurora
   return out;
 }
 
+function textOf(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  return String(value);
+}
+
+function voxCredentialsJson(auth: Record<string, unknown>): string {
+  const accountId = auth.account_id;
+  const keyId = auth.key_id;
+  const privateKey = auth.private_key;
+  const empty =
+    (accountId === undefined || accountId === null || accountId === "") &&
+    (keyId === undefined || keyId === null || keyId === "") &&
+    (privateKey === undefined || privateKey === null || privateKey === "");
+  if (empty) return "";
+  return JSON.stringify(
+    { account_id: accountId, key_id: keyId, private_key: privateKey },
+    null,
+    2,
+  );
+}
+
+function fieldsFromSettings(code: ProviderCode, s: ProviderSettings): {
+  fields: FieldSnapshot;
+  secretsWritable: boolean;
+} {
+  const open = s.auth_settings;
+  const secretsWritable = open !== undefined && open !== null && typeof open === "object";
+  const auth = secretsWritable ? open : {};
+  const extra = s.extra_settings || {};
+  const apiKey =
+    code === "sipout" || code === "finenumbers" ? textOf(auth.key) : textOf(auth.api_key);
+  return {
+    secretsWritable,
+    fields: {
+      baseUrl: s.base_url || "",
+      apiKey,
+      regApiKey: textOf(auth.reg_key),
+      regBaseUrl: typeof extra.reg_base_url === "string" ? extra.reg_base_url : "",
+      email: textOf(auth.email),
+      password: textOf(auth.password),
+      numberingLogin: textOf(auth.numbering_login),
+      numberingPassword: textOf(auth.numbering_password),
+      numberingBaseUrl: textOf(auth.numbering_base_url),
+      accessToken: textOf(auth.access_token),
+      userId: textOf(auth.user_id),
+      userApiSecret: textOf(auth.api_secret),
+      credentialsJson: code === "voximplant" ? voxCredentialsJson(auth) : "",
+      accountSid: textOf(auth.account_sid),
+      authToken: textOf(auth.auth_token),
+    },
+  };
+}
+
 function draftFromSettings(code: ProviderCode, s: ProviderSettings): Draft {
-  const auth = s.auth_settings_masked || {};
+  const { fields, secretsWritable } = fieldsFromSettings(code, s);
   return {
     ...EMPTY_DRAFT,
-    baseUrl: s.base_url || "",
-    email: typeof auth.email === "string" ? auth.email : "",
-    numberingLogin: typeof auth.numbering_login === "string" ? auth.numbering_login : "",
-    numberingBaseUrl: typeof auth.numbering_base_url === "string" ? auth.numbering_base_url : "",
+    ...fields,
+    secretsWritable,
+    baseline: { ...fields },
     csvFiles: code === "aurora" ? parseAuroraCsvFiles(s.extra_settings) : [],
-    accountSid: typeof auth.account_sid === "string" ? auth.account_sid : "",
-    userId:
-      auth.user_id === undefined || auth.user_id === null || auth.user_id === ""
-        ? ""
-        : String(auth.user_id),
     settings: s,
   };
+}
+
+function putChanged(
+  target: Record<string, string>,
+  key: string,
+  value: string,
+  loaded: string,
+) {
+  if (value === loaded) return;
+  if (value.trim() === "" && loaded.trim() === "") return;
+  target[key] = value.trim() === "" ? "" : value;
 }
 
 export default function SettingsPage() {
@@ -212,40 +281,11 @@ export default function SettingsPage() {
 
   const save = async (code: ProviderCode) => {
     const d = drafts[code];
+    if (!d.settings) return;
     setDraft(code, { saving: true, error: null, message: null });
     let auth_settings: Record<string, string> | undefined;
     let extra_settings: Record<string, unknown> | undefined;
-    if (code === "finenumbers") {
-      const next: Record<string, string> = {};
-      if (d.apiKey) next.key = d.apiKey;
-      if (d.regApiKey) next.reg_key = d.regApiKey;
-      auth_settings = Object.keys(next).length ? next : undefined;
-      if (d.regBaseUrl.trim()) {
-        extra_settings = { reg_base_url: d.regBaseUrl.trim() };
-      }
-    } else if (code === "sipout") {
-      auth_settings = d.apiKey ? { key: d.apiKey } : undefined;
-    } else if (code === "exolve" || code === "mcn" || code === "didww") {
-      auth_settings = d.apiKey ? { api_key: d.apiKey } : undefined;
-    } else if (code === "twilio") {
-      const next: Record<string, string> = {};
-      if (d.accountSid) next.account_sid = d.accountSid;
-      if (d.authToken) next.auth_token = d.authToken;
-      auth_settings = Object.keys(next).length ? next : undefined;
-    } else if (code === "voximplant") {
-      auth_settings = d.credentialsJson
-        ? { credentials_json: d.credentialsJson }
-        : undefined;
-    } else if (code === "uis") {
-      auth_settings = d.accessToken ? { access_token: d.accessToken } : undefined;
-    } else if (code === "novofon") {
-      const next: Record<string, string> = { user_id: d.userId.trim() };
-      if (d.accessToken) next.access_token = d.accessToken;
-      if (d.apiKey) next.api_key = d.apiKey;
-      if (d.userApiSecret) next.api_secret = d.userApiSecret;
-      auth_settings = next;
-    } else if (code === "aurora") {
-      auth_settings = undefined;
+    if (code === "aurora") {
       const csv_files = d.csvFiles
         .map((f) => ({
           url: f.url.trim(),
@@ -261,14 +301,41 @@ export default function SettingsPage() {
         return;
       }
       extra_settings = { csv_files };
-    } else {
+    } else if (d.secretsWritable) {
       const next: Record<string, string> = {};
-      if (d.email) next.email = d.email;
-      if (d.password) next.password = d.password;
-      if (d.numberingLogin) next.numbering_login = d.numberingLogin;
-      if (d.numberingPassword) next.numbering_password = d.numberingPassword;
-      if (d.numberingBaseUrl) next.numbering_base_url = d.numberingBaseUrl;
+      const b = d.baseline;
+      if (code === "finenumbers") {
+        putChanged(next, "key", d.apiKey, b.apiKey);
+        putChanged(next, "reg_key", d.regApiKey, b.regApiKey);
+      } else if (code === "sipout") {
+        putChanged(next, "key", d.apiKey, b.apiKey);
+      } else if (code === "exolve" || code === "mcn" || code === "didww") {
+        putChanged(next, "api_key", d.apiKey, b.apiKey);
+      } else if (code === "twilio") {
+        putChanged(next, "account_sid", d.accountSid, b.accountSid);
+        putChanged(next, "auth_token", d.authToken, b.authToken);
+      } else if (code === "voximplant") {
+        putChanged(next, "credentials_json", d.credentialsJson, b.credentialsJson);
+      } else if (code === "uis") {
+        putChanged(next, "access_token", d.accessToken, b.accessToken);
+      } else if (code === "novofon") {
+        putChanged(next, "user_id", d.userId, b.userId);
+        putChanged(next, "access_token", d.accessToken, b.accessToken);
+        putChanged(next, "api_key", d.apiKey, b.apiKey);
+        putChanged(next, "api_secret", d.userApiSecret, b.userApiSecret);
+      } else {
+        putChanged(next, "email", d.email, b.email);
+        putChanged(next, "password", d.password, b.password);
+        putChanged(next, "numbering_login", d.numberingLogin, b.numberingLogin);
+        putChanged(next, "numbering_password", d.numberingPassword, b.numberingPassword);
+        putChanged(next, "numbering_base_url", d.numberingBaseUrl, b.numberingBaseUrl);
+      }
       auth_settings = Object.keys(next).length ? next : undefined;
+    }
+    if (code === "finenumbers" && d.regBaseUrl !== d.baseline.regBaseUrl) {
+      extra_settings = {
+        reg_base_url: d.regBaseUrl.trim() === "" ? "" : d.regBaseUrl,
+      };
     }
     try {
       const s = await apiFetch<ProviderSettings>(`/api/v1/providers/${code}/settings`, {
@@ -667,12 +734,10 @@ export default function SettingsPage() {
                     <label>
                       API-ключ
                       <input
-                        type="password"
-                        placeholder={
-                          d.settings?.auth_settings_masked?.api_key
-                            ? `текущее: ${String(d.settings.auth_settings_masked.api_key)}`
-                            : "API-ключ приложения из ЛК Exolve"
-                        }
+                        type="text"
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="API-ключ приложения из ЛК Exolve"
                         value={d.apiKey}
                         onChange={(e) => setDraft(code, { apiKey: e.target.value })}
                         style={{ width: "100%" }}
@@ -685,11 +750,9 @@ export default function SettingsPage() {
                       Service Account credentials (JSON)
                       <textarea
                         rows={6}
-                        placeholder={
-                          d.settings?.auth_settings_masked?.private_key
-                            ? "credentials сохранены (private_key masked). Вставьте новый JSON, чтобы заменить."
-                            : '{"account_id":…,"key_id":"…","private_key":"-----BEGIN PRIVATE KEY-----\\n…"}'
-                        }
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder='{"account_id":…,"key_id":"…","private_key":"-----BEGIN PRIVATE KEY-----\\n…"}'
                         value={d.credentialsJson}
                         onChange={(e) => setDraft(code, { credentialsJson: e.target.value })}
                         style={{ width: "100%", fontFamily: "monospace", fontSize: "0.85rem" }}
@@ -701,12 +764,10 @@ export default function SettingsPage() {
                     <label>
                       API-ключ (Api-Key)
                       <input
-                        type="password"
-                        placeholder={
-                          d.settings?.auth_settings_masked?.api_key
-                            ? `текущее: ${String(d.settings.auth_settings_masked.api_key)}`
-                            : "API-ключ из панели DIDWW"
-                        }
+                        type="text"
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="API-ключ из панели DIDWW"
                         value={d.apiKey}
                         onChange={(e) => setDraft(code, { apiKey: e.target.value })}
                         style={{ width: "100%" }}
@@ -718,6 +779,9 @@ export default function SettingsPage() {
                     <label>
                       Account SID
                       <input
+                        type="text"
+                        autoComplete="off"
+                        spellCheck={false}
                         value={d.accountSid}
                         onChange={(e) => setDraft(code, { accountSid: e.target.value })}
                         style={{ width: "100%" }}
@@ -727,12 +791,10 @@ export default function SettingsPage() {
                     <label>
                       Auth Token
                       <input
-                        type="password"
-                        placeholder={
-                          d.settings?.auth_settings_masked?.auth_token
-                            ? `текущее: ${String(d.settings.auth_settings_masked.auth_token)}`
-                            : "Auth Token из консоли Twilio"
-                        }
+                        type="text"
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="Auth Token из консоли Twilio"
                         value={d.authToken}
                         onChange={(e) => setDraft(code, { authToken: e.target.value })}
                         style={{ width: "100%" }}
@@ -744,12 +806,10 @@ export default function SettingsPage() {
                     <label>
                       API-токен (Интеграции)
                       <input
-                        type="password"
-                        placeholder={
-                          d.settings?.auth_settings_masked?.api_key
-                            ? `текущее: ${String(d.settings.auth_settings_masked.api_key)}`
-                            : "токен из ЛК → Интеграции → Токены"
-                        }
+                        type="text"
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="токен из ЛК → Интеграции → Токены"
                         value={d.apiKey}
                         onChange={(e) => setDraft(code, { apiKey: e.target.value })}
                         style={{ width: "100%" }}
@@ -760,12 +820,10 @@ export default function SettingsPage() {
                   <label>
                     API key
                     <input
-                      type="password"
-                      placeholder={
-                        d.settings?.auth_settings_masked?.key
-                          ? `текущее: ${String(d.settings.auth_settings_masked.key)}`
-                          : "ключ SipOut"
-                      }
+                      type="text"
+                      autoComplete="off"
+                      spellCheck={false}
+                      placeholder="ключ SipOut"
                       value={d.apiKey}
                       onChange={(e) => setDraft(code, { apiKey: e.target.value })}
                       style={{ width: "100%" }}
@@ -776,12 +834,10 @@ export default function SettingsPage() {
                     <label>
                       PSTN API Bearer key
                       <input
-                        type="password"
-                        placeholder={
-                          d.settings?.auth_settings_masked?.key
-                            ? `текущее: ${String(d.settings.auth_settings_masked.key)}`
-                            : "Bearer token PSTN API (pstn.finenumbers.com)"
-                        }
+                        type="text"
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="Bearer token PSTN API (pstn.finenumbers.com)"
                         value={d.apiKey}
                         onChange={(e) => setDraft(code, { apiKey: e.target.value })}
                         style={{ width: "100%" }}
@@ -790,12 +846,10 @@ export default function SettingsPage() {
                     <label>
                       REG API key
                       <input
-                        type="password"
-                        placeholder={
-                          d.settings?.auth_settings_masked?.reg_key
-                            ? `текущее: ${String(d.settings.auth_settings_masked.reg_key)}`
-                            : "reg_… (reg.finenumbers.com, phones:read)"
-                        }
+                        type="text"
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="reg_… (reg.finenumbers.com, phones:read)"
                         value={d.regApiKey}
                         onChange={(e) => setDraft(code, { regApiKey: e.target.value })}
                         style={{ width: "100%" }}
@@ -805,12 +859,9 @@ export default function SettingsPage() {
                       REG base URL
                       <input
                         type="url"
-                        placeholder={
-                          typeof d.settings?.extra_settings?.reg_base_url === "string" &&
-                          d.settings.extra_settings.reg_base_url
-                            ? String(d.settings.extra_settings.reg_base_url)
-                            : "https://reg.finenumbers.com"
-                        }
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="https://reg.finenumbers.com"
                         value={d.regBaseUrl}
                         onChange={(e) => setDraft(code, { regBaseUrl: e.target.value })}
                         style={{ width: "100%" }}
@@ -822,12 +873,10 @@ export default function SettingsPage() {
                     <label>
                       Access token
                       <input
-                        type="password"
-                        placeholder={
-                          d.settings?.auth_settings_masked?.access_token
-                            ? `текущее: ${String(d.settings.auth_settings_masked.access_token)}`
-                            : "API-ключ из ЛК UIS"
-                        }
+                        type="text"
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="API-ключ из ЛК UIS"
                         value={d.accessToken}
                         onChange={(e) => setDraft(code, { accessToken: e.target.value })}
                         style={{ width: "100%" }}
@@ -839,12 +888,10 @@ export default function SettingsPage() {
                     <label>
                       Access token
                       <input
-                        type="password"
-                        placeholder={
-                          d.settings?.auth_settings_masked?.access_token
-                            ? `текущее: ${String(d.settings.auth_settings_masked.access_token)}`
-                            : "Единственный ключ с экрана API. Он же access_token Data API"
-                        }
+                        type="text"
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="Единственный ключ с экрана API. Он же access_token Data API"
                         value={d.accessToken}
                         onChange={(e) => setDraft(code, { accessToken: e.target.value })}
                         style={{ width: "100%" }}
@@ -853,12 +900,10 @@ export default function SettingsPage() {
                     <label>
                       Key
                       <input
-                        type="password"
-                        placeholder={
-                          d.settings?.auth_settings_masked?.api_key
-                            ? `текущее: ${String(d.settings.auth_settings_masked.api_key)}`
-                            : "Необязательно. В кабинете Новофон 2.0 этого поля нет"
-                        }
+                        type="text"
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="Необязательно. В кабинете Новофон 2.0 этого поля нет"
                         value={d.apiKey}
                         onChange={(e) => setDraft(code, { apiKey: e.target.value })}
                         style={{ width: "100%" }}
@@ -867,12 +912,10 @@ export default function SettingsPage() {
                     <label>
                       Secret User API
                       <input
-                        type="password"
-                        placeholder={
-                          d.settings?.auth_settings_masked?.api_secret
-                            ? `текущее: ${String(d.settings.auth_settings_masked.api_secret)}`
-                            : "Необязательно. Только если в старом кабинете Secret другой"
-                        }
+                        type="text"
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="Необязательно. Только если в старом кабинете Secret другой"
                         value={d.userApiSecret}
                         onChange={(e) => setDraft(code, { userApiSecret: e.target.value })}
                         style={{ width: "100%" }}
@@ -881,12 +924,11 @@ export default function SettingsPage() {
                     <label>
                       User ID
                       <input
+                        type="text"
+                        autoComplete="off"
+                        spellCheck={false}
                         inputMode="numeric"
-                        placeholder={
-                          d.settings?.auth_settings_masked?.user_id
-                            ? `текущее: ${String(d.settings.auth_settings_masked.user_id)}`
-                            : "Пусто для клиента. Для агента — id из get.customer_users, не app_id"
-                        }
+                        placeholder="Пусто для клиента. Для агента — id из get.customer_users, не app_id"
                         value={d.userId}
                         onChange={(e) => setDraft(code, { userId: e.target.value })}
                         style={{ width: "100%" }}
@@ -902,7 +944,8 @@ export default function SettingsPage() {
                       Email
                       <input
                         type="email"
-                        autoComplete="username"
+                        autoComplete="off"
+                        spellCheck={false}
                         placeholder="email для POST api/v1/login"
                         value={d.email}
                         onChange={(e) => setDraft(code, { email: e.target.value })}
@@ -912,13 +955,10 @@ export default function SettingsPage() {
                     <label>
                       Пароль
                       <input
-                        type="password"
-                        autoComplete="current-password"
-                        placeholder={
-                          d.settings?.auth_settings_masked?.password
-                            ? `текущее: ${String(d.settings.auth_settings_masked.password)}`
-                            : "пароль DIDAPI"
-                        }
+                        type="text"
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="пароль DIDAPI"
                         value={d.password}
                         onChange={(e) => setDraft(code, { password: e.target.value })}
                         style={{ width: "100%" }}
@@ -931,6 +971,9 @@ export default function SettingsPage() {
                     <label>
                       Numbering Base URL
                       <input
+                        type="text"
+                        autoComplete="off"
+                        spellCheck={false}
                         value={d.numberingBaseUrl}
                         onChange={(e) => setDraft(code, { numberingBaseUrl: e.target.value })}
                         placeholder="https://did-api.runexis.ru/"
@@ -940,6 +983,9 @@ export default function SettingsPage() {
                     <label>
                       Numbering login
                       <input
+                        type="text"
+                        autoComplete="off"
+                        spellCheck={false}
                         value={d.numberingLogin}
                         onChange={(e) => setDraft(code, { numberingLogin: e.target.value })}
                         placeholder="login для JSON-RPC connect"
@@ -949,13 +995,10 @@ export default function SettingsPage() {
                     <label>
                       Numbering password
                       <input
-                        type="password"
-                        autoComplete="new-password"
-                        placeholder={
-                          d.settings?.auth_settings_masked?.numbering_password
-                            ? `текущее: ${String(d.settings.auth_settings_masked.numbering_password)}`
-                            : "пароль Numbering API"
-                        }
+                        type="text"
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="пароль Numbering API"
                         value={d.numberingPassword}
                         onChange={(e) => setDraft(code, { numberingPassword: e.target.value })}
                         style={{ width: "100%" }}
@@ -965,13 +1008,13 @@ export default function SettingsPage() {
                 )}
 
                 <div style={{ display: "flex", gap: "0.5rem" }}>
-                  <button onClick={() => void save(code)} disabled={d.saving}>
+                  <button onClick={() => void save(code)} disabled={d.saving || !d.settings}>
                     {d.saving ? "Сохранение…" : "Сохранить"}
                   </button>
                   <button
                     className="secondary"
                     onClick={() => void test(code)}
-                    disabled={d.testing}
+                    disabled={d.testing || !d.settings}
                   >
                     {d.testing ? "Проверка…" : "Test connection"}
                   </button>
